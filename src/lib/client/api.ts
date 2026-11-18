@@ -1,5 +1,6 @@
 import type {
   PublicSettings,
+  ReasoningEffort,
   SendBody,
   Session,
   SessionDetail,
@@ -28,6 +29,8 @@ export interface SettingsUpdate {
   model?: string;
   /** A string saves a new key, null removes the saved one, omitted leaves it. */
   apiKey?: string | null;
+  reasoning?: ReasoningEffort;
+  systemPrompt?: string;
 }
 
 export interface ChatApi {
@@ -149,11 +152,12 @@ export function createApi(base = "/api"): ChatApi {
         if (payload.replaceFromMessageId) {
           form.set("replaceFromMessageId", payload.replaceFromMessageId);
         }
+        if (payload.web) form.set("web", "true");
         for (const file of payload.files) form.append("files", file, file.name);
         init = { method: "POST", body: form };
       } else if ("content" in payload) {
-        const { content, replaceFromMessageId } = payload;
-        init = body("POST", { content, replaceFromMessageId });
+        const { content, replaceFromMessageId, web } = payload;
+        init = body("POST", { content, replaceFromMessageId, ...(web ? { web: true } : {}) });
       } else {
         init = body("POST", payload);
       }

@@ -6,6 +6,7 @@
  * heights swell into two clusters, with slender towers, stepped crowns, spires
  * and masts breaking the roofline, so it reads as a skyline and not a band.
  */
+import { chrysler, empireState, oneWorldTrade } from "./landmarks.mjs";
 import {
   bayer,
   canvas,
@@ -145,41 +146,58 @@ function city() {
     }
     x += w;
   }
-  const landmark = (x, color, parts, spire) => {
+  // Three of the towers that used to stand here were invented. They are still
+  // rolled for, on a canvas nobody sees, so that every building after them
+  // comes out exactly as before; the real ones are drawn in their place.
+  const unseen = canvas(W, H);
+  const landmark = (x, color, parts, spire, c = skyline) => {
     let y = GROUND;
     for (const [w, h] of parts) {
       y -= h;
       const left = x - Math.floor(w / 2);
-      skyline.rect(left, y, w, h, color);
-      skyline.rect(left + w - 2, y, 2, h, shade(color, 0.9));
+      c.rect(left, y, w, h, color);
+      c.rect(left + w - 2, y, 2, h, shade(color, 0.9));
       for (let wy = y + 3; wy < y + h - 2; wy += 4) {
         for (let wx = left + 2; wx < left + w - 3; wx += 3) {
-          if (chance(0.6)) skyline.set(wx, wy, shade(color, 0.88));
+          if (chance(0.6)) c.set(wx, wy, shade(color, 0.88));
           if (L.chance(0.26)) {
-            emit.light(skyline, wx, wy, 1, 1, L.pick(lit), L.chance(0.3) ? "evening" : "night");
+            emit.light(c, wx, wy, 1, 1, L.pick(lit), L.chance(0.3) ? "evening" : "night");
           }
         }
       }
     }
-    skyline.rect(x, y - spire, 1, spire, color);
+    c.rect(x, y - spire, 1, spire, color);
     return y - spire;
   };
   const beacons = [];
+  landmark(
+    118,
+    hex("#5f788f"),
+    [
+      [24, 166],
+      [17, 24],
+      [11, 18],
+      [7, 13],
+      [3, 11],
+    ],
+    24,
+    unseen,
+  );
+  // The icons, with dice of their own for their windows.
+  const I = dice(1931);
   beacons.push([
     118,
-    landmark(
-      118,
-      hex("#5f788f"),
-      [
-        [24, 166],
-        [17, 24],
-        [11, 18],
-        [7, 13],
-        [3, 11],
-      ],
-      24,
-    ),
-  ]); // stepped deco tower
+    oneWorldTrade(skyline, {
+      x: 118,
+      base: GROUND,
+      height: 214,
+      width: 25,
+      glass: hex("#7896ad"),
+      emit,
+      L: I,
+      lit,
+    }),
+  ]);
   landmark(
     44,
     hex("#647e94"),
@@ -204,7 +222,18 @@ function city() {
       [2, 5],
     ],
     18,
-  ); // arched crown
+    unseen,
+  );
+  chrysler(skyline, {
+    x: 292,
+    base: GROUND,
+    height: 196,
+    width: 15,
+    steel: hex("#8497a6"),
+    emit,
+    L: I,
+    lit,
+  });
   landmark(
     476,
     hex("#677f95"),
@@ -224,7 +253,19 @@ function city() {
       [4, 10],
     ],
     12,
+    unseen,
   );
+  empireState(skyline, {
+    x: 237,
+    base: GROUND,
+    height: 222,
+    width: 30,
+    stone: hex("#8b939b"),
+    emit,
+    L: I,
+    lit,
+    flood: hex("#e9e2c4"),
+  });
 
   // --- mid layer: the city in colour, worn. Few reds, and those are brownstone.
   const bodies = [
@@ -614,6 +655,7 @@ export function skylineScene(puff, cast) {
     images[`rooftops-${state}.png`] = scene.states[state].rooftops;
     images[`people-${state}.png`] = cast.people.graded(grit).graded(PEOPLE_GRADES[state]);
     images[`props-${state}.png`] = cast.props.graded(grit).graded(PEOPLE_GRADES[state]);
+    images[`wheels-${state}.png`] = cast.wheels.graded(grit).graded(PEOPLE_GRADES[state]);
   }
   return {
     images,
@@ -644,6 +686,7 @@ export function skylineScene(puff, cast) {
           reverse: false,
           seconds: 46,
           steps: lane,
+          span: 1,
           front: false,
         },
         {
@@ -656,6 +699,7 @@ export function skylineScene(puff, cast) {
           reverse: true,
           seconds: 64,
           steps: lane,
+          span: 1,
           front: false,
         },
       ],
@@ -668,6 +712,7 @@ export function skylineScene(puff, cast) {
       // Street life: there is no street here, so people come up onto the roofs.
       life: {
         kind: "roofs",
+        road: 0,
         near: 0,
         far: 0,
         from: 0,

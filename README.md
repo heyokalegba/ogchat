@@ -20,14 +20,24 @@ interface is see-through, over a pixel-art New York that keeps real time.
   and night; stars come out and the moon shows its real phase.
 - **Night lights.** Windows and street lamps come on as it gets dark, and their
   halos swell and settle on uneven rhythms, so the city shimmers.
-- **Always moving.** Clouds drift, chimneys smoke, traffic passes, birds cross.
+- **Landmarks you know.** One World Trade Center, the Empire State Building
+  (floodlit at night) and the Chrysler Building stand in the skyline scene. In
+  Brooklyn, One World Trade and the Empire State rise over the rooftops beside
+  downtown Brooklyn's own clock tower, the Williamsburgh Savings Bank.
+- **Always moving.** Clouds drift, chimneys smoke, birds cross, and now and then
+  an airliner goes over or a helicopter comes across.
+- **Traffic.** Sedans, hatchbacks, SUVs, pickups, vans, a box truck, a city bus,
+  sports cars and yellow cabs, in a spread of paints, parked and passing.
 - **People.** A few are out at any time, usually three to five: someone alone,
   a couple, a dog pulling its walker toward a tree, a runner, a parent with a
-  pram or a child. They stop to look at a phone or let the dog sniff, then walk
-  on. Now and then a group comes through, and there are never more than twenty.
-  In Brooklyn they walk the pavement, passing behind the parked cars; over the
-  skyline they come up onto the roofs to look at the view. Fewer are out at
-  night. Everyone is dealt at random from a cast of 36 people and 8 dogs.
+  pram or a child, a kid on a skateboard, a kid bouncing a basketball. Cyclists
+  and delivery riders pass in the road. People stop to look at a phone or let
+  the dog sniff, then walk on. Now and then a group comes through, and there
+  are never more than twenty. In Brooklyn they walk the pavement, passing
+  behind the parked cars; over the skyline they come up onto the roofs to look
+  at the view. Fewer are out at night. Everyone is dealt at random from a cast
+  of 56 people and 8 dogs. The cast is a quarter East Asian, a quarter Black,
+  a quarter brown and a quarter white, exactly, for every kind of character.
 
 ## The look panel
 
@@ -37,6 +47,7 @@ is remembered in your browser.
 | Control                 | What it does                                                                                                                                                                                                                                                   |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | People                  | `out` or `none`. `none` empties the streets and roofs.                                                                                                                                                                                                         |
+| Strength                | How strongly the scene shows, from full down to faint. Lower it when the picture competes with the text, above all with the wall hidden.                                                                                                                       |
 | Time in Brooklyn        | Drag to set the scene to any time of day. **The clock cannot be paused:** it runs on from wherever you leave it. `now` snaps it back to the real time.                                                                                                         |
 | Wall                    | `brick` or `none`. With `none` the wall goes away and the chat floats over the scene; its text then has its own colour (chalk to start with) and a stronger outline. The lightness slider makes the brick darker and grittier to the left, paler to the right. |
 | Text size               | 80% to 150%. Scales all the type in the app.                                                                                                                                                                                                                   |
@@ -54,7 +65,8 @@ More screens: [first run](docs/screens/01-first-run.png) ·
 [brooklyn at night](docs/screens/09-night.png) ·
 [the look panel](docs/screens/10-look-panel.png) ·
 [without the wall](docs/screens/11-no-wall.png) ·
-[people on the pavement](docs/screens/12-street-life.png)
+[brooklyn with people, traffic and One World Trade](docs/screens/12-street-life.png) ·
+[the skyline at night](docs/screens/13-skyline-night.png)
 
 ## Run it
 
@@ -84,7 +96,9 @@ npm run mock-provider
 This starts a stand-in provider at `http://127.0.0.1:8787/v1`. In settings, set
 the base URL to that address and enter any key. Messages starting with
 `/error`, `/empty`, `/slow` or `/drop` exercise the failure paths and `/think`
-reasons before it answers. The key `bad` is rejected as invalid (401), `broke`
+reasons before it answers. Every reply ends by reporting the thinking level,
+system prompt and web search setting it was sent, and with web search on it
+cites two made-up sources. The key `bad` is rejected as invalid (401), `broke`
 is out of credits (402) and `nope` is refused (403).
 
 ## Provider configuration
@@ -106,6 +120,24 @@ defaults:
 (the reply shows `thinking` until the answer starts) and it reads text only, so
 attached images are refused by the provider. Text files and PDFs are fine,
 because ogchat sends those as text.
+
+### Thinking, web search and a system prompt
+
+- **Thinking.** The `think` button by the message box steps through auto,
+  medium, high and max; settings has the same choice, plus low. It is sent to
+  the provider as `reasoning_effort`. Auto sends nothing. On
+  `abliterated-model-large-v2` medium and high are the same level, and auto
+  means max.
+- **Web search.** The globe by the message box lets the next message search the
+  web. The provider does the searching (`web_search_options` on the request)
+  and the reply lists its sources. A message sent with it on is tagged `web`,
+  and retrying that message searches again. On abliteration.ai, web search has
+  to be switched on for the account first (console: Account, then Web tools)
+  and is billed per search on top of tokens.
+- **System prompt.** A box in settings. Whatever is in it goes ahead of every
+  conversation as the system message, from the next message on. It is stored
+  in `data/settings.json` with the other settings and is not part of any saved
+  conversation.
 
 ### If the key does not work
 
@@ -267,8 +299,13 @@ Day to day, use the look panel (above). To change what it starts from:
     once and turned out in four lights; `GRADES` near the top of each sets how
     the other three differ from the one it was drawn in.
   - `scripts/art/people.mjs`: the cast. Each person and dog is dealt from
-    lists of skin, hair, hat, coat and trouser colours at the top; `CAST` and
-    `DOGS` set how many there are.
+    lists of hat, coat and trouser colours at the top; `HERITAGE` holds the
+    four equal parts the cast is dealt in, with the skin and hair of each;
+    `CAST`, `RIDERS` and `DOGS` set how many of everyone there are.
+  - `scripts/art/vehicles.mjs`: every kind of vehicle and the paints. The mix
+    on the street is `PARKED` and `MOVING` in `brooklyn.mjs`.
+  - `scripts/art/landmarks.mjs`: One World Trade, the Empire State and the
+    Chrysler Building.
 - **The people:** `src/components/shell/life.ts` decides who turns up and what
   they do. `STREET_MIX` is how often each kind of party appears, `wantedHeads`
   how many people the street aims for (three to five by day), `MAX_HEADS` the
@@ -286,7 +323,7 @@ Day to day, use the look panel (above). To change what it starts from:
 ### What the moving backdrop costs
 
 Very little, by design. Every picture is small pixel art drawn at 640x360 and
-scaled up: about 100 KB of a scene is on show at any one time, plus 85 KB of
+scaled up: about 120 to 130 KB of a scene is on show at any one time, plus 86 KB of
 shared sky and 76 KB for the wall, all served from your own machine. The motion
 is plain CSS sliding and fading layers. There is no video and no canvas; the
 only script is a clock that looks at the time every fifteen seconds, and a
@@ -300,19 +337,19 @@ in it.
 
 ## API
 
-| Route                                          | Purpose                                                                                                                                                                                                                   |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/sessions?q=`                         | List sessions, optionally filtered                                                                                                                                                                                        |
-| `POST /api/sessions`                           | Create a session                                                                                                                                                                                                          |
-| `GET /api/sessions/:id`                        | Session with messages, plus `generating` / `partial`                                                                                                                                                                      |
-| `PATCH /api/sessions/:id`                      | Rename `{ title }`                                                                                                                                                                                                        |
-| `DELETE /api/sessions/:id`                     | Delete                                                                                                                                                                                                                    |
-| `POST /api/sessions/:id/messages`              | Send `{ content, replaceFromMessageId? }` or `{ regenerate: true }`; streams NDJSON events `start`, `thinking`, `delta`, `done` / `error`. With attachments, send `multipart/form-data` with the same fields plus `files` |
-| `GET /api/sessions/:id/files/:fileId`          | An attachment: images as images, everything else as plain text                                                                                                                                                            |
-| `DELETE /api/sessions/:id/messages/:messageId` | Delete a user message and everything after it                                                                                                                                                                             |
-| `POST /api/sessions/:id/stop`                  | Stop the reply in progress                                                                                                                                                                                                |
-| `GET` / `PUT /api/settings`                    | Read (masked) / update provider settings                                                                                                                                                                                  |
-| `POST /api/settings/test`                      | Try `{ baseUrl?, model?, apiKey? }` (or the current settings) against the provider without saving; returns `{ check }`                                                                                                    |
+| Route                                          | Purpose                                                                                                                                                                                                                         |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/sessions?q=`                         | List sessions, optionally filtered                                                                                                                                                                                              |
+| `POST /api/sessions`                           | Create a session                                                                                                                                                                                                                |
+| `GET /api/sessions/:id`                        | Session with messages, plus `generating` / `partial`                                                                                                                                                                            |
+| `PATCH /api/sessions/:id`                      | Rename `{ title }`                                                                                                                                                                                                              |
+| `DELETE /api/sessions/:id`                     | Delete                                                                                                                                                                                                                          |
+| `POST /api/sessions/:id/messages`              | Send `{ content, replaceFromMessageId?, web? }` or `{ regenerate: true }`; streams NDJSON events `start`, `thinking`, `delta`, `done` / `error`. With attachments, send `multipart/form-data` with the same fields plus `files` |
+| `GET /api/sessions/:id/files/:fileId`          | An attachment: images as images, everything else as plain text                                                                                                                                                                  |
+| `DELETE /api/sessions/:id/messages/:messageId` | Delete a user message and everything after it                                                                                                                                                                                   |
+| `POST /api/sessions/:id/stop`                  | Stop the reply in progress                                                                                                                                                                                                      |
+| `GET` / `PUT /api/settings`                    | Read (masked) / update provider settings: `baseUrl`, `model`, `apiKey`, `reasoning`, `systemPrompt`                                                                                                                             |
+| `POST /api/settings/test`                      | Try `{ baseUrl?, model?, apiKey? }` (or the current settings) against the provider without saving; returns `{ check }`                                                                                                          |
 
 There is no login, so the API only answers requests addressed to a loopback
 host and refuses state-changing requests from other origins. To serve ogchat

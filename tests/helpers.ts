@@ -88,7 +88,13 @@ export interface ProviderCall {
   url: string;
   method: string;
   headers: Record<string, string>;
-  body: { model: string; stream: boolean; messages: { role: string; content: string }[] };
+  body: {
+    model: string;
+    stream: boolean;
+    messages: { role: string; content: string }[];
+    reasoning_effort?: string;
+    web_search_options?: { search_context_size?: string };
+  };
   signal: AbortSignal | null;
 }
 

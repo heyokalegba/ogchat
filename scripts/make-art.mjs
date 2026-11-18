@@ -30,8 +30,8 @@ import path from "node:path";
 import { birds, CHAT_ART, ROOT, SHELL_ART, smoke, STATES, writePng, written } from "./art/lib.mjs";
 import { bricks } from "./art/bricks.mjs";
 import { brooklynScene } from "./art/brooklyn.mjs";
-import { PEOPLE_META, peopleSheet, propsSheet } from "./art/people.mjs";
-import { cloudStrip, moon, sky, stars, sun } from "./art/sky.mjs";
+import { PEOPLE_META, peopleSheet, propsSheet, wheelsSheet } from "./art/people.mjs";
+import { cloudStrip, FLIER, fliers, moon, sky, stars, sun } from "./art/sky.mjs";
 import { skylineScene } from "./art/skyline.mjs";
 
 // Start from an empty folder, so a renamed picture never leaves its old self behind.
@@ -47,6 +47,7 @@ for (const state of STATES) {
   add(`sky-${state}.png`, sky(state));
   add(`clouds-far-${state}.png`, cloudStrip("far", state));
   add(`clouds-near-${state}.png`, cloudStrip("near", state));
+  add(`fliers-${state}.png`, fliers(state));
 }
 const starfield = stars();
 add("stars.png", starfield.steady);
@@ -59,7 +60,7 @@ const puff = smoke();
 add("smoke.png", puff.canvas);
 add("birds.png", birds());
 
-const cast = { people: peopleSheet(), props: propsSheet() };
+const cast = { people: peopleSheet(), props: propsSheet(), wheels: wheelsSheet() };
 const scenes = { skyline: skylineScene(puff, cast), brooklyn: brooklynScene(puff, cast) };
 for (const [id, scene] of Object.entries(scenes)) {
   for (const [name, image] of Object.entries(scene.images)) add(`${id}/${name}`, image);
@@ -81,12 +82,14 @@ const sceneBlock = (id) => `{
     parked: ${files.has(`${id}/parked-day.png`) ? perState((s) => `${id}/parked-${s}.png`) : "null"},
     people: ${perState((s) => `${id}/people-${s}.png`)},
     props: ${perState((s) => `${id}/props-${s}.png`)},
+    wheels: ${perState((s) => `${id}/wheels-${s}.png`)},
     lights: { a: ${src(`${id}/lights-a.png`)}, b: ${src(`${id}/lights-b.png`)}, c: ${src(`${id}/lights-c.png`)} },
     glow: {
       back: [${src(`${id}/glow-back-a.png`)}, ${src(`${id}/glow-back-b.png`)}],
       front: [${src(`${id}/glow-front-a.png`)}, ${src(`${id}/glow-front-b.png`)}],
     },
-    traffic: ${src(`${id}/traffic.png`)},
+    /** The traffic strips, in each light. A scene with one picture for all hours repeats it. */
+    traffic: ${perState((s) => (files.has(`${id}/traffic-${s}.png`) ? `${id}/traffic-${s}.png` : `${id}/traffic.png`))},
     config: ${JSON.stringify(scenes[id].config, null, 2).replace(/\n/g, "\n    ")},
   }`;
 
@@ -110,6 +113,9 @@ export const SKY = {
   moon: ${src("moon.png")},
   smoke: ${src("smoke.png")},
   birds: ${src("birds.png")},
+  /** An airliner and a helicopter: two frames across, one row each. */
+  fliers: ${perState((s) => `fliers-${s}.png`)},
+  flier: ${JSON.stringify(FLIER)},
 } as const;
 
 /**

@@ -2,7 +2,12 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ApiError, type ChatApi } from "@/lib/client/api";
-import type { PublicSettings, SettingsCheck } from "@/lib/types";
+import {
+  REASONING_EFFORTS,
+  type PublicSettings,
+  type ReasoningEffort,
+  type SettingsCheck,
+} from "@/lib/types";
 import { CloseIcon } from "../chat/icons";
 import styles from "./shell.module.css";
 
@@ -26,6 +31,8 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
   const [baseUrl, setBaseUrl] = useState(settings.baseUrl);
   const [model, setModel] = useState(settings.model);
   const [apiKey, setApiKey] = useState("");
+  const [reasoning, setReasoning] = useState<ReasoningEffort>(settings.reasoning);
+  const [systemPrompt, setSystemPrompt] = useState(settings.systemPrompt);
   const [removeKey, setRemoveKey] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +56,9 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
       }
       if (event.key !== "Tab" || !panel.current) return;
       // Keep focus inside the dialog.
-      const focusable = panel.current.querySelectorAll<HTMLElement>("input, button:not(:disabled)");
+      const focusable = panel.current.querySelectorAll<HTMLElement>(
+        "input, select, textarea, button:not(:disabled)",
+      );
       const firstEl = focusable[0];
       const lastEl = focusable[focusable.length - 1];
       if (!firstEl || !lastEl) return;
@@ -96,6 +105,8 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
       const next = await api.saveSettings({
         baseUrl,
         model,
+        reasoning,
+        systemPrompt,
         ...(typed ? { apiKey: typed } : removeKey ? { apiKey: null } : {}),
       });
       setApiKey("");
@@ -241,6 +252,60 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
                   provider and nowhere else.
                 </>
               )}
+            </p>
+          </div>
+
+          <div className={styles.field}>
+            <div className={styles.labelRow}>
+              <label className={styles.label} htmlFor="ogchat-reasoning">
+                Thinking
+              </label>
+            </div>
+            <select
+              id="ogchat-reasoning"
+              className={styles.textInput}
+              value={reasoning}
+              onChange={(event) => setReasoning(event.target.value as ReasoningEffort)}
+            >
+              {REASONING_EFFORTS.map((effort) => (
+                <option key={effort} value={effort}>
+                  {effort === "default" ? "auto (the provider decides)" : effort}
+                </option>
+              ))}
+            </select>
+            <p className={styles.help}>
+              How hard the model reasons before it answers. Also on the <code>think</code> button by
+              the message box. On <code>abliterated-model-large-v2</code>, medium and high are the
+              same level, and auto means max.
+            </p>
+          </div>
+
+          <div className={styles.field}>
+            <div className={styles.labelRow}>
+              <label className={styles.label} htmlFor="ogchat-system-prompt">
+                System prompt
+              </label>
+              {systemPrompt && (
+                <button
+                  type="button"
+                  className={styles.linkButton}
+                  onClick={() => setSystemPrompt("")}
+                >
+                  clear
+                </button>
+              )}
+            </div>
+            <textarea
+              id="ogchat-system-prompt"
+              className={`${styles.textInput} ${styles.textArea}`}
+              rows={4}
+              value={systemPrompt}
+              placeholder="Standing instructions for every conversation. Leave empty for none."
+              spellCheck
+              onChange={(event) => setSystemPrompt(event.target.value)}
+            />
+            <p className={styles.help}>
+              Sent ahead of every conversation, old and new, from the next message on.
             </p>
           </div>
 

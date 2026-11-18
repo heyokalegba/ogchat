@@ -21,8 +21,56 @@ export const PERSON = { w: 9, h: 15 };
 /** One dog's (or prop's) cell. */
 export const PROP = { w: 12, h: 9 };
 
-const SKIN = ["#e3bc98", "#d2a27c", "#b9835c", "#96633f", "#74492f", "#553626"].map(hex);
-const HAIR = ["#16130f", "#2a1d15", "#4a3222", "#6b4a2c", "#8f8a82", "#a98a52", "#5e2f22"].map(hex);
+/** One cell for anyone on wheels or with a ball: a cyclist, a skater, a kid dribbling. */
+export const WHEEL = { w: 20, h: 19 };
+
+/**
+ * Who lives here. The cast is dealt in four equal parts, the way a New York
+ * street is mixed, so that over time a quarter of the people you see are
+ * East Asian, a quarter Black, a quarter brown (South Asian, Latino, Middle
+ * Eastern) and a quarter white. At this size a person is a few pixels of
+ * skin and hair, so that is what each part sets: a range of skin tones, the
+ * hair colours that go with them, and how common long or full hair is.
+ * Which person turns up when is left to chance; the shares are exact across
+ * the sheet, for every kind of character on it.
+ */
+const HERITAGE = [
+  {
+    skin: ["#ecc9a0", "#e2b98c", "#d6aa7e"],
+    hair: ["#141110", "#1a1512", "#211813"],
+    long: 0.4,
+    puff: 0,
+  },
+  {
+    skin: ["#6e4832", "#573727", "#7d543a", "#442b1f"],
+    hair: ["#0f0d0c", "#16130f", "#1c1512"],
+    long: 0.15,
+    puff: 0.4,
+  },
+  {
+    skin: ["#b27f57", "#a2704a", "#916140", "#c08c62"],
+    hair: ["#16130f", "#241913", "#1c1512"],
+    long: 0.35,
+    puff: 0.05,
+  },
+  {
+    skin: ["#f0d0b4", "#e8c3a4", "#e0b697"],
+    hair: ["#4a3222", "#6b4a2c", "#a98a52", "#5e2f22", "#2a1d15", "#8a6a3c"],
+    long: 0.3,
+    puff: 0,
+  },
+].map((part) => ({ ...part, skin: part.skin.map(hex), hair: part.hair.map(hex) }));
+const GREY = hex("#8f8a82");
+
+/** `count` people's heritage, in equal shares and shuffled. `count` is a multiple of four. */
+export function shares(d, count) {
+  const order = Array.from({ length: count }, (_, i) => i % HERITAGE.length);
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(d.rand() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  return order.map((index) => HERITAGE[index]);
+}
 const TOPS = [
   "#7a3328", // brick red
   "#8a4a36",
@@ -169,7 +217,7 @@ function person(c, ox, oy, look, pose) {
   }
 }
 
-function castPerson(d, kind) {
+function castPerson(d, kind, heritage) {
   const { pick, chance, between } = d;
   const child = kind === "child";
   const runner = kind === "runner";
@@ -179,15 +227,16 @@ function castPerson(d, kind) {
     legs: child ? 3 : runner ? 5 : between(4, 5),
     torso: child ? 3 : between(4, 5),
     stride: runner ? 2 : 1,
-    skin: pick(SKIN),
-    hair: pick(HAIR),
+    skin: pick(heritage.skin),
+    // some of the grown-ups have gone grey
+    hair: !child && !runner && chance(0.1) ? GREY : pick(heritage.hair),
     top,
-    pants: runner ? pick([LEGS[2], LEGS[0], SKIN[2]]) : pick(LEGS),
+    pants: runner ? pick([LEGS[2], LEGS[0], LEGS[6]]) : pick(LEGS),
     shoes: runner ? SHOES[2] : pick(SHOES),
     hat: hatStyle ? pick(TOPS) : null,
     hatStyle,
-    long: !hatStyle && chance(0.3),
-    puff: !hatStyle && chance(0.12),
+    long: !hatStyle && chance(heritage.long),
+    puff: !hatStyle && chance(heritage.puff),
     bare: runner || chance(0.2),
     coat: !runner && !child && chance(0.3) ? between(1, 2) : 0,
     pack: !runner && chance(child ? 0.5 : 0.2) ? pick(BAGS) : null,
@@ -197,7 +246,7 @@ function castPerson(d, kind) {
 }
 
 /** How many of each kind of person the sheet holds, in row order. */
-export const CAST = { adults: 26, children: 6, runners: 4 };
+export const CAST = { adults: 28, children: 8, runners: 4 };
 
 /** Every person, one per row. Rows: adults, then children, then runners. */
 export function peopleSheet() {
@@ -208,12 +257,185 @@ export function peopleSheet() {
   ];
   const c = canvas(PERSON.w * FRAMES, PERSON.h * kinds.length);
   const d = dice(4242);
+  // Equal shares within each kind, so the children and the runners are as mixed as the adults.
+  const heritage = [
+    ...shares(d, CAST.adults),
+    ...shares(d, CAST.children),
+    ...shares(d, CAST.runners),
+  ];
   kinds.forEach((kind, row) => {
-    const look = castPerson(d, kind);
+    const look = castPerson(d, kind, heritage[row]);
     for (let pose = 0; pose < FRAMES; pose++) {
       person(c, pose * PERSON.w, row * PERSON.h, look, pose);
     }
   });
+  return c;
+}
+
+// ---------------------------------------------------------------- on wheels, and with a ball
+
+/** A bicycle wheel: a five-pixel ring with a hub. */
+function ring(c, x, y) {
+  const tyre = hex("#141416");
+  for (let i = 1; i <= 3; i++) {
+    c.set(x + i, y, tyre);
+    c.set(x + i, y + 4, tyre);
+    c.set(x, y + i, tyre);
+    c.set(x + 4, y + i, tyre);
+  }
+  c.set(x + 2, y + 2, hex("#6b6558"));
+}
+
+/** A cyclist, leaning into it. `pose` 0-3 turns the pedals; standing still is coasting. */
+function cyclist(c, ox, oy, look, pose) {
+  const g = oy + WHEEL.h - 1;
+  const px = (x, up, color) => c.set(ox + x, g - up, color);
+  const frame = look.bike;
+  ring(c, ox + 2, g - 4);
+  ring(c, ox + 13, g - 4);
+  // the frame: chain stay, seat tube, top tube, down tube, fork
+  for (let x = 5; x <= 9; x++) px(x, 2, frame);
+  px(8, 3, frame);
+  px(8, 4, frame);
+  px(8, 5, frame);
+  for (let x = 9; x <= 13; x++) px(x, 5, frame);
+  px(10, 3, frame);
+  px(11, 4, frame);
+  px(14, 4, frame);
+  px(14, 3, frame);
+  px(15, 2, frame);
+  px(13, 6, frame);
+  px(14, 7, hex("#17171a")); // bars
+  px(15, 7, hex("#17171a"));
+  px(7, 6, hex("#17171a")); // saddle
+  px(8, 6, hex("#17171a"));
+  px(16, 6, hex("#e9e2c4")); // front lamp
+  px(2, 5, hex("#a8382c")); // rear reflector
+
+  // legs: the far one first
+  const far = shade(look.pants, 0.72);
+  const down = [
+    [9, 6],
+    [9, 5],
+    [9, 4],
+    [9, 3],
+  ];
+  const up = [
+    [9, 6],
+    [10, 6],
+    [10, 5],
+  ];
+  const level = [
+    [9, 6],
+    [10, 5],
+    [10, 4],
+  ];
+  const turning = pose < WALK_FRAMES ? pose : 1;
+  const legs = [
+    [up, down],
+    [level, level],
+    [down, up],
+    [level, level],
+  ][turning];
+  const leg = (pixels, color) => {
+    pixels.forEach(([x, y]) => px(x, y, color));
+    const [fx, fy] = pixels.at(-1);
+    px(fx + 1, fy - (pixels === up ? 0 : 0), look.shoes);
+  };
+  leg(legs[0], far);
+  leg(legs[1], look.pants);
+
+  // body, leaning forward from the saddle to the bars
+  [
+    [8, 7],
+    [8, 8],
+    [9, 8],
+    [9, 9],
+    [10, 9],
+    [10, 10],
+    [11, 10],
+    [11, 11],
+  ].forEach(([x, y]) => px(x, y, look.top));
+  px(8, 7, shade(look.top, 0.85));
+  if (look.box) {
+    // a delivery rider's bag, square on the back
+    for (let x = 4; x <= 8; x++) for (let y = 9; y <= 13; y++) px(x, y, look.box);
+    for (let x = 4; x <= 8; x++) px(x, 13, shade(look.box, 1.25));
+    px(8, 9, shade(look.box, 0.75));
+  }
+  const sleeve = look.bare ? look.skin : shade(look.top, 0.8);
+  px(12, 9, sleeve);
+  px(13, 8, look.skin); // a hand on the bars
+  // head, with a helmet or their hair
+  for (let x = 11; x <= 13; x++) for (let y = 12; y <= 14; y++) px(x, y, look.skin);
+  px(13, 12, shade(look.skin, 0.86));
+  const crown = look.helmet ?? look.hair;
+  for (let x = 11; x <= 13; x++) px(x, 15, crown);
+  px(11, 14, crown);
+  if (look.helmet) px(14, 15, shade(crown, 0.8));
+  else if (look.long) px(10, 13, look.hair);
+}
+
+/** A kid on a skateboard: kicking along on frames 0-3, standing on it otherwise. */
+function skater(c, ox, oy, look, pose) {
+  const g = oy + WHEEL.h - 1;
+  // one push, then three frames of rolling
+  const stance = pose < WALK_FRAMES ? [0, 1, 4, 4][pose] : pose;
+  person(c, ox + 5, oy + WHEEL.h - PERSON.h - 2, look, stance);
+  for (let x = 6; x <= 13; x++) c.set(ox + x, g - 1, look.board);
+  c.set(ox + 14, g - 2, look.board); // the kicked-up nose
+  c.set(ox + 7, g, hex("#d8d4c8"));
+  c.set(ox + 12, g, hex("#d8d4c8"));
+}
+
+/** A kid with a basketball: dribbling as they walk, and on the spot when they stop. */
+function baller(c, ox, oy, look, pose) {
+  const g = oy + WHEEL.h - 1;
+  person(c, ox + 3, oy + WHEEL.h - PERSON.h, look, pose);
+  // the ball leaves the hand, hits the pavement and comes back up
+  const height = pose < WALK_FRAMES ? [5, 2, 0, 3][pose] : [5, 0][pose - WALK_FRAMES];
+  const ball = hex("#c2622d");
+  const bx = ox + 11;
+  c.set(bx, g - height, ball);
+  c.set(bx + 1, g - height, shade(ball, 0.8));
+  c.set(bx, g - height - 1, shade(ball, 1.2));
+  c.set(bx + 1, g - height - 1, ball);
+}
+
+/** How many of each the wheels sheet holds, in row order. Each a multiple of four. */
+export const RIDERS = { cyclists: 8, skaters: 4, ballers: 4 };
+
+/** Cyclists, then skaters, then kids with a ball, one per row. */
+export function wheelsSheet() {
+  const rows = RIDERS.cyclists + RIDERS.skaters + RIDERS.ballers;
+  const c = canvas(WHEEL.w * FRAMES, WHEEL.h * rows);
+  const d = dice(1986);
+  const heritage = [
+    ...shares(d, RIDERS.cyclists),
+    ...shares(d, RIDERS.skaters),
+    ...shares(d, RIDERS.ballers),
+  ];
+  const bikes = ["#17171a", "#7a3328", "#34485e", "#c9c2ae", "#566b4a"].map(hex);
+  for (let row = 0; row < rows; row++) {
+    const kind = row < RIDERS.cyclists ? "adult" : "child";
+    const look = castPerson(d, kind, heritage[row]);
+    let draw;
+    if (row < RIDERS.cyclists) {
+      look.bike = d.pick(bikes);
+      look.helmet = d.chance(0.55)
+        ? d.pick([hex("#d6cfbd"), hex("#1c1c20"), hex("#7a3328")])
+        : null;
+      // every fourth rider is out delivering
+      look.box = row % 4 === 3 ? d.pick([hex("#2f5a5a"), hex("#b0603a"), hex("#1c1c20")]) : null;
+      draw = cyclist;
+    } else {
+      // no rucksacks or caps in the way of the trick
+      look.pack = null;
+      look.board = d.pick([hex("#2a2420"), hex("#7a3328"), hex("#566b4a")]);
+      draw = row < RIDERS.cyclists + RIDERS.skaters ? skater : baller;
+    }
+    for (let pose = 0; pose < FRAMES; pose++) draw(c, pose * WHEEL.w, row * WHEEL.h, look, pose);
+  }
   return c;
 }
 
@@ -348,7 +570,11 @@ export const PEOPLE_META = {
   walkFrames: WALK_FRAMES,
   person: { ...PERSON, rows: CAST.adults + CAST.children + CAST.runners },
   prop: { ...PROP, rows: PROPS.rows },
+  wheel: { ...WHEEL, rows: RIDERS.cyclists + RIDERS.skaters + RIDERS.ballers },
   cast: {
+    cyclists: [0, RIDERS.cyclists],
+    skaters: [RIDERS.cyclists, RIDERS.skaters],
+    ballers: [RIDERS.cyclists + RIDERS.skaters, RIDERS.ballers],
     adults: [0, CAST.adults],
     children: [CAST.adults, CAST.children],
     runners: [CAST.adults + CAST.children, CAST.runners],

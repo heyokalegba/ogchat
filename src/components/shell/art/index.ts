@@ -2,15 +2,19 @@
 import skyDay from "./sky-day.png";
 import cloudsFarDay from "./clouds-far-day.png";
 import cloudsNearDay from "./clouds-near-day.png";
+import fliersDay from "./fliers-day.png";
 import skyGolden from "./sky-golden.png";
 import cloudsFarGolden from "./clouds-far-golden.png";
 import cloudsNearGolden from "./clouds-near-golden.png";
+import fliersGolden from "./fliers-golden.png";
 import skyDusk from "./sky-dusk.png";
 import cloudsFarDusk from "./clouds-far-dusk.png";
 import cloudsNearDusk from "./clouds-near-dusk.png";
+import fliersDusk from "./fliers-dusk.png";
 import skyNight from "./sky-night.png";
 import cloudsFarNight from "./clouds-far-night.png";
 import cloudsNearNight from "./clouds-near-night.png";
+import fliersNight from "./fliers-night.png";
 import stars from "./stars.png";
 import starsTwinkle from "./stars-twinkle.png";
 import sun from "./sun.png";
@@ -30,18 +34,22 @@ import skylineCityDay from "./skyline/city-day.png";
 import skylineRooftopsDay from "./skyline/rooftops-day.png";
 import skylinePeopleDay from "./skyline/people-day.png";
 import skylinePropsDay from "./skyline/props-day.png";
+import skylineWheelsDay from "./skyline/wheels-day.png";
 import skylineCityGolden from "./skyline/city-golden.png";
 import skylineRooftopsGolden from "./skyline/rooftops-golden.png";
 import skylinePeopleGolden from "./skyline/people-golden.png";
 import skylinePropsGolden from "./skyline/props-golden.png";
+import skylineWheelsGolden from "./skyline/wheels-golden.png";
 import skylineCityDusk from "./skyline/city-dusk.png";
 import skylineRooftopsDusk from "./skyline/rooftops-dusk.png";
 import skylinePeopleDusk from "./skyline/people-dusk.png";
 import skylinePropsDusk from "./skyline/props-dusk.png";
+import skylineWheelsDusk from "./skyline/wheels-dusk.png";
 import skylineCityNight from "./skyline/city-night.png";
 import skylineRooftopsNight from "./skyline/rooftops-night.png";
 import skylinePeopleNight from "./skyline/people-night.png";
 import skylinePropsNight from "./skyline/props-night.png";
+import skylineWheelsNight from "./skyline/wheels-night.png";
 import brooklynLightsA from "./brooklyn/lights-a.png";
 import brooklynLightsB from "./brooklyn/lights-b.png";
 import brooklynLightsC from "./brooklyn/lights-c.png";
@@ -49,27 +57,34 @@ import brooklynGlowBackA from "./brooklyn/glow-back-a.png";
 import brooklynGlowBackB from "./brooklyn/glow-back-b.png";
 import brooklynGlowFrontA from "./brooklyn/glow-front-a.png";
 import brooklynGlowFrontB from "./brooklyn/glow-front-b.png";
-import brooklynTraffic from "./brooklyn/traffic.png";
+import brooklynTrafficDay from "./brooklyn/traffic-day.png";
 import brooklynCityDay from "./brooklyn/city-day.png";
 import brooklynRooftopsDay from "./brooklyn/rooftops-day.png";
 import brooklynParkedDay from "./brooklyn/parked-day.png";
 import brooklynPeopleDay from "./brooklyn/people-day.png";
 import brooklynPropsDay from "./brooklyn/props-day.png";
+import brooklynWheelsDay from "./brooklyn/wheels-day.png";
+import brooklynTrafficGolden from "./brooklyn/traffic-golden.png";
 import brooklynCityGolden from "./brooklyn/city-golden.png";
 import brooklynRooftopsGolden from "./brooklyn/rooftops-golden.png";
 import brooklynParkedGolden from "./brooklyn/parked-golden.png";
 import brooklynPeopleGolden from "./brooklyn/people-golden.png";
 import brooklynPropsGolden from "./brooklyn/props-golden.png";
+import brooklynWheelsGolden from "./brooklyn/wheels-golden.png";
+import brooklynTrafficDusk from "./brooklyn/traffic-dusk.png";
 import brooklynCityDusk from "./brooklyn/city-dusk.png";
 import brooklynRooftopsDusk from "./brooklyn/rooftops-dusk.png";
 import brooklynParkedDusk from "./brooklyn/parked-dusk.png";
 import brooklynPeopleDusk from "./brooklyn/people-dusk.png";
 import brooklynPropsDusk from "./brooklyn/props-dusk.png";
+import brooklynWheelsDusk from "./brooklyn/wheels-dusk.png";
+import brooklynTrafficNight from "./brooklyn/traffic-night.png";
 import brooklynCityNight from "./brooklyn/city-night.png";
 import brooklynRooftopsNight from "./brooklyn/rooftops-night.png";
 import brooklynParkedNight from "./brooklyn/parked-night.png";
 import brooklynPeopleNight from "./brooklyn/people-night.png";
 import brooklynPropsNight from "./brooklyn/props-night.png";
+import brooklynWheelsNight from "./brooklyn/wheels-night.png";
 
 /** The four lights every picture comes in. The backdrop crossfades between neighbours. */
 export const SKY_STATES = ["day","golden","dusk","night"] as const;
@@ -88,6 +103,9 @@ export const SKY = {
   moon: moon.src,
   smoke: smoke.src,
   birds: birds.src,
+  /** An airliner and a helicopter: two frames across, one row each. */
+  fliers: { day: fliersDay.src, golden: fliersGolden.src, dusk: fliersDusk.src, night: fliersNight.src },
+  flier: {"w":26,"h":10,"frames":2,"rows":2,"plane":0,"helicopter":1},
 } as const;
 
 /**
@@ -101,24 +119,41 @@ export const PEOPLE = {
   "person": {
     "w": 9,
     "h": 15,
-    "rows": 36
+    "rows": 40
   },
   "prop": {
     "w": 12,
     "h": 9,
     "rows": 10
   },
+  "wheel": {
+    "w": 20,
+    "h": 19,
+    "rows": 16
+  },
   "cast": {
+    "cyclists": [
+      0,
+      8
+    ],
+    "skaters": [
+      8,
+      4
+    ],
+    "ballers": [
+      12,
+      4
+    ],
     "adults": [
       0,
-      26
+      28
     ],
     "children": [
-      26,
-      6
+      28,
+      8
     ],
     "runners": [
-      32,
+      36,
       4
     ],
     "dogs": [
@@ -138,12 +173,14 @@ export const SCENES = {
     parked: null,
     people: { day: skylinePeopleDay.src, golden: skylinePeopleGolden.src, dusk: skylinePeopleDusk.src, night: skylinePeopleNight.src },
     props: { day: skylinePropsDay.src, golden: skylinePropsGolden.src, dusk: skylinePropsDusk.src, night: skylinePropsNight.src },
+    wheels: { day: skylineWheelsDay.src, golden: skylineWheelsGolden.src, dusk: skylineWheelsDusk.src, night: skylineWheelsNight.src },
     lights: { a: skylineLightsA.src, b: skylineLightsB.src, c: skylineLightsC.src },
     glow: {
       back: [skylineGlowBackA.src, skylineGlowBackB.src],
       front: [skylineGlowFrontA.src, skylineGlowFrontB.src],
     },
-    traffic: skylineTraffic.src,
+    /** The traffic strips, in each light. A scene with one picture for all hours repeats it. */
+    traffic: { day: skylineTraffic.src, golden: skylineTraffic.src, dusk: skylineTraffic.src, night: skylineTraffic.src },
     config: {
       "label": "skyline",
       "hint": "the harbour, the bridge and the towers",
@@ -190,6 +227,7 @@ export const SCENES = {
           "reverse": false,
           "seconds": 46,
           "steps": 348,
+          "span": 1,
           "front": false
         },
         {
@@ -202,13 +240,14 @@ export const SCENES = {
           "reverse": true,
           "seconds": 64,
           "steps": 348,
+          "span": 1,
           "front": false
         }
       ],
       "beacons": [
         {
           "left": "18.438%",
-          "top": "17.778%",
+          "top": "13.889%",
           "delay": "0.0s"
         },
         {
@@ -228,6 +267,7 @@ export const SCENES = {
       },
       "life": {
         "kind": "roofs",
+        "road": 0,
         "near": 0,
         "far": 0,
         "from": 0,
@@ -316,12 +356,14 @@ export const SCENES = {
     parked: { day: brooklynParkedDay.src, golden: brooklynParkedGolden.src, dusk: brooklynParkedDusk.src, night: brooklynParkedNight.src },
     people: { day: brooklynPeopleDay.src, golden: brooklynPeopleGolden.src, dusk: brooklynPeopleDusk.src, night: brooklynPeopleNight.src },
     props: { day: brooklynPropsDay.src, golden: brooklynPropsGolden.src, dusk: brooklynPropsDusk.src, night: brooklynPropsNight.src },
+    wheels: { day: brooklynWheelsDay.src, golden: brooklynWheelsGolden.src, dusk: brooklynWheelsDusk.src, night: brooklynWheelsNight.src },
     lights: { a: brooklynLightsA.src, b: brooklynLightsB.src, c: brooklynLightsC.src },
     glow: {
       back: [brooklynGlowBackA.src, brooklynGlowBackB.src],
       front: [brooklynGlowFrontA.src, brooklynGlowFrontB.src],
     },
-    traffic: brooklynTraffic.src,
+    /** The traffic strips, in each light. A scene with one picture for all hours repeats it. */
+    traffic: { day: brooklynTrafficDay.src, golden: brooklynTrafficGolden.src, dusk: brooklynTrafficDusk.src, night: brooklynTrafficNight.src },
     config: {
       "label": "brooklyn",
       "hint": "a brownstone block by Prospect Park",
@@ -360,30 +402,37 @@ export const SCENES = {
       "lanes": [
         {
           "left": "0%",
-          "top": "95.833%",
+          "top": "93.333%",
           "width": "100%",
-          "height": "1.667%",
+          "height": "5.000%",
           "rows": 2,
           "row": 0,
           "reverse": true,
-          "seconds": 38,
-          "steps": 640,
+          "seconds": 44,
+          "steps": 1920,
+          "span": 3,
           "front": true
         },
         {
           "left": "0%",
-          "top": "97.778%",
+          "top": "95.000%",
           "width": "100%",
-          "height": "1.667%",
+          "height": "5.000%",
           "rows": 2,
           "row": 1,
           "reverse": false,
           "seconds": 52,
-          "steps": 640,
+          "steps": 1920,
+          "span": 3,
           "front": true
         }
       ],
       "beacons": [
+        {
+          "left": "55.000%",
+          "top": "19.167%",
+          "delay": "0s"
+        },
         {
           "left": "26.250%",
           "top": "25.833%",
@@ -400,6 +449,7 @@ export const SCENES = {
         "far": 336,
         "from": -14,
         "to": 654,
+        "road": 351,
         "sniff": [
           59,
           133,

@@ -11,7 +11,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import { createApi } from "@/lib/client/api";
-import type { SessionMeta } from "@/lib/types";
+import type { ReasoningEffort, SessionMeta } from "@/lib/types";
 import { BootLine } from "./BootLine";
 import styles from "./chat.module.css";
 import { Composer } from "./Composer";
@@ -28,6 +28,9 @@ export interface ChatSurfaceProps {
   apiBase?: string;
   /** Provider status for the status line and the empty state; null while unknown. */
   provider?: { ready: boolean; model: string } | null;
+  /** How hard the model thinks, and what to do when the composer changes it. */
+  reasoning?: ReasoningEffort;
+  onReasoningChange?: (next: ReasoningEffort) => void;
   onSessionCreated?: (session: SessionMeta) => void;
   onSessionUpdated?: (session: SessionMeta) => void;
   /** The requested session no longer exists. */
@@ -309,6 +312,10 @@ export function ChatSurface(props: ChatSurfaceProps) {
         files={chat.files}
         onAddFiles={chat.addFiles}
         onRemoveFile={chat.removeFile}
+        web={chat.web}
+        onToggleWeb={() => chat.setWeb(!chat.web)}
+        reasoning={props.reasoning}
+        onReasoningChange={props.onReasoningChange}
         footer={
           <div className={styles.hints}>
             <span className={styles.hintKeys}>

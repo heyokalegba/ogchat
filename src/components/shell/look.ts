@@ -11,6 +11,8 @@ export interface Look {
   clockOffsetMs: number;
   /** Whether people walk about in the scene. */
   people: boolean;
+  /** How strongly the scene shows, in percent. Lower fades it into the dark, behind the text. */
+  sceneStrength: number;
   /** Whether the brick wall is there. Without it the chat floats over the scene. */
   wallShown: boolean;
   /** Wall lightness, 0 (dark and gritty) to 100 (pale). 50 is the wall as drawn. */
@@ -27,6 +29,7 @@ export const DEFAULT_LOOK: Look = {
   scene: "skyline",
   clockOffsetMs: 0,
   people: true,
+  sceneStrength: 100,
   wallShown: true,
   wall: 50,
   textSize: 100,
@@ -41,6 +44,7 @@ export function activeTextColor(look: Look): string {
 }
 
 export const TEXT_SIZE = { min: 80, max: 150, step: 5 };
+export const SCENE_STRENGTH = { min: 15, max: 100, step: 5 };
 
 /** Text colours that sit well on the wall. Any other colour can be picked too. */
 export const TEXT_SWATCHES = [
@@ -68,6 +72,11 @@ function clean(value: unknown): Look {
         : DEFAULT_LOOK.scene,
     clockOffsetMs: clamp(Math.round(number(raw.clockOffsetMs, 0)), -DAY_MS, DAY_MS),
     people: typeof raw.people === "boolean" ? raw.people : DEFAULT_LOOK.people,
+    sceneStrength: clamp(
+      Math.round(number(raw.sceneStrength, DEFAULT_LOOK.sceneStrength)),
+      SCENE_STRENGTH.min,
+      SCENE_STRENGTH.max,
+    ),
     wallShown: typeof raw.wallShown === "boolean" ? raw.wallShown : DEFAULT_LOOK.wallShown,
     wall: clamp(Math.round(number(raw.wall, DEFAULT_LOOK.wall)), 0, 100),
     textSize: clamp(
@@ -127,6 +136,7 @@ export function lookVariables(look: Look): Record<string, string> {
   return {
     "--og-wall-light": (0.72 + (look.wall / 100) * 0.56).toFixed(3),
     "--og-wall-opacity": look.wallShown ? "1" : "0",
+    "--og-scene-veil": (1 - look.sceneStrength / 100).toFixed(2),
     "--og-type": (look.textSize / 100).toFixed(2),
     "--og-wall-text": color,
     "--og-halo-rgb": halo,

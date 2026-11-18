@@ -14,6 +14,19 @@
 }
 
 /*
+ * A dark veil over the whole scene, for when the picture competes with the
+ * text. The look panel sets how much of it there is; by default, none.
+ */
+.backdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #0b0e1a;
+  opacity: var(--og-scene-veil, 0);
+  transition: opacity 200ms linear;
+}
+
+/*
  * The 16:9 scene, sized to cover the window and anchored to its bottom edge,
  * so the street or the skyline always sits on the ground. Every layer is
  * placed inside it in percentages and therefore stays lined up at any size.
@@ -319,7 +332,11 @@
 
 /* ---------------------------------------------------------------- traffic */
 
-/* One lane: a window onto a strip twice its width that slides past. */
+/*
+ * One lane: a window onto a strip that slides past. The strip holds its
+ * picture twice over, so the loop has no seam; Backdrop.tsx sets its width
+ * to twice the picture's.
+ */
 .lane {
   position: absolute;
   overflow: hidden;
@@ -394,6 +411,68 @@
 }
 
 @keyframes flap {
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+/* ---------------------------------------------------------------- aircraft */
+
+/* One crossing of the sky, left to right (SkyTraffic.tsx). */
+.flightPath {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 0;
+  animation: fly-across 70s linear 1 both;
+}
+
+.flightLeft {
+  animation-name: fly-back;
+}
+
+.flightLeft .flier {
+  transform: scaleX(-1);
+}
+
+@keyframes fly-across {
+  from {
+    transform: translate(-6%, 0);
+  }
+  to {
+    transform: translate(104%, var(--rise, 0));
+  }
+}
+
+@keyframes fly-back {
+  from {
+    transform: translate(104%, 0);
+  }
+  to {
+    transform: translate(-6%, var(--rise, 0));
+  }
+}
+
+.flier {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: hidden;
+}
+
+/* Two frames side by side: the airliner's strobe, the helicopter's rotor. */
+.flierFrames {
+  width: 200%;
+  height: 100%;
+  background-repeat: no-repeat;
+  animation: flier-frames 1.4s steps(2) infinite;
+}
+
+.flierFrames.rotor {
+  animation-duration: 0.16s;
+}
+
+@keyframes flier-frames {
   to {
     transform: translateX(-100%);
   }

@@ -103,6 +103,18 @@ describe("request shape", () => {
     expect(JSON.parse(init.body).model).toBe("other-model");
   });
 
+  it("adds the thinking level and web search only when asked", () => {
+    const base = { baseUrl: "https://api.abliteration.ai/v1", apiKey: "k", model: "m" };
+    const plain = JSON.parse(buildChatRequest(base, history).init.body);
+    expect(plain).not.toHaveProperty("reasoning_effort");
+    expect(plain).not.toHaveProperty("web_search_options");
+    const full = JSON.parse(
+      buildChatRequest(base, history, { reasoningEffort: "max", webSearch: true }).init.body,
+    );
+    expect(full.reasoning_effort).toBe("max");
+    expect(full.web_search_options).toEqual({ search_context_size: "medium" });
+  });
+
   it("sends only role and content for each message", () => {
     const messages = [
       { role: "user", content: "x", id: "m1", createdAt: "now", partial: true },
@@ -364,6 +376,38 @@ describe("error classes", () => {
     const err = await failure(options);
     expect(err).toBeInstanceOf(ProviderEmptyReplyError);
     expect(err.message).toMatch(/thinking/);
+  });
+
+  it("lists sources the provider cites, unless the reply already links to them", async () => {
+    const chunk = (body: object) => `data: ${JSON.stringify(body)}\n\n`;
+    const annotation = (url: string, title: string) => ({
+      type: "url_citation",
+      url_citation: { url, title },
+    });
+    const { options } = harness(() =>
+      streamResponse([
+        chunk({ choices: [{ delta: { content: "See [the docs](https://a.example/docs)." } }] }),
+        chunk({
+          choices: [
+            {
+              delta: {
+                annotations: [
+                  annotation("https://a.example/docs", "Docs"),
+                  annotation("https://b.example/post", "A [post]"),
+                  annotation("javascript:alert(1)", "nope"),
+                ],
+              },
+            },
+          ],
+          citations: ["https://c.example/", "https://b.example/post"],
+        }),
+        "data: [DONE]\n\n",
+      ]),
+    );
+    expect((await collect(options)).join("")).toBe(
+      "See [the docs](https://a.example/docs).\n\n**Sources**\n" +
+        "- [A post](https://b.example/post)\n- [https://c.example/](https://c.example/)",
+    );
   });
 
   it("ends with ProviderAbortedError when the caller aborts mid-stream", async () => {

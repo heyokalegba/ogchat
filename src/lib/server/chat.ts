@@ -23,10 +23,22 @@ export class ChatRequestError extends Error {
 }
 
 export type SendInput =
-  | { kind: "message"; content: string; replaceFromMessageId?: string; uploads: IngestedFile[] }
+  | {
+      kind: "message";
+      content: string;
+      replaceFromMessageId?: string;
+      uploads: IngestedFile[];
+      /** Search the web for this message. */
+      web: boolean;
+    }
   | { kind: "regenerate" };
 
-function messageInput(rawContent: unknown, replace: unknown, uploads: IngestedFile[]): SendInput {
+function messageInput(
+  rawContent: unknown,
+  replace: unknown,
+  uploads: IngestedFile[],
+  web: boolean,
+): SendInput {
   const content = typeof rawContent === "string" ? rawContent.trim() : "";
   if (content.length > MAX_MESSAGE_CHARS) {
     throw new ChatRequestError(413, "message_too_long", "Message is too long.");
@@ -40,12 +52,12 @@ function messageInput(rawContent: unknown, replace: unknown, uploads: IngestedFi
   if (!content && uploads.length === 0 && !replaceFromMessageId) {
     throw new ChatRequestError(400, "empty_message", "Message is empty.");
   }
-  return { kind: "message", content, replaceFromMessageId, uploads };
+  return { kind: "message", content, replaceFromMessageId, uploads, web };
 }
 
 export function parseSendInput(body: Record<string, unknown>): SendInput {
   if (body.regenerate === true) return { kind: "regenerate" };
-  return messageInput(body.content, body.replaceFromMessageId, []);
+  return messageInput(body.content, body.replaceFromMessageId, [], body.web === true);
 }
 
 /**
@@ -97,6 +109,7 @@ export async function readSendInput(request: Request): Promise<SendInput> {
     form.get("content"),
     typeof replace === "string" ? replace : undefined,
     uploads,
+    form.get("web") === "true",
   );
 }
 
@@ -159,6 +172,7 @@ export function prepareTurn(sessionId: string, input: SendInput): PreparedTurn {
         role: "user",
         content: input.content,
         attachments,
+        web: input.web,
       });
       if (!appended) throw new ChatRequestError(404, "not_found", "Session not found.");
       pruneSessionFiles(sessionId);
@@ -172,13 +186,20 @@ export function prepareTurn(sessionId: string, input: SendInput): PreparedTurn {
   }
 }
 
+/** Added when a request that asked for web search is turned down. */
+const WEB_HINT =
+  " This message asked for web search. On abliteration.ai that has to be switched on for your account first (console: Account, then Web tools). Or turn the web button off and retry.";
+
 /** Added when a request that carried images is turned down as malformed. */
 const IMAGE_HINT =
   " This conversation includes an image, and some models only read text (abliterated-model-large-v2 is one). Delete the message with the image, or switch model in settings.";
 
-function toChatError(err: unknown, sentImages = false): ChatError {
+function toChatError(err: unknown, sentImages = false, web = false): ChatError {
   if (err instanceof ProviderError) {
-    const hint = sentImages && (err.status === 400 || err.status === 422) ? IMAGE_HINT : "";
+    const refused = err.status === 400 || err.status === 422;
+    const hint =
+      (sentImages && refused ? IMAGE_HINT : "") +
+      (web && (refused || err.status === 403) ? WEB_HINT : "");
     return {
       code: err.code,
       message: `${err.message}${hint}`,
@@ -221,10 +242,12 @@ export async function runTurn(
   };
 
   let sentImages = false;
+  // Whether the message being answered asked for web search. A retry asks again.
+  const web = turn.session.messages.findLast((m) => m.role === "user")?.web === true;
   try {
     emit({ type: "start", session: toMeta(turn.session), userMessage: turn.userMessage });
     const settings = resolveSettings();
-    const messages = buildProviderMessages(turn.session);
+    const messages = buildProviderMessages(turn.session, settings.systemPrompt);
     sentImages = messages.some(
       (m) => Array.isArray(m.content) && m.content.some((part) => part.type === "image_url"),
     );
@@ -232,6 +255,8 @@ export async function runTurn(
       config: { baseUrl: settings.baseUrl, apiKey: settings.apiKey, model: settings.model },
       messages,
       signal: generation.controller.signal,
+      reasoningEffort: settings.reasoning === "default" ? null : settings.reasoning,
+      webSearch: web,
       onThinking: () => emit({ type: "thinking" }),
     });
     for await (const text of stream) {
@@ -247,7 +272,7 @@ export async function runTurn(
         emit({ type: "done", session: meta(), message, stopped: true });
       } else {
         if (!(err instanceof ProviderError)) console.error("[ogchat] reply failed:", err);
-        emit({ type: "error", session: meta(), error: toChatError(err, sentImages), message });
+        emit({ type: "error", session: meta(), error: toChatError(err, sentImages, web), message });
       }
     } catch (inner) {
       console.error("[ogchat] could not record the failed reply:", inner);

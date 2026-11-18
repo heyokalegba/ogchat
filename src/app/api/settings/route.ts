@@ -12,7 +12,7 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 /**
- * PUT /api/settings { baseUrl?, model?, apiKey? }  →  { settings }
+ * PUT /api/settings { baseUrl?, model?, apiKey?, reasoning?, systemPrompt? }  →  { settings }
  * apiKey: a string saves a new key, null removes the saved one, omitted leaves it.
  */
 export async function PUT(request: Request): Promise<Response> {
@@ -24,6 +24,8 @@ export async function PUT(request: Request): Promise<Response> {
       baseUrl: body.baseUrl,
       model: body.model,
       apiKey: body.apiKey,
+      reasoning: body.reasoning,
+      systemPrompt: body.systemPrompt,
     });
     return json({ settings });
   } catch (err) {

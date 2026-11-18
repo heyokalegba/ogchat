@@ -57,6 +57,13 @@ export interface StreamChatOptions {
   /** Max silence between two chunks of a streaming reply. */
   idleTimeoutMs?: number;
   /**
+   * How hard a reasoning model should think: "low", "medium", "high" or "max".
+   * Left out, the provider decides.
+   */
+  reasoningEffort?: string | null;
+  /** Let the provider search the web for this reply and cite what it used. */
+  webSearch?: boolean;
+  /**
    * Called once if the model starts by reasoning (models such as
    * abliterated-model-large-v2 always do) before any answer text arrives.
    */
@@ -90,6 +97,7 @@ function authHeaders(apiKey: string): Record<string, string> {
 export function buildChatRequest(
   config: ProviderConfig & { apiKey: string },
   messages: ProviderMessage[],
+  extras: { reasoningEffort?: string | null; webSearch?: boolean } = {},
 ): { url: string; init: { method: "POST"; headers: Record<string, string>; body: string } } {
   return {
     url: chatCompletionsUrl(config.baseUrl),
@@ -104,6 +112,9 @@ export function buildChatRequest(
         model: config.model,
         messages: messages.map(({ role, content }) => ({ role, content })),
         stream: true,
+        ...(extras.reasoningEffort ? { reasoning_effort: extras.reasoningEffort } : {}),
+        // The OpenAI chat-completions shape for search: an options object on the request itself.
+        ...(extras.webSearch ? { web_search_options: { search_context_size: "medium" } } : {}),
       }),
     },
   };
@@ -170,13 +181,66 @@ function httpError(status: number, detail: string, baseUrl = ""): ProviderError 
   return new ProviderHTTPError(status, detail);
 }
 
+/** A web page the provider says it drew on. */
+interface Citation {
+  url: string;
+  title: string;
+}
+
+/**
+ * Collects the sources attached to a reply. Providers put them in a few
+ * places: `annotations` of type url_citation on the message or the delta
+ * (the OpenAI shape), or a plain `citations` list of URLs on the chunk.
+ */
+function collectCitations(payload: unknown, into: Map<string, Citation>): void {
+  if (!payload || typeof payload !== "object") return;
+  const p = payload as Record<string, unknown>;
+  const add = (url: unknown, title: unknown) => {
+    if (typeof url !== "string" || !/^https?:\/\//i.test(url) || into.has(url)) return;
+    into.set(url, { url, title: typeof title === "string" && title.trim() ? title.trim() : url });
+  };
+  const choice = (Array.isArray(p.choices) ? p.choices[0] : null) as Record<string, unknown> | null;
+  for (const holder of [choice?.delta, choice?.message]) {
+    const annotations = (holder as Record<string, unknown> | undefined)?.annotations;
+    if (!Array.isArray(annotations)) continue;
+    for (const entry of annotations) {
+      if (!entry || typeof entry !== "object") continue;
+      const a = entry as Record<string, unknown>;
+      const inner = (a.url_citation ?? a) as Record<string, unknown>;
+      add(inner.url, inner.title);
+    }
+  }
+  if (Array.isArray(p.citations)) {
+    for (const entry of p.citations) {
+      if (typeof entry === "string") add(entry, null);
+      else if (entry && typeof entry === "object") {
+        const c = entry as Record<string, unknown>;
+        add(c.url, c.title);
+      }
+    }
+  }
+}
+
+/** The sources a reply did not already link to itself, as a closing markdown list. */
+function sourcesBlock(citations: Map<string, Citation>, reply: string): string {
+  const missing = [...citations.values()].filter((c) => !reply.includes(c.url));
+  if (missing.length === 0) return "";
+  const line = (c: Citation) => `- [${c.title.replace(/[[\]]/g, "")}](${c.url})`;
+  return `\n\n**Sources**\n${missing.slice(0, 20).map(line).join("\n")}`;
+}
+
 /** `text` is answer text; `thinking` marks a chunk that carried only reasoning. */
 type SseResult = { done: true } | { done: false; text: string; thinking?: boolean } | null;
 
 /** Where providers put a reasoning model's thoughts in a streamed chunk. */
 const REASONING_FIELDS = ["reasoning_content", "reasoning", "thinking"] as const;
 
-function parseSseLine(line: string, status: number, key: string): SseResult {
+function parseSseLine(
+  line: string,
+  status: number,
+  key: string,
+  citations?: Map<string, Citation>,
+): SseResult {
   if (!line.startsWith("data:")) return null;
   const data = line.slice(5).trim();
   if (!data) return null;
@@ -190,6 +254,7 @@ function parseSseLine(line: string, status: number, key: string): SseResult {
   if (payload && typeof payload === "object" && "error" in payload && payload.error) {
     throw new ProviderHTTPError(status, clip(redactSecret(errorDetail(payload), key)));
   }
+  if (citations) collectCitations(payload, citations);
   const delta = (payload as { choices?: { delta?: Record<string, unknown> }[] })?.choices?.[0]
     ?.delta;
   if (!delta || typeof delta !== "object") return null;
@@ -234,7 +299,10 @@ export async function* streamChat(options: StreamChatOptions): AsyncGenerator<st
   }
   let request: ReturnType<typeof buildChatRequest>;
   try {
-    request = buildChatRequest({ ...config, apiKey }, messages);
+    request = buildChatRequest({ ...config, apiKey }, messages, {
+      reasoningEffort: options.reasoningEffort,
+      webSearch: options.webSearch,
+    });
   } catch {
     throw new ProviderConfigError(
       "The API base URL is not a valid http(s) URL. Check it in settings.",
@@ -282,6 +350,8 @@ export async function* streamChat(options: StreamChatOptions): AsyncGenerator<st
     const contentType = res.headers.get("content-type") ?? "";
     let produced = false;
     let thought = false;
+    let reply = "";
+    const citations = new Map<string, Citation>();
 
     if (contentType.includes("application/json")) {
       // The provider ignored `stream: true` and answered in one piece.
@@ -297,8 +367,10 @@ export async function* streamChat(options: StreamChatOptions): AsyncGenerator<st
       }
       const text = (payload as { choices?: { message?: { content?: unknown } }[] })?.choices?.[0]
         ?.message?.content;
+      collectCitations(payload, citations);
       if (typeof text === "string" && text.trim()) {
         produced = true;
+        reply = text;
         yield text;
       }
     } else if (res.body) {
@@ -328,7 +400,7 @@ export async function* streamChat(options: StreamChatOptions): AsyncGenerator<st
           while (!finished && (newline = buffer.indexOf("\n")) !== -1) {
             const line = buffer.slice(0, newline).replace(/\r$/, "");
             buffer = buffer.slice(newline + 1);
-            const parsed = parseSseLine(line, res.status, apiKey);
+            const parsed = parseSseLine(line, res.status, apiKey, citations);
             if (!parsed) continue;
             if (parsed.done) {
               finished = true;
@@ -337,6 +409,7 @@ export async function* streamChat(options: StreamChatOptions): AsyncGenerator<st
               thought = true;
             } else {
               if (parsed.text.trim()) produced = true;
+              reply += parsed.text;
               yield parsed.text;
             }
           }
@@ -357,6 +430,9 @@ export async function* streamChat(options: StreamChatOptions): AsyncGenerator<st
       }
       throw new ProviderEmptyReplyError(thought);
     }
+    // Sources the provider attached but the reply did not link to: list them at the end.
+    const sources = sourcesBlock(citations, reply);
+    if (sources) yield sources;
   } catch (err) {
     const failure =
       err instanceof ProviderError

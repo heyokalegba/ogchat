@@ -10,9 +10,20 @@ import {
   type ReactNode,
   type Ref,
 } from "react";
+import type { ReasoningEffort } from "@/lib/types";
 import { PendingFiles } from "./Attachments";
 import styles from "./chat.module.css";
-import { PaperclipIcon, SendIcon, StopIcon } from "./icons";
+import { GlobeIcon, PaperclipIcon, SendIcon, StopIcon } from "./icons";
+
+/** The thinking levels the composer steps through. "low" is in settings for those who want it. */
+const THINKING: ReasoningEffort[] = ["default", "medium", "high", "max"];
+const THINKING_LABEL: Record<ReasoningEffort, string> = {
+  default: "auto",
+  low: "low",
+  medium: "medium",
+  high: "high",
+  max: "max",
+};
 
 export interface ComposerProps {
   value: string;
@@ -28,16 +39,25 @@ export interface ComposerProps {
   files: File[];
   onAddFiles: (files: File[]) => void;
   onRemoveFile: (index: number) => void;
+  /** Whether the next message may search the web. */
+  web: boolean;
+  onToggleWeb: () => void;
+  /** How hard the model thinks. The control is left out when no handler is given. */
+  reasoning?: ReasoningEffort;
+  onReasoningChange?: (next: ReasoningEffort) => void;
   footer?: ReactNode;
 }
 
 /**
  * Enter sends, Shift+Enter inserts a newline, Escape stops a reply in progress.
  * Files are attached with the paperclip, by pasting, or by dropping them on the chat.
+ * The globe lets the next message search the web; "think" sets how hard the
+ * model reasons before it answers.
  */
 export function Composer(props: ComposerProps) {
   const { value, onChange, onSubmit, onStop, busy, canSend, inputRef, footer } = props;
-  const { files, onAddFiles, onRemoveFile } = props;
+  const { files, onAddFiles, onRemoveFile, web, onToggleWeb, onReasoningChange } = props;
+  const reasoning = props.reasoning ?? "default";
   const ready = canSend && !busy && (value.trim().length > 0 || files.length > 0);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
@@ -111,6 +131,33 @@ export function Composer(props: ComposerProps) {
               textarea.current?.focus();
             }}
           />
+          {onReasoningChange && (
+            <button
+              type="button"
+              className={`${styles.chip} ${reasoning === "default" ? "" : styles.chipOn}`}
+              onClick={() => {
+                const at = THINKING.indexOf(reasoning);
+                onReasoningChange(THINKING[(at + 1) % THINKING.length]!);
+              }}
+              aria-label={`Thinking: ${THINKING_LABEL[reasoning]}. Press to change.`}
+              title="How hard the model thinks before answering: auto, medium, high, max"
+            >
+              <span className={styles.chipPrefix}>think: </span>
+              {THINKING_LABEL[reasoning]}
+            </button>
+          )}
+          <button
+            type="button"
+            className={`${styles.attach} ${web ? styles.attachOn : ""}`}
+            onClick={onToggleWeb}
+            aria-pressed={web}
+            aria-label="Search the web"
+            title={
+              web ? "Web search is on for the next message" : "Let the next message search the web"
+            }
+          >
+            <GlobeIcon />
+          </button>
           <button
             type="button"
             className={styles.attach}

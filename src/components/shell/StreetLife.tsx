@@ -1,6 +1,14 @@
 "use client";
 
-import { memo, useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { PEOPLE, SCENES, type SceneId, type SkyState } from "./art";
 import styles from "./backdrop.module.css";
 import {
@@ -31,7 +39,12 @@ const u = (n: number) => `calc(var(--u) * ${n})`;
 const ROOF_BOX = 22; // how much room above a roof line its people get
 
 function MemberView({ member, sheets }: { member: Member; sheets: Sheets }) {
-  const cell = member.sheet === "people" ? PEOPLE.person : PEOPLE.prop;
+  const cell =
+    member.sheet === "people"
+      ? PEOPLE.person
+      : member.sheet === "props"
+        ? PEOPLE.prop
+        : PEOPLE.wheel;
   return (
     <div
       className={styles.member}
@@ -63,6 +76,7 @@ function MemberView({ member, sheets }: { member: Member; sheets: Sheets }) {
 interface Sheets {
   people: string;
   props: string;
+  wheels: string;
 }
 
 /** One party, playing its script from start to finish and then asking to be removed. */
@@ -132,7 +146,13 @@ const PartyView = memo(function PartyView(props: {
   );
 });
 
-export function StreetLife(props: { scene: SceneId; light: SkyState; night: number }) {
+export function StreetLife(props: {
+  scene: SceneId;
+  light: SkyState;
+  night: number;
+  /** Whatever stands at the kerb: drawn over the pavement and under the road. */
+  kerb?: ReactNode;
+}) {
   const { scene, light } = props;
   const art = SCENES[scene];
   const life: LifeConfig = art.config.life;
@@ -235,8 +255,13 @@ export function StreetLife(props: { scene: SceneId; light: SkyState; night: numb
     };
   }, [life, commit]);
 
-  const sheets: Sheets = { people: art.people[light], props: art.props[light] };
-  const street = parties.filter((party) => party.roof === null);
+  const sheets: Sheets = {
+    people: art.people[light],
+    props: art.props[light],
+    wheels: art.wheels[light],
+  };
+  const street = parties.filter((party) => party.roof === null && !party.road);
+  const road = parties.filter((party) => party.road);
 
   return (
     <div className={styles.life}>
@@ -270,6 +295,10 @@ export function StreetLife(props: { scene: SceneId; light: SkyState; night: numb
         .map((party) => (
           <PartyView key={party.id} party={party} sheets={sheets} onDone={onDone} />
         ))}
+      {props.kerb}
+      {road.map((party) => (
+        <PartyView key={party.id} party={party} sheets={sheets} onDone={onDone} />
+      ))}
     </div>
   );
 }

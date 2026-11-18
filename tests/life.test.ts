@@ -15,9 +15,20 @@ import {
 const meta: LifeMeta = {
   frames: 6,
   walkFrames: 4,
-  person: { w: 9, h: 15, rows: 36 },
+  person: { w: 9, h: 15, rows: 40 },
   prop: { w: 12, h: 9, rows: 10 },
-  cast: { adults: [0, 26], children: [26, 6], runners: [32, 4], dogs: [0, 8], pram: 8, lead: 9 },
+  wheel: { w: 20, h: 19, rows: 16 },
+  cast: {
+    cyclists: [0, 8],
+    skaters: [8, 4],
+    ballers: [12, 4],
+    adults: [0, 28],
+    children: [28, 8],
+    runners: [36, 4],
+    dogs: [0, 8],
+    pram: 8,
+    lead: 9,
+  },
 };
 
 const street: LifeConfig = {
@@ -26,6 +37,7 @@ const street: LifeConfig = {
   far: 336,
   from: -14,
   to: 654,
+  road: 351,
   sniff: [59, 133, 237, 307, 319, 399, 475, 591],
   linger: [164, 176, 300, 452],
   roofs: [],
@@ -37,6 +49,7 @@ const roofs: LifeConfig = {
   far: 0,
   from: 0,
   to: 0,
+  road: 0,
   sniff: [],
   linger: [],
   roofs: [
@@ -104,7 +117,7 @@ describe("walkers on the pavement", () => {
         expect(rightward ? step.to > at : step.to < at).toBe(true);
         const speed = Math.abs(step.to - at) / step.seconds;
         expect(speed).toBeGreaterThan(5);
-        expect(speed).toBeLessThan(22);
+        expect(speed).toBeLessThan(37);
         at = step.to;
       }
     }
@@ -116,6 +129,11 @@ describe("walkers on the pavement", () => {
       expect(party.lift).toBe(0);
       for (const member of party.members) {
         const feet = party.y + member.dy;
+        if (party.road) {
+          // cyclists ride in the road, outside the parked cars
+          expect(Math.abs(feet - street.road)).toBeLessThanOrEqual(1);
+          continue;
+        }
         expect(feet).toBeGreaterThanOrEqual(street.far);
         expect(feet).toBeLessThanOrEqual(street.near);
       }
@@ -124,9 +142,15 @@ describe("walkers on the pavement", () => {
 
   it("are cast from the sheets: real rows, sensible cadences, heads counted right", () => {
     for (const party of parties) {
-      expect(people(party)).toHaveLength(party.heads);
+      const riders = party.members.filter((m) => m.sheet === "wheels");
+      expect(people(party).length + riders.length).toBe(party.heads);
       for (const member of party.members) {
-        const rows = member.sheet === "people" ? meta.person.rows : meta.prop.rows;
+        const rows =
+          member.sheet === "people"
+            ? meta.person.rows
+            : member.sheet === "props"
+              ? meta.prop.rows
+              : meta.wheel.rows;
         expect(Number.isInteger(member.row)).toBe(true);
         expect(member.row).toBeGreaterThanOrEqual(0);
         expect(member.row).toBeLessThan(rows);
@@ -145,15 +169,28 @@ describe("walkers on the pavement", () => {
     const dogs = parties.filter((p) => p.members.some((m) => m.sheet === "props" && m.row < 8));
     const leads = parties.filter((p) => p.members.some((m) => m.row === 9 && m.sheet === "props"));
     const prams = parties.filter((p) => p.members.some((m) => m.row === 8 && m.sheet === "props"));
-    const children = parties.filter((p) => people(p).some((m) => m.row >= 26 && m.row < 32));
-    const runners = parties.filter((p) => people(p).some((m) => m.row >= 32));
+    const children = parties.filter((p) => people(p).some((m) => m.row >= 28 && m.row < 36));
+    const runners = parties.filter((p) => people(p).some((m) => m.row >= 36));
+    const wheels = (from: number, to: number) =>
+      parties.filter((p) =>
+        p.members.some((m) => m.sheet === "wheels" && m.row >= from && m.row < to),
+      );
+    const cyclists = wheels(0, 8);
+    expect(cyclists.length).toBeGreaterThan(30);
+    for (const party of cyclists) {
+      expect(party.road).toBe(true);
+      expect(party.steps).toHaveLength(1); // straight through, no stopping
+    }
+    expect(wheels(8, 12).length).toBeGreaterThan(5); // skaters
+    expect(wheels(12, 16).length).toBeGreaterThan(5); // kids with a ball
+    expect(parties.filter((p) => p.road).length).toBe(cyclists.length);
     const solo = parties.filter((p) => p.members.length === 1);
     const pairs = parties.filter((p) => p.heads === 2);
     for (const group of [dogs, leads, prams, children, runners, pairs]) {
       expect(group.length).toBeGreaterThan(15);
     }
-    expect(solo.length).toBeGreaterThan(150);
-    expect(solo.length).toBeLessThan(400);
+    expect(solo.length).toBeGreaterThan(200);
+    expect(solo.length).toBeLessThan(420);
     // a dog on a lead is ahead of its walker
     for (const party of leads) {
       const walker = people(party)[0]!;
@@ -239,6 +276,28 @@ describe("for people who asked for less motion", () => {
         expect(party.steps).toEqual([{ kind: "wait", seconds: Infinity }]);
         expect(party.lift).toBe(0);
       }
+    }
+  });
+});
+
+describe("the cast", () => {
+  it("is dealt in four equal parts, for every kind of character", async () => {
+    // The generator is plain JavaScript outside the app; load it by path.
+    const art = "../scripts/art/";
+    const people = (await import(/* @vite-ignore */ `${art}people.mjs`)) as {
+      shares: (d: unknown, count: number) => object[];
+      CAST: Record<string, number>;
+      RIDERS: Record<string, number>;
+    };
+    const { dice } = (await import(/* @vite-ignore */ `${art}lib.mjs`)) as {
+      dice: (seed: number) => unknown;
+    };
+    for (const count of [...Object.values(people.CAST), ...Object.values(people.RIDERS)]) {
+      expect(count % 4).toBe(0);
+      const dealt = people.shares(dice(count), count);
+      const tally = new Map<object, number>();
+      for (const part of dealt) tally.set(part, (tally.get(part) ?? 0) + 1);
+      expect([...tally.values()]).toEqual([count / 4, count / 4, count / 4, count / 4]);
     }
   });
 });

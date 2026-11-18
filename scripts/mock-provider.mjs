@@ -12,7 +12,9 @@
  *   /think   reasons for a moment before answering, like a reasoning model
  * API keys that fail on purpose: "bad" is rejected with 401, "broke" is out
  * of credits (402), "nope" is not allowed to use the model (403).
- * It also answers GET /v1/models, which the settings test uses.
+ * It also answers GET /v1/models, which the settings test uses. It reports
+ * back the thinking level and system prompt it was sent, and when a message
+ * asks for web search it "finds" two sources and cites them.
  */
 import http from "node:http";
 
@@ -100,6 +102,7 @@ const server = http.createServer(async (req, res) => {
     .map((part) => part.text)
     .join("\n");
   const images = parts.filter((part) => part.type === "image_url").length;
+  const system = messages.find((message) => message.role === "system")?.content ?? "";
   const fileBlocks = (last.match(/^Attached file: /gm) ?? []).length;
   console.log(
     `[mock-provider] model=${body.model} messages=${messages.length} last=${JSON.stringify(last.slice(0, 60))}`,
@@ -143,7 +146,7 @@ const server = http.createServer(async (req, res) => {
       ? Array.from({ length: 120 }, (_, i) => `Line ${i + 1} of a deliberately long reply.`).join(
           "\n\n",
         )
-      : `${REPLY}${last.replace(/\s+/g, " ").slice(0, 200)}\n\nThat was message ${messages.length} of this session's context. Attachments received with it: ${fileBlocks} file(s) as text, ${images} image(s).`;
+      : `${REPLY}${last.replace(/\s+/g, " ").slice(0, 200)}\n\nThat was message ${messages.length} of this session's context. Attachments received with it: ${fileBlocks} file(s) as text, ${images} image(s). Thinking: ${body.reasoning_effort ?? "auto"}. System prompt: ${system ? JSON.stringify(system.slice(0, 60)) : "none"}. Web search: ${body.web_search_options ? "on" : "off"}.`;
     const tokens = text.match(/\s*\S+/g) ?? [];
     let closed = false;
     res.on("close", () => (closed = true));
@@ -156,6 +159,19 @@ const server = http.createServer(async (req, res) => {
       send(token);
       await sleep(slow ? 60 : 22);
     }
+  }
+  if (body.web_search_options) {
+    const annotations = [
+      {
+        type: "url_citation",
+        url_citation: { url: "https://example.com/first", title: "First source" },
+      },
+      {
+        type: "url_citation",
+        url_citation: { url: "https://example.org/second", title: "Second source" },
+      },
+    ];
+    res.write(`data: ${JSON.stringify({ choices: [{ index: 0, delta: { annotations } }] })}\n\n`);
   }
   res.write("data: [DONE]\n\n");
   res.end();

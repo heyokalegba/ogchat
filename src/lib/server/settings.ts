@@ -1,4 +1,9 @@
-import type { KeySource, PublicSettings } from "@/lib/types";
+import {
+  REASONING_EFFORTS,
+  type KeySource,
+  type PublicSettings,
+  type ReasoningEffort,
+} from "@/lib/types";
 import { maskKey } from "@/lib/provider/redact";
 import { readJson, writeJsonAtomic } from "./fsjson";
 import { settingsFile } from "./paths";
@@ -16,23 +21,32 @@ import { settingsFile } from "./paths";
 
 export const DEFAULT_BASE_URL = "https://api.abliteration.ai/v1";
 export const DEFAULT_MODEL = "abliterated-model-large-v2";
+export const MAX_SYSTEM_PROMPT_CHARS = 20_000;
 
 export interface ResolvedSettings {
   baseUrl: string;
   model: string;
   apiKey: string | null;
   keySource: KeySource | null;
+  reasoning: ReasoningEffort;
+  systemPrompt: string;
 }
 
 interface StoredSettings {
   baseUrl?: string;
   model?: string;
   apiKey?: string;
+  reasoning?: ReasoningEffort;
+  systemPrompt?: string;
 }
 
 export interface SettingsPatch {
   baseUrl?: unknown;
   model?: unknown;
+  /** One of REASONING_EFFORTS. */
+  reasoning?: unknown;
+  /** Text sent as the system message of every conversation; "" for none. */
+  systemPrompt?: unknown;
   /** A string replaces the saved key; null or "" removes it; undefined leaves it alone. */
   apiKey?: unknown;
 }
@@ -48,6 +62,10 @@ function str(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
+function isEffort(value: unknown): value is ReasoningEffort {
+  return typeof value === "string" && (REASONING_EFFORTS as readonly string[]).includes(value);
+}
+
 function readStored(): StoredSettings {
   let raw: unknown;
   try {
@@ -57,7 +75,16 @@ function readStored(): StoredSettings {
   }
   if (!raw || typeof raw !== "object") return {};
   const s = raw as Record<string, unknown>;
-  return { baseUrl: str(s.baseUrl), model: str(s.model), apiKey: str(s.apiKey) };
+  return {
+    baseUrl: str(s.baseUrl),
+    model: str(s.model),
+    apiKey: str(s.apiKey),
+    reasoning: isEffort(s.reasoning) && s.reasoning !== "default" ? s.reasoning : undefined,
+    systemPrompt:
+      typeof s.systemPrompt === "string" && s.systemPrompt.trim()
+        ? s.systemPrompt.slice(0, MAX_SYSTEM_PROMPT_CHARS)
+        : undefined,
+  };
 }
 
 function writeStored(stored: StoredSettings): void {
@@ -94,6 +121,8 @@ export function resolveSettings(): ResolvedSettings {
     model: stored.model ?? env("OGCHAT_MODEL") ?? DEFAULT_MODEL,
     apiKey: stored.apiKey ?? envKey,
     keySource: stored.apiKey ? "settings" : envKey ? "env" : null,
+    reasoning: stored.reasoning ?? "default",
+    systemPrompt: stored.systemPrompt ?? "",
   };
 }
 
@@ -108,6 +137,8 @@ export function publicSettings(): PublicSettings {
       source: s.keySource,
     },
     defaults: { baseUrl: DEFAULT_BASE_URL, model: DEFAULT_MODEL },
+    reasoning: s.reasoning,
+    systemPrompt: s.systemPrompt,
   };
 }
 
@@ -139,6 +170,7 @@ export function previewSettings(patch: SettingsPatch): ResolvedSettings {
   const current = resolveSettings();
   const typedKey = patch.apiKey === undefined ? null : cleanKey(patch.apiKey);
   return {
+    ...current,
     baseUrl: patch.baseUrl === undefined ? current.baseUrl : normalizeBaseUrl(patch.baseUrl),
     model: patch.model === undefined ? current.model : cleanModel(patch.model),
     apiKey: typedKey ?? current.apiKey,
@@ -168,6 +200,29 @@ export function updateSettings(patch: SettingsPatch): PublicSettings {
     const key = cleanKey(patch.apiKey);
     if (key) stored.apiKey = key;
     else delete stored.apiKey;
+  }
+
+  if (patch.reasoning !== undefined) {
+    if (!isEffort(patch.reasoning)) {
+      throw new SettingsValidationError(
+        `Reasoning must be one of: ${REASONING_EFFORTS.join(", ")}.`,
+      );
+    }
+    if (patch.reasoning === "default") delete stored.reasoning;
+    else stored.reasoning = patch.reasoning;
+  }
+
+  if (patch.systemPrompt !== undefined) {
+    if (typeof patch.systemPrompt !== "string") {
+      throw new SettingsValidationError("System prompt must be text.");
+    }
+    if (patch.systemPrompt.length > MAX_SYSTEM_PROMPT_CHARS) {
+      throw new SettingsValidationError(
+        `System prompt is too long (the limit is ${MAX_SYSTEM_PROMPT_CHARS.toLocaleString("en-US")} characters).`,
+      );
+    }
+    if (patch.systemPrompt.trim()) stored.systemPrompt = patch.systemPrompt.trim();
+    else delete stored.systemPrompt;
   }
 
   writeStored(stored);

@@ -288,6 +288,93 @@ describe("sending messages", () => {
     expect(last(events, "done").message?.content).toBe("Hello.");
   });
 
+  it("sends the system prompt first and the thinking level, when they are set", async () => {
+    await useKey();
+    const provider = stubProvider(() => sseResponse(["ok"]));
+    const session = await create();
+    await send(session.id, { content: "hi" });
+    // nothing extra by default: the provider decides
+    expect(provider.calls[0]?.body.messages).toEqual([{ role: "user", content: "hi" }]);
+    expect(provider.calls[0]?.body).not.toHaveProperty("reasoning_effort");
+    expect(provider.calls[0]?.body).not.toHaveProperty("web_search_options");
+
+    await putSettings(
+      req("PUT", "/api/settings", { reasoning: "max", systemPrompt: "You are terse." }),
+    );
+    await send(session.id, { content: "again" });
+    expect(provider.calls[1]?.body.reasoning_effort).toBe("max");
+    expect(provider.calls[1]?.body.messages).toEqual([
+      { role: "system", content: "You are terse." },
+      { role: "user", content: "hi" },
+      { role: "assistant", content: "ok" },
+      { role: "user", content: "again" },
+    ]);
+    // the prompt is an instruction to the model, not part of the saved conversation
+    expect((await detail(session.id)).session.messages.map((m) => m.role)).toEqual([
+      "user",
+      "assistant",
+      "user",
+      "assistant",
+    ]);
+  });
+
+  it("asks the provider to search the web only for messages sent with web on", async () => {
+    await useKey();
+    const chunk = (body: object) => `data: ${JSON.stringify(body)}\n\n`;
+    const provider = stubProvider((call) =>
+      call.body.web_search_options
+        ? new Response(
+            chunk({ choices: [{ delta: { content: "It is sunny" } }] }) +
+              chunk({
+                choices: [
+                  {
+                    delta: {
+                      annotations: [
+                        {
+                          type: "url_citation",
+                          url_citation: {
+                            url: "https://weather.example/nyc",
+                            title: "NYC weather",
+                          },
+                        },
+                      ],
+                    },
+                  },
+                ],
+              }) +
+              "data: [DONE]\n\n",
+            { headers: { "Content-Type": "text/event-stream" } },
+          )
+        : sseResponse(["plain"]),
+    );
+    const session = await create();
+    const searched = await send(session.id, { content: "weather?", web: true });
+    expect(provider.calls[0]?.body.web_search_options).toEqual({ search_context_size: "medium" });
+    const started = searched[0];
+    expect(started?.type === "start" && started.userMessage?.web).toBe(true);
+    // the sources the provider attached are listed under the reply
+    expect(last(searched, "done").message?.content).toBe(
+      "It is sunny\n\n**Sources**\n- [NYC weather](https://weather.example/nyc)",
+    );
+
+    // a retry of that message searches again; a plain message does not
+    await send(session.id, { regenerate: true });
+    expect(provider.calls[1]?.body.web_search_options).toBeDefined();
+    const plain = await send(session.id, { content: "thanks" });
+    expect(provider.calls[2]?.body).not.toHaveProperty("web_search_options");
+    expect(last(plain, "done").message?.content).toBe("plain");
+  });
+
+  it("explains a refused web search", async () => {
+    await useKey();
+    stubProvider(() =>
+      Response.json({ error: { message: "web tools are not enabled" } }, { status: 400 }),
+    );
+    const session = await create();
+    const events = await send(session.id, { content: "news?", web: true });
+    expect(last(events, "error").error.message).toMatch(/Web tools/);
+  });
+
   it("uses the base URL and model from settings without re-entering the key", async () => {
     await useKey();
     const saved = await putSettings(
@@ -675,7 +762,30 @@ describe("settings API", () => {
         baseUrl: "https://api.abliteration.ai/v1",
         model: "abliterated-model-large-v2",
       },
+      reasoning: "default",
+      systemPrompt: "",
     });
+  });
+
+  it("saves the thinking level and the system prompt, and validates both", async () => {
+    const res = await putSettings(
+      req("PUT", "/api/settings", { reasoning: "high", systemPrompt: "  Answer in one line.  " }),
+    );
+    expect(res.status).toBe(200);
+    expect(await settings()).toMatchObject({
+      reasoning: "high",
+      systemPrompt: "Answer in one line.",
+    });
+    // going back to auto and an empty prompt removes both
+    await putSettings(req("PUT", "/api/settings", { reasoning: "default", systemPrompt: "" }));
+    expect(await settings()).toMatchObject({ reasoning: "default", systemPrompt: "" });
+
+    const bad = await putSettings(req("PUT", "/api/settings", { reasoning: "ludicrous" }));
+    expect(bad.status).toBe(400);
+    const long = await putSettings(
+      req("PUT", "/api/settings", { systemPrompt: "x".repeat(20_001) }),
+    );
+    expect(long.status).toBe(400);
   });
 
   it("saves settings and only ever returns the key masked", async () => {

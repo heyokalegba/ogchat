@@ -25,10 +25,13 @@ const CONFIRM_MS = 3000;
 function TagRow({
   role,
   time,
+  note,
   children,
 }: {
   role: string;
   time: string;
+  /** A word after the time, such as "web" on a message that searched. */
+  note?: string;
   children?: React.ReactNode;
 }) {
   const tone =
@@ -41,6 +44,7 @@ function TagRow({
     <div className={styles.tagRow}>
       <span className={`${styles.tag} ${tone}`}>{role}&gt;</span>
       {time && <time className={styles.time}>{time}</time>}
+      {note && <span className={styles.time}>{note}</span>}
       {children}
     </div>
   );
@@ -143,7 +147,11 @@ export const MessageView = memo(function MessageView(props: MessageViewProps) {
 
   return (
     <article className={styles.message} data-role={message.role}>
-      <TagRow role={message.role} time={clockTime(message.createdAt)}>
+      <TagRow
+        role={message.role}
+        time={clockTime(message.createdAt)}
+        note={message.web ? "web" : undefined}
+      >
         <div className={`${styles.actions} ${confirming ? styles.actionsPinned : ""}`}>
           {isUser && canEdit && (
             <>

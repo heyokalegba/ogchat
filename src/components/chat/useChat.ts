@@ -49,6 +49,7 @@ export interface UseChatOptions {
 }
 
 const POLL_MS = 800;
+const WEB_KEY = "ogchat:web";
 const STOP_GRACE_MS = 2500;
 
 function metaOf(session: Session): SessionMeta {
@@ -104,6 +105,27 @@ export function useChat(options: UseChatOptions) {
   const setFiles = useCallback((next: File[]) => {
     filesRef.current = next;
     setFilesState(next);
+  }, []);
+  /** Whether the next message may search the web. Remembered in this browser. */
+  const [web, setWebState] = useState(false);
+  const webRef = useRef(false);
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(WEB_KEY) === "1";
+      webRef.current = saved;
+      setWebState(saved);
+    } catch {
+      // storage unavailable: the switch simply starts off
+    }
+  }, []);
+  const setWeb = useCallback((next: boolean) => {
+    webRef.current = next;
+    setWebState(next);
+    try {
+      window.localStorage.setItem(WEB_KEY, next ? "1" : "0");
+    } catch {
+      // not remembered, still applied
+    }
   }, []);
   /** Counts session opens; drives the boot line and composer focus. */
   const [openCount, setOpenCount] = useState(0);
@@ -358,7 +380,11 @@ export function useChat(options: UseChatOptions) {
       if ((!text && attached.length === 0) || phaseRef.current !== "idle") return false;
       setDraft("");
       setFiles([]);
-      void submit({ content: text, ...(attached.length ? { files: attached } : {}) });
+      void submit({
+        content: text,
+        ...(attached.length ? { files: attached } : {}),
+        ...(webRef.current ? { web: true } : {}),
+      });
       return true;
     },
     [setFiles, submit],
@@ -408,7 +434,11 @@ export function useChat(options: UseChatOptions) {
     (messageId: string, content: string) => {
       const text = content.trim();
       if (phaseRef.current !== "idle") return false;
-      void submit({ content: text, replaceFromMessageId: messageId });
+      void submit({
+        content: text,
+        replaceFromMessageId: messageId,
+        ...(webRef.current ? { web: true } : {}),
+      });
       return true;
     },
     [submit],
@@ -484,6 +514,8 @@ export function useChat(options: UseChatOptions) {
     phase,
     streamText,
     thinking,
+    web,
+    setWeb,
     error,
     draft,
     setDraft,

@@ -6,7 +6,7 @@ import { MenuIcon } from "@/components/chat/icons";
 import "@/components/chat/theme.css";
 import { createApi } from "@/lib/client/api";
 import { brooklynClock, offsetForClockTime, readSky } from "@/lib/daylight";
-import type { PublicSettings, SessionMeta } from "@/lib/types";
+import type { PublicSettings, ReasoningEffort, SessionMeta } from "@/lib/types";
 import { SCENES, type SceneId } from "./art";
 import { Backdrop } from "./Backdrop";
 import { DEFAULT_LOOK, loadLook, lookVariables, saveLook, type Look } from "./look";
@@ -210,6 +210,14 @@ export function AppShell() {
     api.getSettings().then(setSettings, () => {});
   }, [api]);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
+  /** The composer's thinking button: applied at once, saved in the background. */
+  const onReasoningChange = useCallback(
+    (reasoning: ReasoningEffort) => {
+      setSettings((current) => (current ? { ...current, reasoning } : current));
+      api.saveSettings({ reasoning }).then(setSettings, () => {});
+    },
+    [api],
+  );
 
   const changeLook = useCallback((patch: Partial<Look>) => {
     setLook((current) => {
@@ -326,6 +334,8 @@ export function AppShell() {
               sessionId={activeId}
               openToken={openToken}
               provider={provider}
+              reasoning={settings?.reasoning}
+              onReasoningChange={settings ? onReasoningChange : undefined}
               onSessionCreated={onSessionCreated}
               onSessionUpdated={upsert}
               onSessionMissing={onSessionMissing}

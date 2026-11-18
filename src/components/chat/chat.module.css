@@ -51,13 +51,23 @@
   overscroll-behavior: contain;
 }
 
+/*
+ * The conversation, the boot line and the composer share one measure. It sits
+ * a little left of centre: when there is room to spare, less of it goes on the
+ * left than on the right.
+ */
+.column,
+.bootInner,
+.composer {
+  width: 100%;
+  max-width: 924px;
+  margin: 0 auto 0 max(0px, calc((100% - 924px) / 2 - 16px));
+}
+
 .column {
   display: flex;
   flex-direction: column;
-  width: 100%;
-  max-width: 840px;
   min-height: 100%;
-  margin: 0 auto;
   padding: 62px 24px 20px;
 }
 
@@ -83,8 +93,6 @@
 
 .bootInner {
   display: flex;
-  max-width: 840px;
-  margin: 0 auto;
   padding: 16px 24px 0;
 }
 
@@ -315,10 +323,12 @@
   gap: 10px;
   width: fit-content;
   max-width: 100%;
-  padding: 10px 14px;
+  /* Snug top and bottom: the sheet should hug a one-line message. */
+  padding: 5px 14px 6px;
   border: var(--og-line) solid var(--og-ink);
   background: var(--og-yellow);
   box-shadow: var(--og-shadow);
+  line-height: 1.5;
 }
 
 .userBody {
@@ -599,9 +609,6 @@ a.chip:hover {
 
 .composer {
   flex: none;
-  width: 100%;
-  max-width: 840px;
-  margin: 0 auto;
   padding: 6px 24px 14px;
 }
 
@@ -677,6 +684,34 @@ a.chip:hover {
 }
 
 .surface .attach:hover {
+  color: var(--og-white);
+  background: var(--og-ink);
+}
+
+/* A switch that is on: the web search globe. */
+.surface .attachOn {
+  color: var(--og-white);
+  background: var(--og-accent);
+}
+
+/* A small lettered control in the input row: the thinking level. */
+.surface .chip {
+  flex: none;
+  height: 32px;
+  padding: 0 8px;
+  border: 2px solid var(--og-ink);
+  font-family: var(--og-font-mono);
+  font-size: calc(12px * var(--og-type));
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--og-ink);
+  transition:
+    background var(--og-fast) var(--og-ease),
+    color var(--og-fast) var(--og-ease);
+}
+
+.surface .chip:hover,
+.surface .chipOn {
   color: var(--og-white);
   background: var(--og-ink);
 }
@@ -768,6 +803,16 @@ a.chip:hover {
 }
 
 @media (max-width: 560px) {
+  .surface .chip {
+    padding: 0 5px;
+  }
+  /* No room for the word on a phone; the level alone still says what it is set to. */
+  .chipPrefix {
+    display: none;
+  }
+  .inputRow {
+    gap: 4px;
+  }
   .column {
     padding: 58px 16px 16px;
   }

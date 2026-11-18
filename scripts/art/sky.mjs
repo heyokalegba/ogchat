@@ -5,7 +5,7 @@
  * The sky pictures hold no sun, moon or stars. Those are separate sprites the
  * backdrop places from the real time, so they can move.
  */
-import { bandedSky, bayer, canvas, clouds, dice, H, hex, W } from "./lib.mjs";
+import { bandedSky, bayer, canvas, clouds, dice, grade, H, hex, shade, W } from "./lib.mjs";
 
 /** Sky colours from overhead down to the horizon, per state. */
 const BANDS = {
@@ -148,4 +148,101 @@ export function moon() {
     }
   }
   return { canvas: c, frame: size };
+}
+
+// ---------------------------------------------------------------- aircraft
+
+/** One aircraft's cell, and how the sheet is laid out: two frames across, one row each. */
+export const FLIER = { w: 26, h: 10, frames: 2, rows: 2, plane: 0, helicopter: 1 };
+
+/** How something up in the sky takes the light at each hour. */
+const AIR_GRADES = {
+  day: (c) => c,
+  golden: grade({ gain: [1.0, 0.9, 0.76], tint: "#d08a4a", amount: 0.16 }),
+  dusk: grade({ gain: [0.5, 0.48, 0.6], tint: "#3a3050", amount: 0.3 }),
+  night: grade({ gain: [0.24, 0.26, 0.38], tint: "#131a30", amount: 0.36 }),
+};
+
+/**
+ * An airliner and a helicopter, nose to the right, in one light. The second
+ * frame is the airliner's strobe going off and the helicopter's rotor coming
+ * round. After dark they are mostly their lights.
+ */
+export function fliers(state) {
+  const c = canvas(FLIER.w * FLIER.frames, FLIER.h * FLIER.rows);
+  const tone = AIR_GRADES[state];
+  const dark = state === "dusk" || state === "night";
+  const body = tone(hex("#c9cdd2"));
+  const belly = tone(hex("#8d949c"));
+  const trim = tone(hex("#34485e"));
+  const glass = tone(hex("#2a3644"));
+  for (let frame = 0; frame < FLIER.frames; frame++) {
+    const ox = frame * FLIER.w;
+    const px = (x, y, color) => c.set(ox + x, y, color);
+
+    // ---- the airliner
+    for (let x = 3; x <= 22; x++) {
+      px(x, 4, body);
+      px(x, 5, belly);
+    }
+    px(23, 5, body); // nose
+    px(23, 4, glass);
+    for (let x = 7; x <= 20; x += 2) px(x, 4, glass); // windows
+    [
+      [1, 1],
+      [2, 1],
+      [1, 2],
+      [2, 2],
+      [3, 2],
+      [2, 3],
+      [3, 3],
+      [4, 3],
+    ].forEach(([x, y]) => px(x, y, trim)); // the fin, in the airline's colour
+    px(1, 4, body); // tailplane
+    px(2, 4, body);
+    [
+      [13, 6],
+      [12, 6],
+      [11, 7],
+      [10, 7],
+      [9, 8],
+    ].forEach(([x, y]) => px(x, y, belly)); // the near wing, swept back
+    px(12, 7, shade(belly, 0.6)); // an engine under it
+    px(13, 7, shade(belly, 0.6));
+    if (dark) {
+      px(9, 8, hex("#c8483a")); // wingtip
+      px(23, 5, hex("#e9e2c4"));
+      if (frame === 1) px(1, 1, hex("#ffffff")); // the strobe
+    }
+
+    // ---- the helicopter
+    const oy = FLIER.h;
+    const hp = (x, y, color) => c.set(ox + x, oy + y, color);
+    const hull = tone(hex("#3f5560"));
+    const blade = tone(hex("#22262b"));
+    // rotor: a full sweep, then edge on
+    for (let x = frame === 0 ? 4 : 9; x <= (frame === 0 ? 20 : 15); x++) hp(x, 0, blade);
+    hp(12, 1, blade);
+    for (let x = 8; x <= 16; x++) for (let y = 2; y <= 5; y++) hp(x, y, hull);
+    hp(17, 3, hull);
+    hp(17, 4, hull);
+    hp(8, 2, tone(hex("#2f434c")));
+    for (let x = 14; x <= 16; x++) for (let y = 3; y <= 4; y++) hp(x, y, glass);
+    hp(17, 4, glass);
+    for (let x = 1; x <= 8; x++) hp(x, 3, hull); // tail boom
+    hp(1, 2, hull);
+    hp(0, frame === 0 ? 1 : 2, blade); // tail rotor
+    hp(0, frame === 0 ? 3 : 2, blade);
+    hp(1, frame === 0 ? 2 : 1, blade);
+    hp(10, 6, blade); // skids
+    hp(15, 6, blade);
+    for (let x = 8; x <= 17; x++) hp(x, 7, blade);
+    for (let x = 8; x <= 16; x++) hp(x, 5, tone(hex("#2f434c")));
+    if (dark) {
+      hp(12, 6, frame === 0 ? hex("#d2483a") : hex("#5a2a24")); // the beacon under the belly
+      hp(17, 4, hex("#e9e2c4"));
+      hp(1, 2, hex("#c8483a"));
+    }
+  }
+  return c;
 }

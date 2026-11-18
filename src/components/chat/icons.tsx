@@ -28,6 +28,13 @@ export const SendIcon = () => (
   </Icon>
 );
 
+export const GlobeIcon = () => (
+  <Icon>
+    <circle cx="8" cy="8" r="5.5" />
+    <path d="M2.5 8h11M8 2.5c-2.2 1.7-2.2 9.3 0 11M8 2.5c2.2 1.7 2.2 9.3 0 11" />
+  </Icon>
+);
+
 export const StopIcon = () => (
   <Icon>
     <rect x="4.5" y="4.5" width="7" height="7" rx="1.2" fill="currentColor" stroke="none" />

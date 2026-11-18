@@ -905,6 +905,15 @@
   transition: box-shadow var(--og-fast) var(--og-ease);
 }
 
+/* The system prompt: the same field, several lines tall. */
+.textArea {
+  height: auto;
+  min-height: 96px;
+  padding: 9px 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
 .textInput::placeholder {
   color: #7b7466;
 }

@@ -8,6 +8,8 @@
  * canopy of Prospect Park with the memorial arch at its gate, and the clock
  * tower downtown catching the last light. The sun has just gone.
  */
+import { empireState, oneWorldTrade } from "./landmarks.mjs";
+import { dealer, lamps, stamp, vehicle } from "./vehicles.mjs";
 import {
   bayer,
   canvas,
@@ -113,7 +115,56 @@ function block() {
     }
     x += w;
   }
-  // The clock tower: a slender stepped shaft under a dome, its clock face lit.
+  // ------------------------------------------------------------ farther still: Manhattan
+  // Lower Manhattan and midtown stand over the rooftops to the right of
+  // downtown, paler for the distance. One World Trade is the tallest thing
+  // in the picture. Dice of their own, so the block is dealt as before.
+  {
+    const M = dice(1776);
+    const haze = ["#605e7e", "#676585", "#5b5a79"].map(hex);
+    const glow = [hex("#b89f66"), hex("#c9ae70")];
+    for (let x = 300; x < 492;) {
+      const w = M.between(7, 13);
+      const near = Math.exp(-(((x - 352) / 34) ** 2)) + 0.75 * Math.exp(-(((x - 452) / 26) ** 2));
+      const h = Math.round(M.between(44, 62) + 46 * near);
+      const color = M.pick(haze);
+      skyline.rect(x, PARK_BASE - h, w, h, color);
+      skyline.rect(x + w - 2, PARK_BASE - h, 2, h, shade(color, 0.9));
+      for (let wy = PARK_BASE - h + 3; wy < PARK_BASE - 30; wy += 4) {
+        for (let wx = x + 1; wx < x + w - 2; wx += 3) {
+          if (M.chance(0.14)) emit.light(skyline, wx, wy, 1, 1, M.pick(glow), "night");
+        }
+      }
+      x += w + (M.chance(0.25) ? M.between(1, 3) : 0);
+    }
+    beacons.push([
+      352,
+      oneWorldTrade(skyline, {
+        x: 352,
+        base: PARK_BASE,
+        height: 152,
+        width: 15,
+        glass: hex("#7476a0"),
+        emit,
+        L: M,
+        lit: glow,
+      }),
+    ]);
+    empireState(skyline, {
+      x: 452,
+      base: PARK_BASE,
+      height: 104,
+      width: 17,
+      stone: hex("#77728c"),
+      emit,
+      L: M,
+      lit: glow,
+      flood: hex("#e6d9b4"),
+    });
+  }
+
+  // The clock tower (the Williamsburgh Savings Bank tower, downtown Brooklyn's
+  // own landmark): a slender stepped shaft under a dome, its clock face lit.
   {
     const cx = 168;
     const stone = hex("#665f78");
@@ -471,26 +522,6 @@ function block() {
         rooftops.rect(cx, SIDEWALK - 6, 5, 2, hex(tone));
       }
       emit.spill(rooftops, x + w / 2, SIDEWALK - 2, 20, hex("#d9b061"), 0.5, "evening");
-      // the neon in the window comes and goes
-      for (const [dx, dy] of [
-        [0, 0],
-        [1, 0],
-        [2, 0],
-        [0, 1],
-        [2, 1],
-        [0, 2],
-        [1, 2],
-        [2, 2],
-        [4, 0],
-        [4, 1],
-        [4, 2],
-        [5, 0],
-        [6, 0],
-        [6, 1],
-        [5, 1],
-      ]) {
-        emit.light(rooftops, x + 6 + dx, wy + 2 + dy, 1, 1, hex("#e0735e"), "b");
-      }
       return top;
     }
 
@@ -588,23 +619,17 @@ function block() {
     x += w;
   }
 
-  // parked cars along the kerb
+  // Parked along the kerb: all sorts, nose to the right like the lane beside them.
+  // The old dice are still thrown so the trees after them fall as before; the
+  // make and paint of each car come from dice of their own.
   const paints = ["#3a4654", "#5a3d36", "#4a4a48", "#2c3a33", "#6b6558", "#2b2d33"].map(D);
+  const park = dealer(dice(808), PARKED);
   for (const x of [22, 96, 204, 262, 356, 438, 548, 598]) {
     if (chance(0.2)) continue;
-    const body = pick(paints);
-    const y = 338;
-    parked.rect(x + 6, y, 14, 4, body); // cabin
-    parked.rect(x + 7, y + 1, 5, 3, hex("#1b1d26"));
-    parked.rect(x + 13, y + 1, 6, 3, hex("#1b1d26"));
-    parked.set(x + 8, y + 1, hex("#474a66"));
-    parked.rect(x, y + 4, 28, 5, body);
-    parked.rect(x, y + 4, 28, 1, shade(body, 1.25));
-    parked.rect(x, y + 8, 28, 1, shade(body, 0.6));
-    parked.rect(x + 3, y + 8, 5, 3, hex("#0e0e11")); // wheels
-    parked.rect(x + 20, y + 8, 5, 3, hex("#0e0e11"));
-    parked.set(x, y + 5, hex("#8a3a30")); // tail light
-    parked.set(x + 27, y + 5, hex("#bdb48c"));
+    pick(paints);
+    const car = park();
+    stamp(parked, vehicle(car.kind, car.paint), x, PARKED_BASE, { tone: dusk });
+    lamps(parked, car, x, PARKED_BASE);
   }
   rooftops.rect(306, SIDEWALK - 6, 3, 6, D("#8f3d2f")); // a hydrant
   rooftops.rect(305, SIDEWALK - 4, 5, 1, D("#8f3d2f"));
@@ -686,49 +711,58 @@ function block() {
   return { states, lights, glow, beacons, chimneys };
 }
 
+/** Where parked cars' wheels rest, and where each lane's do. */
+const PARKED_BASE = 348;
+const LANES = [
+  { base: 353, seconds: 44, reverse: true }, // by the kerb, heading right
+  { base: 359, seconds: 52, reverse: false }, // nearer us, heading left
+];
+const LANE_ROW = 18; // tall enough for a bus
+const LANE_SPAN = 3; // the strip is this many pictures long, so the traffic takes a while to repeat
+
+const PARKED = [
+  ["sedan", 4],
+  ["hatchback", 3],
+  ["suv", 3],
+  ["pickup", 1.5],
+  ["van", 1],
+  ["sports", 0.7],
+];
+const MOVING = [
+  ["sedan", 4],
+  ["hatchback", 2],
+  ["suv", 3],
+  ["taxi", 2.2],
+  ["pickup", 1.5],
+  ["van", 1.5],
+  ["sports", 1],
+  ["truck", 1],
+  ["bus", 0.9],
+];
+
 /**
- * What passes on the street, as two seamless strips six pixels tall: one
- * row heading right (a car, a bus), one heading left (a car, a cyclist).
+ * What passes on the street: one long seamless strip per lane, in one light.
+ * The same dice deal the same traffic in every light; after dark the lamps
+ * are on.
  */
-function traffic() {
-  const c = canvas(W, 12);
-  const car = (x, y, dir, body) => {
-    c.rect(x + 4, y, 8, 2, shade(body, 1.2)); // cabin
-    c.rect(x + 5, y, 2, 2, hex("#4a5266"));
-    c.rect(x + 9, y, 2, 2, hex("#4a5266"));
-    c.rect(x, y + 2, 16, 3, body);
-    c.rect(x + 2, y + 5, 3, 1, hex("#0c0c0e"));
-    c.rect(x + 11, y + 5, 3, 1, hex("#0c0c0e"));
-    const nose = dir > 0 ? x + 15 : x;
-    const tail = dir > 0 ? x : x + 15;
-    c.set(nose, y + 3, hex("#f4e6a8"));
-    c.set(tail, y + 3, hex("#b8402f"));
-    for (let i = 1; i <= 10; i++) {
-      if (bayer(nose + i * dir, y + 3) < 0.8 - i * 0.07)
-        c.set(nose + i * dir, y + 4, hex("#9c8f62")); // light on the road
+function traffic(state) {
+  const c = canvas(W * LANE_SPAN, LANE_ROW * LANES.length);
+  const d = dice(606);
+  const next = dealer(d, MOVING);
+  const tone = (p) => GRADES[state](dusk(p));
+  const on = state === "dusk" || state === "night";
+  LANES.forEach((lane, row) => {
+    const base = (row + 1) * LANE_ROW - 1;
+    const flip = !lane.reverse; // the strip that slides left carries cars facing left
+    let x = d.between(20, 120);
+    for (;;) {
+      const v = next();
+      if (x + v.w > c.w - 60) break;
+      stamp(c, vehicle(v.kind, v.paint), x, base, { flip, tone });
+      lamps(c, v, x, base, { flip, on });
+      x += v.w + d.between(200, 480);
     }
-  };
-  const bus = (x, y) => {
-    c.rect(x, y, 34, 5, hex("#3d566e"));
-    c.rect(x, y + 3, 34, 1, hex("#c9c5b6"));
-    for (let wx = x + 2; wx < x + 31; wx += 4) c.rect(wx, y + 1, 3, 2, hex("#d8c68e"));
-    c.rect(x + 3, y + 5, 4, 1, hex("#0c0c0e"));
-    c.rect(x + 26, y + 5, 4, 1, hex("#0c0c0e"));
-    c.set(x + 33, y + 4, hex("#f4e6a8"));
-    c.set(x, y + 4, hex("#b8402f"));
-    for (let i = 1; i <= 10; i++)
-      if (bayer(x + 33 + i, y) < 0.8 - i * 0.07) c.set(x + 33 + i, y + 5, hex("#9c8f62"));
-  };
-  car(120, 0, 1, hex("#23262d"));
-  bus(418, 0);
-  car(306, 6, -1, hex("#3a2a28"));
-  // a cyclist with a front light
-  c.rect(540, 10, 2, 2, hex("#0c0c0e"));
-  c.rect(546, 10, 2, 2, hex("#0c0c0e"));
-  c.rect(541, 9, 6, 1, hex("#2a2a2e"));
-  c.rect(543, 6, 2, 3, hex("#3b4a5c"));
-  c.set(544, 5, hex("#8a6a55"));
-  c.set(539, 9, hex("#f4e6a8"));
+  });
   return c;
 }
 
@@ -747,9 +781,9 @@ export function brooklynScene(puff, cast) {
     "glow-back-b.png": scene.glow.backB,
     "glow-front-a.png": scene.glow.frontA,
     "glow-front-b.png": scene.glow.frontB,
-    "traffic.png": traffic(),
   };
   for (const state of STATES) {
+    images[`traffic-${state}.png`] = traffic(state);
     images[`city-${state}.png`] = scene.states[state].city;
     images[`rooftops-${state}.png`] = scene.states[state].rooftops;
     images[`parked-${state}.png`] = scene.states[state].parked;
@@ -757,6 +791,7 @@ export function brooklynScene(puff, cast) {
     // palette first, then light it like everything else here.
     images[`people-${state}.png`] = cast.people.graded(dusk).graded(GRADES[state]);
     images[`props-${state}.png`] = cast.props.graded(dusk).graded(GRADES[state]);
+    images[`wheels-${state}.png`] = cast.wheels.graded(dusk).graded(GRADES[state]);
   }
   return {
     images,
@@ -776,32 +811,19 @@ export function brooklynScene(puff, cast) {
         opacity: 0.5,
         front: true,
       })),
-      lanes: [
-        {
-          left: "0%",
-          top: pctY(345),
-          width: "100%",
-          height: pctY(6),
-          rows: 2,
-          row: 0,
-          reverse: true,
-          seconds: 38,
-          steps: W,
-          front: true,
-        },
-        {
-          left: "0%",
-          top: pctY(352),
-          width: "100%",
-          height: pctY(6),
-          rows: 2,
-          row: 1,
-          reverse: false,
-          seconds: 52,
-          steps: W,
-          front: true,
-        },
-      ],
+      lanes: LANES.map((lane, row) => ({
+        left: "0%",
+        top: pctY(lane.base - LANE_ROW + 1),
+        width: "100%",
+        height: pctY(LANE_ROW),
+        rows: LANES.length,
+        row,
+        reverse: lane.reverse,
+        seconds: lane.seconds,
+        steps: W * LANE_SPAN,
+        span: LANE_SPAN,
+        front: true,
+      })),
       beacons: scene.beacons.map(([x, y]) => ({ left: pctX(x), top: pctY(y), delay: "0s" })),
       birds: { top: "13%", seconds: 84 },
       // Street life: people cross the whole picture along the pavement.
@@ -813,6 +835,8 @@ export function brooklynScene(puff, cast) {
         from: -14,
         to: W + 14,
         // where a dog insists on stopping, and where people tend to
+        // where cyclists ride: in the road, between the parked cars and the traffic
+        road: PARKED_BASE + 3,
         sniff: [...TREES.map((x) => x + 1), HYDRANT],
         linger: [164, 176, 300, 452],
         roofs: [],

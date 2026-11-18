@@ -168,6 +168,8 @@ describe("settings persistence", () => {
       model: "abliterated-model-large-v2",
       apiKey: null,
       keySource: null,
+      reasoning: "default",
+      systemPrompt: "",
     });
   });
 
@@ -185,6 +187,8 @@ describe("settings persistence", () => {
       model: "local-model",
       apiKey: TEST_KEY,
       keySource: "settings",
+      reasoning: "default",
+      systemPrompt: "",
     });
     const file = path.join(data.dir(), "settings.json");
     expect(fs.statSync(file).mode & 0o777).toBe(0o600);
@@ -208,6 +212,8 @@ describe("settings persistence", () => {
       model: "env-model",
       apiKey: TEST_KEY,
       keySource: "env",
+      reasoning: "default",
+      systemPrompt: "",
     });
     expect(settings.publicSettings().apiKey).toEqual({
       set: true,

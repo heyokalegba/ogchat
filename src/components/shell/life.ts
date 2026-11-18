@@ -17,8 +17,13 @@ export interface LifeMeta {
   walkFrames: number;
   person: { w: number; h: number; rows: number };
   prop: { w: number; h: number; rows: number };
+  /** Anyone on wheels or with a ball: cyclists, skaters, kids dribbling. */
+  wheel: { w: number; h: number; rows: number };
   /** [first row, count] for each kind of character; single rows for the props. */
   cast: {
+    cyclists: readonly [number, number];
+    skaters: readonly [number, number];
+    ballers: readonly [number, number];
     adults: readonly [number, number];
     children: readonly [number, number];
     runners: readonly [number, number];
@@ -37,6 +42,8 @@ export interface LifeConfig {
   /** Pavement: where people come into the picture and where they leave it. */
   from: number;
   to: number;
+  /** The row cyclists' wheels run on, out in the road. 0 where there is no road. */
+  road: number;
   /** Things a dog stops at, and places people tend to stop, by x. */
   sniff: readonly number[];
   linger: readonly number[];
@@ -44,7 +51,7 @@ export interface LifeConfig {
 }
 
 export interface Member {
-  sheet: "people" | "props";
+  sheet: "people" | "props" | "wheels";
   row: number;
   /** Left edge of the sprite's cell, from the party's middle, when facing right. */
   dx: number;
@@ -69,6 +76,8 @@ export interface Party {
   heads: number;
   /** Index into the scene's roofs, or null on the pavement. */
   roof: number | null;
+  /** Out in the road, past the parked cars, rather than on the pavement. */
+  road: boolean;
   /** Where the party's middle starts; feet row; how far below the roof line it starts. */
   x: number;
   y: number;
@@ -96,17 +105,30 @@ export function wantedHeads(rand: Rand, night: number): number {
 
 // ---------------------------------------------------------------- formations
 
-type Kind = "solo" | "couple" | "dog" | "runner" | "child" | "pram" | "friends";
+type Kind =
+  | "solo"
+  | "couple"
+  | "dog"
+  | "runner"
+  | "child"
+  | "pram"
+  | "friends"
+  | "cyclist"
+  | "skater"
+  | "baller";
 
-/** How often each kind of party turns up on the pavement. */
+/** How often each kind of party turns up on the street. */
 const STREET_MIX: readonly [Kind, number][] = [
-  ["solo", 0.38],
-  ["couple", 0.17],
-  ["dog", 0.17],
-  ["runner", 0.08],
-  ["child", 0.08],
-  ["pram", 0.05],
-  ["friends", 0.07],
+  ["solo", 0.3],
+  ["couple", 0.15],
+  ["dog", 0.15],
+  ["cyclist", 0.11],
+  ["runner", 0.06],
+  ["child", 0.06],
+  ["friends", 0.06],
+  ["pram", 0.04],
+  ["skater", 0.035],
+  ["baller", 0.035],
 ];
 
 function pickKind(rand: Rand, mix: readonly [Kind, number][], room: number): Kind {
@@ -134,6 +156,8 @@ interface Formation {
 
 /** A person's stride covers about this many pixels per walk cycle. */
 const STRIDE = { adult: 8, child: 5.5, runner: 13, dog: 6 };
+/** Seconds for one turn of the pedals, one kick of a skateboard, one bounce of a ball. */
+const TEMPO = { cyclist: 0.55, skater: 1.3, baller: 0.62 };
 
 function form(rand: Rand, meta: LifeMeta, kind: Kind, size = 0): Formation {
   const { cast, person, prop } = meta;
@@ -181,6 +205,23 @@ function form(rand: Rand, meta: LifeMeta, kind: Kind, size = 0): Formation {
       add("people", row(rand, cast.runners), 0, 0, STRIDE.runner);
       speed = between(rand, 17, 21);
       break;
+    case "cyclist":
+      add("wheels", row(rand, cast.cyclists), 0, 0, 0);
+      speed = between(rand, 27, 36);
+      members[0]!.cadence = TEMPO.cyclist;
+      break;
+    case "skater":
+      add("wheels", row(rand, cast.skaters), 0, 0, 0);
+      speed = between(rand, 13, 17);
+      members[0]!.cadence = TEMPO.skater;
+      break;
+    case "baller":
+      add("wheels", row(rand, cast.ballers), 0, 0, 0);
+      speed = between(rand, 5.5, 7);
+      members[0]!.cadence = TEMPO.baller;
+      // the ball keeps time whether they are walking or not
+      members[0]!.idle = TEMPO.baller;
+      break;
     case "couple":
       adult(0, -1);
       adult(6, 0);
@@ -223,7 +264,8 @@ function form(rand: Rand, meta: LifeMeta, kind: Kind, size = 0): Formation {
   }
 
   // Centre the formation on the party's middle.
-  const widthOf = (m: Member) => (m.sheet === "people" ? person.w : prop.w);
+  const widthOf = (m: Member) =>
+    m.sheet === "people" ? person.w : m.sheet === "props" ? prop.w : meta.wheel.w;
   const left = Math.min(...members.map((m) => m.dx));
   const right = Math.max(...members.map((m) => m.dx + widthOf(m)));
   const middle = (left + right) / 2;
@@ -261,7 +303,8 @@ export function castWalkers(
   options: CastOptions = {},
 ): Party {
   const room = options.room ?? MAX_HEADS;
-  const kind: Kind = options.group ? "friends" : pickKind(rand, STREET_MIX, room);
+  let kind: Kind = options.group ? "friends" : pickKind(rand, STREET_MIX, room);
+  if (kind === "cyclist" && !life.road) kind = "solo";
   const shape = form(rand, meta, kind, Math.min(options.group ?? 0, room));
   const rightward = rand() < 0.5;
   const start = (rightward ? life.from : life.to) + (rightward ? -1 : 1) * shape.reach;
@@ -270,7 +313,14 @@ export function castWalkers(
 
   // Stops along the way, in the order they will be reached.
   const stops: number[] = [];
-  const pauses = kind === "runner" ? 0 : shape.dog ? 0.6 : kind === "friends" ? 0.5 : 0.3;
+  const hurried = kind === "runner" || kind === "cyclist" || kind === "skater";
+  const pauses = hurried
+    ? 0
+    : shape.dog || kind === "baller"
+      ? 0.6
+      : kind === "friends"
+        ? 0.5
+        : 0.3;
   if (rand() < pauses) {
     const spots = shape.dog ? life.sniff : life.linger;
     const ahead = spots.filter((spot) => (rightward ? spot > x + 12 : spot < x - 12));
@@ -301,9 +351,11 @@ export function castWalkers(
     id: nextId(),
     heads: shape.heads,
     roof: null,
+    road: kind === "cyclist",
     x,
     // Keep everyone's feet on the pavement: the party's line is its nearest member.
-    y: whole(rand, life.far + 3, life.near),
+    // Cyclists keep to the road, a pixel or two either side of their line.
+    y: kind === "cyclist" ? life.road + whole(rand, -1, 1) : whole(rand, life.far + 3, life.near),
     lift: 0,
     members: shape.members,
     steps,
@@ -370,6 +422,7 @@ export function castRoofVisit(
     id: nextId(),
     heads: shape.heads,
     roof: index,
+    road: false,
     x: hatch,
     y: 0,
     lift: HATCH_DEPTH,

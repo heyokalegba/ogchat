@@ -51,6 +51,9 @@ function toProviderMessage(sessionId: string, message: ChatMessage): ProviderMes
   };
 }
 
-export function buildProviderMessages(session: Session): ProviderMessage[] {
-  return session.messages.map((message) => toProviderMessage(session.id, message));
+/** `systemPrompt`, when there is one, goes first as the system message. */
+export function buildProviderMessages(session: Session, systemPrompt = ""): ProviderMessage[] {
+  const history = session.messages.map((message) => toProviderMessage(session.id, message));
+  const system = systemPrompt.trim();
+  return system ? [{ role: "system", content: system }, ...history] : history;
 }

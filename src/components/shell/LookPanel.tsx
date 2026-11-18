@@ -4,7 +4,14 @@ import { useEffect, useRef } from "react";
 import { describeOffset, formatMinutes, type WallClock } from "@/lib/daylight";
 import { CloseIcon } from "../chat/icons";
 import { SCENES, type SceneId } from "./art";
-import { activeTextColor, DEFAULT_LOOK, TEXT_SIZE, TEXT_SWATCHES, type Look } from "./look";
+import {
+  activeTextColor,
+  DEFAULT_LOOK,
+  SCENE_STRENGTH,
+  TEXT_SIZE,
+  TEXT_SWATCHES,
+  type Look,
+} from "./look";
 import styles from "./shell.module.css";
 
 export interface LookPanelProps {
@@ -117,6 +124,29 @@ export function LookPanel({
               none
             </button>
           </div>
+        </div>
+        <div className={styles.lookRow}>
+          <label className={styles.lookLabel} htmlFor="ogchat-scene-strength">
+            strength
+          </label>
+          <span className={styles.lookAside}>
+            {look.sceneStrength === 100 ? "full" : `${look.sceneStrength}%`}
+          </span>
+        </div>
+        <input
+          id="ogchat-scene-strength"
+          className={styles.slider}
+          type="range"
+          min={SCENE_STRENGTH.min}
+          max={SCENE_STRENGTH.max}
+          step={SCENE_STRENGTH.step}
+          value={look.sceneStrength}
+          title="Fade the scene back into the dark so text over it is easier to read"
+          onChange={(event) => onChange({ sceneStrength: Number(event.target.value) })}
+        />
+        <div className={styles.ticks} aria-hidden="true">
+          <span>faint</span>
+          <span>full</span>
         </div>
       </section>
 

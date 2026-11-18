@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import type { SkyView } from "@/lib/daylight";
 import { SCENES, SKY, type SceneId } from "./art";
 import styles from "./backdrop.module.css";
+import { SkyTraffic } from "./SkyTraffic";
 import { StreetLife } from "./StreetLife";
 
 /**
@@ -84,7 +85,9 @@ export function Backdrop(props: { scene: SceneId; view: SkyView; people?: boolea
           <div
             className={`${styles.laneStrip} ${lane.reverse ? styles.laneReverse : ""}`}
             style={{
-              ...image(art.traffic),
+              ...image(art.traffic[light]),
+              // The strip holds its picture twice, and the picture is \`span\` lanes long.
+              width: `${lane.span * 200}%`,
               // The strip image holds every lane as a row; show this one.
               backgroundSize: `50% ${lane.rows * 100}%`,
               backgroundPosition: `0 ${lane.rows > 1 ? (lane.row / (lane.rows - 1)) * 100 : 0}%`,
@@ -103,6 +106,8 @@ export function Backdrop(props: { scene: SceneId; view: SkyView; people?: boolea
         <div className={`${styles.layer} ${styles[`glow${phase}B`]}`} style={image(sources[1])} />
       </div>
     );
+
+  const parked = art.parked && <Blend className={styles.layer} sources={art.parked} view={view} />;
 
   return (
     <div className={styles.backdrop} aria-hidden="true">
@@ -173,6 +178,8 @@ export function Backdrop(props: { scene: SceneId; view: SkyView; people?: boolea
           </div>
         )}
 
+        <SkyTraffic light={light} />
+
         <Blend className={styles.layer} sources={art.city} view={view} />
         <div
           className={`${styles.layer} ${styles.lightsA}`}
@@ -199,9 +206,8 @@ export function Backdrop(props: { scene: SceneId; view: SkyView; people?: boolea
           style={{ ...image(art.lights.b), opacity: switching }}
         />
         {glow(art.glow.front, "Front")}
-        {people && <StreetLife scene={scene} light={light} night={night} />}
-        {/* Cars at the kerb stand between the pavement and us. */}
-        {art.parked && <Blend className={styles.layer} sources={art.parked} view={view} />}
+        {/* Cars at the kerb stand between the pavement and us; cyclists pass outside them. */}
+        {people ? <StreetLife scene={scene} light={light} night={night} kerb={parked} /> : parked}
         {smoke(true)}
         {lanes(true)}
       </div>

@@ -31,7 +31,16 @@ export interface ChatMessage {
   partial?: boolean;
   /** Files attached to a user message. */
   attachments?: Attachment[];
+  /** Set on a user message that was sent with web search on, so a retry searches again. */
+  web?: boolean;
 }
+
+/**
+ * How hard a reasoning model should think before it answers. "default"
+ * sends nothing and leaves it to the provider.
+ */
+export const REASONING_EFFORTS = ["default", "low", "medium", "high", "max"] as const;
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 
 export interface SessionMeta {
   id: string;
@@ -58,6 +67,9 @@ export interface PublicSettings {
     source: KeySource | null;
   };
   defaults: { baseUrl: string; model: string };
+  reasoning: ReasoningEffort;
+  /** Instructions sent ahead of every conversation. Empty for none. */
+  systemPrompt: string;
 }
 
 /** One line of a settings test: what was checked and what was found. */
@@ -95,6 +107,8 @@ export type SendBody =
       replaceFromMessageId?: string;
       /** Browser only: files to upload with this message (sent as multipart form data). */
       files?: File[];
+      /** Let the provider search the web for this message. */
+      web?: boolean;
     }
   | { regenerate: true };
 
