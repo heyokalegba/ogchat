@@ -949,6 +949,60 @@
   padding-top: 4px;
 }
 
+/* "test" sits apart, on the left: it tries the settings, it does not save them. */
+.overlay .buttonTest {
+  margin-right: auto;
+}
+
+/* What the test found, one line per step. */
+.check {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: var(--og-line) solid var(--og-ink);
+  background: var(--og-white);
+}
+
+.checkLine {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: start;
+  margin: 0;
+  font-size: calc(14px * var(--og-type));
+  line-height: 1.45;
+  color: var(--og-ink);
+  overflow-wrap: anywhere;
+}
+
+.checkLine b {
+  font-family: var(--og-font-mono);
+  font-size: 0.9em;
+}
+
+.checkMark {
+  min-width: 30px;
+  padding: 1px 0;
+  border: 2px solid var(--og-ink);
+  font-family: var(--og-font-mono);
+  font-size: calc(11.5px * var(--og-type));
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--og-ink);
+  background: var(--og-yellow);
+}
+
+.checkMark[data-state="ok"] {
+  color: var(--og-white);
+  background: var(--og-green);
+}
+
+.checkMark[data-state="fail"] {
+  color: var(--og-white);
+  background: var(--og-accent);
+}
+
 .overlay .button {
   height: 34px;
   padding: 0 16px;

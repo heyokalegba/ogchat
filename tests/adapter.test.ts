@@ -1,12 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   buildChatRequest,
+  checkProvider,
   maskKey,
   ProviderAbortedError,
   ProviderAuthError,
   ProviderConfigError,
+  ProviderCreditsError,
   ProviderEmptyReplyError,
   ProviderError,
+  ProviderForbiddenError,
   ProviderHTTPError,
   ProviderNetworkError,
   ProviderRateLimitError,
@@ -22,7 +25,7 @@ import { hangingResponse, sseBody, sseResponse, streamResponse, TEST_KEY } from 
 const config: ProviderConfig = {
   baseUrl: "https://api.abliteration.ai/v1",
   apiKey: TEST_KEY,
-  model: "abliterated-model-large",
+  model: "abliterated-model-large-v2",
 };
 
 const history: ProviderMessage[] = [
@@ -79,7 +82,7 @@ describe("request shape", () => {
       "Content-Type": "application/json",
     });
     expect(JSON.parse(String(init.body))).toEqual({
-      model: "abliterated-model-large",
+      model: "abliterated-model-large-v2",
       stream: true,
       messages: [
         { role: "system", content: "Be brief." },
@@ -181,16 +184,47 @@ describe("error classes", () => {
     expect(noModel.fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("maps 401 and 403 to ProviderAuthError", async () => {
-    for (const status of [401, 403]) {
-      const { options } = harness(() =>
-        Response.json({ error: { message: "Incorrect API key provided" } }, { status }),
-      );
-      const err = await failure(options);
-      expect(err).toBeInstanceOf(ProviderAuthError);
-      expect(err.code).toBe("invalid_key");
-      expect(err.status).toBe(status);
-    }
+  it("maps 401 to ProviderAuthError, with what the provider said", async () => {
+    const { options } = harness(() =>
+      Response.json({ error: { message: "Incorrect API key provided" } }, { status: 401 }),
+    );
+    const err = await failure(options);
+    expect(err).toBeInstanceOf(ProviderAuthError);
+    expect(err.code).toBe("invalid_key");
+    expect(err.status).toBe(401);
+    expect(err.message).toContain("Incorrect API key provided");
+  });
+
+  it("maps 402 to ProviderCreditsError: the key is fine, the account is empty", async () => {
+    const { options } = harness(() =>
+      Response.json({ error: { message: "Insufficient credits" } }, { status: 402 }),
+    );
+    const err = await failure(options);
+    expect(err).toBeInstanceOf(ProviderCreditsError);
+    expect(err.code).toBe("no_credits");
+    expect(err.status).toBe(402);
+    expect(err.message).toMatch(/out of credits/);
+    expect(err.message).toMatch(/key is fine/);
+  });
+
+  it("maps 403 to ProviderForbiddenError, not to a wrong key", async () => {
+    const denied = harness(() =>
+      Response.json({ error: { message: "Key lacks access to this project" } }, { status: 403 }),
+    );
+    const err = await failure(denied.options);
+    expect(err).toBeInstanceOf(ProviderForbiddenError);
+    expect(err).not.toBeInstanceOf(ProviderAuthError);
+    expect(err.code).toBe("forbidden");
+    expect(err.status).toBe(403);
+    expect(err.message).toMatch(/not allowed to use this model or project/);
+    expect(err.message).toContain("Key lacks access to this project");
+
+    const policy = harness(() =>
+      Response.json({ error: { message: "policy_violation" } }, { status: 403 }),
+    );
+    expect((await failure(policy.options)).message).toMatch(
+      /blocked this request under its policy/,
+    );
   });
 
   it("maps 429 to ProviderRateLimitError", async () => {
@@ -278,6 +312,38 @@ describe("error classes", () => {
       expect(err).toBeInstanceOf(ProviderEmptyReplyError);
       expect(err.code).toBe("empty_reply");
     }
+  });
+
+  it("treats reasoning chunks as a sign of life, not as reply text", async () => {
+    const chunk = (delta: object) => `data: ${JSON.stringify({ choices: [{ delta }] })}\n\n`;
+    const onThinking = vi.fn();
+    const { options } = harness(
+      () =>
+        streamResponse([
+          chunk({ role: "assistant" }),
+          chunk({ reasoning_content: "The user said hello." }),
+          chunk({ reasoning_content: " I should greet them." }),
+          chunk({ content: "Hello" }),
+          chunk({ reasoning: "more thought" }),
+          chunk({ content: " there" }),
+          "data: [DONE]\n\n",
+        ]),
+      { onThinking },
+    );
+    expect(await collect(options)).toEqual(["Hello", " there"]);
+    expect(onThinking).toHaveBeenCalledTimes(1);
+  });
+
+  it("says so when a model only thought and never answered", async () => {
+    const { options } = harness(() =>
+      streamResponse([
+        `data: ${JSON.stringify({ choices: [{ delta: { reasoning_content: "hmm" } }] })}\n\n`,
+        "data: [DONE]\n\n",
+      ]),
+    );
+    const err = await failure(options);
+    expect(err).toBeInstanceOf(ProviderEmptyReplyError);
+    expect(err.message).toMatch(/thinking/);
   });
 
   it("ends with ProviderAbortedError when the caller aborts mid-stream", async () => {
@@ -410,5 +476,114 @@ describe("the API key stays out of logs and messages", () => {
     const written = spies.flatMap((spy) => spy.mock.calls.flat().map(String)).join("\n");
     expect(written).toContain("invalid_key");
     expect(written).not.toContain(TEST_KEY);
+  });
+});
+
+describe("connection test", () => {
+  const MODELS = { object: "list", data: [{ id: "abliterated-model" }, { id: config.model }] };
+  const REPLY = { choices: [{ message: { role: "assistant", content: "ok" } }] };
+
+  /** A provider answering GET /models and POST /chat/completions as told. */
+  function provider(models: () => Response, chat: () => Response = () => Response.json(REPLY)) {
+    const calls: { url: string; init: RequestInit }[] = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(input), init: init ?? {} });
+      return String(input).endsWith("/models") ? models() : chat();
+    }) as unknown as typeof fetch;
+    return { calls, fetchImpl };
+  }
+  const states = (check: Awaited<ReturnType<typeof checkProvider>>) =>
+    Object.fromEntries(check.steps.map((step) => [step.id, step.ok]));
+
+  it("passes when the key, the model and a test message all work", async () => {
+    const { calls, fetchImpl } = provider(() => Response.json(MODELS));
+    const check = await checkProvider({ config, fetchImpl });
+    expect(check.ok).toBe(true);
+    // The test key does not start with ak_, which is worth a note on abliteration.ai.
+    expect(states(check)).toEqual({ settings: null, key: true, model: true, reply: true });
+    expect(calls.map((c) => [c.init.method, c.url])).toEqual([
+      ["GET", "https://api.abliteration.ai/v1/models"],
+      ["POST", "https://api.abliteration.ai/v1/chat/completions"],
+    ]);
+    for (const call of calls) {
+      expect(call.init.headers).toMatchObject({ Authorization: `Bearer ${TEST_KEY}` });
+    }
+    expect(JSON.parse(String(calls[1]?.init.body))).toMatchObject({
+      model: config.model,
+      stream: false,
+    });
+    expect(JSON.stringify(check)).not.toContain(TEST_KEY);
+  });
+
+  it("does not question a key that looks like an abliteration.ai key", async () => {
+    const { fetchImpl } = provider(() => Response.json(MODELS));
+    const check = await checkProvider({
+      config: { ...config, apiKey: "ak_0123456789abcdef" },
+      fetchImpl,
+    });
+    expect(states(check).settings).toBe(true);
+    expect(JSON.stringify(check)).not.toContain("ak_0123456789abcdef");
+  });
+
+  it("stops at a rejected key without sending a message", async () => {
+    const { calls, fetchImpl } = provider(() =>
+      Response.json({ error: { message: `Invalid API key ${TEST_KEY}` } }, { status: 401 }),
+    );
+    const check = await checkProvider({ config, fetchImpl });
+    expect(check.ok).toBe(false);
+    expect(states(check)).toEqual({ settings: null, key: false });
+    expect(check.steps.at(-1)?.detail).toMatch(/rejected the API key \(401\)/);
+    expect(calls).toHaveLength(1);
+    expect(JSON.stringify(check)).not.toContain(TEST_KEY);
+  });
+
+  it("names the models the key can use when the model id is not one of them", async () => {
+    const { fetchImpl } = provider(
+      () => Response.json(MODELS),
+      () => Response.json({ error: { message: "model not found" } }, { status: 404 }),
+    );
+    const check = await checkProvider({ config: { ...config, model: "large v2" }, fetchImpl });
+    expect(check.ok).toBe(false);
+    expect(states(check)).toMatchObject({ key: true, model: false, reply: false });
+    const model = check.steps.find((step) => step.id === "model");
+    expect(model?.detail).toContain("abliterated-model-large-v2");
+  });
+
+  it("tells an empty account apart from a bad key", async () => {
+    const { fetchImpl } = provider(
+      () => Response.json(MODELS),
+      () => Response.json({ error: { message: "Insufficient credits" } }, { status: 402 }),
+    );
+    const check = await checkProvider({ config, fetchImpl });
+    expect(check.ok).toBe(false);
+    expect(states(check)).toMatchObject({ key: true, model: true, reply: false });
+    expect(check.steps.at(-1)?.detail).toMatch(/out of credits/);
+  });
+
+  it("falls back to the test message when there is no model list", async () => {
+    const { fetchImpl } = provider(() => new Response("nope", { status: 404 }));
+    const check = await checkProvider({ config, fetchImpl });
+    expect(check.ok).toBe(true);
+    expect(states(check)).toEqual({ settings: null, key: null, reply: true });
+  });
+
+  it("reports an unreachable provider and missing settings without throwing", async () => {
+    const offline = vi.fn(async () => {
+      throw new TypeError("fetch failed");
+    }) as unknown as typeof fetch;
+    const down = await checkProvider({ config, fetchImpl: offline });
+    expect(down.ok).toBe(false);
+    expect(down.steps.at(-1)?.detail).toMatch(/Could not reach api\.abliteration\.ai/);
+
+    const never = vi.fn() as unknown as typeof fetch;
+    const noKey = await checkProvider({ config: { ...config, apiKey: null }, fetchImpl: never });
+    expect(noKey.ok).toBe(false);
+    expect(noKey.steps[0]?.detail).toMatch(/No API key is set/);
+    const badUrl = await checkProvider({
+      config: { ...config, baseUrl: "nope" },
+      fetchImpl: never,
+    });
+    expect(badUrl.ok).toBe(false);
+    expect(never).not.toHaveBeenCalled();
   });
 });

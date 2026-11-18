@@ -165,7 +165,7 @@ describe("settings persistence", () => {
     const { settings } = await boot();
     expect(settings.resolveSettings()).toEqual({
       baseUrl: "https://api.abliteration.ai/v1",
-      model: "abliterated-model-large",
+      model: "abliterated-model-large-v2",
       apiKey: null,
       keySource: null,
     });

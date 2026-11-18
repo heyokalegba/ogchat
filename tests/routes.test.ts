@@ -19,6 +19,7 @@ import {
 import { POST as stopSession } from "@/app/api/sessions/[id]/stop/route";
 import { GET as listSessions, POST as createSession } from "@/app/api/sessions/route";
 import { GET as getSettings, PUT as putSettings } from "@/app/api/settings/route";
+import { POST as testSettings } from "@/app/api/settings/test/route";
 import {
   forbidNetwork,
   hangingResponse,
@@ -229,7 +230,7 @@ describe("sending messages", () => {
       method: "POST",
       headers: { Authorization: `Bearer ${TEST_KEY}` },
       body: {
-        model: "abliterated-model-large",
+        model: "abliterated-model-large-v2",
         stream: true,
         messages: [{ role: "user", content: "Say hello to the world" }],
       },
@@ -266,6 +267,25 @@ describe("sending messages", () => {
     ]);
     // Activity moves a session to the top of the list.
     expect((await list()).map((s) => s.id)).toEqual([session.id, other.id]);
+  });
+
+  it("says when a reasoning model is thinking, once, and keeps thoughts out of the reply", async () => {
+    await useKey();
+    const chunk = (delta: object) => `data: ${JSON.stringify({ choices: [{ delta }] })}\n\n`;
+    stubProvider(
+      () =>
+        new Response(
+          chunk({ reasoning_content: "They greeted me." }) +
+            chunk({ reasoning_content: " Greet back." }) +
+            chunk({ content: "Hello." }) +
+            "data: [DONE]\n\n",
+          { headers: { "Content-Type": "text/event-stream" } },
+        ),
+    );
+    const session = await create();
+    const events = await send(session.id, { content: "hi" });
+    expect(events.map((event) => event.type)).toEqual(["start", "thinking", "delta", "done"]);
+    expect(last(events, "done").message?.content).toBe("Hello.");
   });
 
   it("uses the base URL and model from settings without re-entering the key", async () => {
@@ -539,6 +559,28 @@ describe("failures surface as inline errors, never a lost session", () => {
     await expectRecoverable(session.id);
   });
 
+  it("out of credits is not reported as a bad key", async () => {
+    await useKey();
+    const { session, events } = await failingTurn(() =>
+      Response.json({ error: { message: "Insufficient credits" } }, { status: 402 }),
+    );
+    const error = last(events, "error");
+    expect(error.error).toMatchObject({ code: "no_credits", status: 402 });
+    expect(error.error.message).toMatch(/out of credits/);
+    await expectRecoverable(session.id);
+  });
+
+  it("a refused request (403) is not reported as a bad key", async () => {
+    await useKey();
+    const { session, events } = await failingTurn(() =>
+      Response.json({ error: { message: "No access to this model" } }, { status: 403 }),
+    );
+    const error = last(events, "error");
+    expect(error.error).toMatchObject({ code: "forbidden", status: 403 });
+    expect(error.error.message).toContain("No access to this model");
+    await expectRecoverable(session.id);
+  });
+
   it("invalid key", async () => {
     await useKey();
     const { session, events } = await failingTurn(() =>
@@ -627,11 +669,11 @@ describe("settings API", () => {
   it("reports defaults and no key on a fresh install", async () => {
     expect(await settings()).toEqual({
       baseUrl: "https://api.abliteration.ai/v1",
-      model: "abliterated-model-large",
+      model: "abliterated-model-large-v2",
       apiKey: { set: false, masked: null, source: null },
       defaults: {
         baseUrl: "https://api.abliteration.ai/v1",
-        model: "abliterated-model-large",
+        model: "abliterated-model-large-v2",
       },
     });
   });
@@ -672,6 +714,80 @@ describe("settings API", () => {
     const res = await putSettings(req("PUT", "/api/settings", { baseUrl: "javascript:alert(1)" }));
     expect(res.status).toBe(400);
     expect((await errorOf(res)).code).toBe("invalid_settings");
+  });
+
+  describe("testing the connection", () => {
+    type Check = { ok: boolean; steps: { id: string; ok: boolean | null; detail: string }[] };
+    const models = () =>
+      Response.json({ data: [{ id: "abliterated-model-large-v2" }, { id: "abliterated-model" }] });
+    const reply = () => Response.json({ choices: [{ message: { content: "ok" } }] });
+
+    async function runTest(body: unknown): Promise<{ status: number; text: string; check: Check }> {
+      const res = await testSettings(req("POST", "/api/settings/test", body));
+      const text = await res.text();
+      return { status: res.status, text, check: (JSON.parse(text) as { check: Check }).check };
+    }
+
+    it("tests the saved settings and never returns the key", async () => {
+      await useKey();
+      const provider = stubProvider((call) => (call.method === "GET" ? models() : reply()));
+      const { status, text, check } = await runTest({});
+      expect(status).toBe(200);
+      expect(check.ok).toBe(true);
+      expect(provider.calls.map((c) => [c.method, c.url])).toEqual([
+        ["GET", "https://api.abliteration.ai/v1/models"],
+        ["POST", "https://api.abliteration.ai/v1/chat/completions"],
+      ]);
+      expect(provider.calls[1]?.body.model).toBe("abliterated-model-large-v2");
+      expect(provider.calls[0]?.headers.Authorization).toBe(`Bearer ${TEST_KEY}`);
+      expect(text).not.toContain(TEST_KEY);
+    });
+
+    it("tests what is typed without saving it", async () => {
+      const provider = stubProvider((call) => (call.method === "GET" ? models() : reply()));
+      const { check } = await runTest({
+        baseUrl: "http://127.0.0.1:8787/v1",
+        model: "abliterated-model",
+        apiKey: "typed-but-not-saved",
+      });
+      expect(check.ok).toBe(true);
+      expect(provider.calls[0]?.url).toBe("http://127.0.0.1:8787/v1/models");
+      expect(provider.calls[0]?.headers.Authorization).toBe("Bearer typed-but-not-saved");
+      expect(provider.calls[1]?.body.model).toBe("abliterated-model");
+      // Nothing was written: the app still has no key and the default model.
+      expect(await settings()).toMatchObject({
+        baseUrl: "https://api.abliteration.ai/v1",
+        model: "abliterated-model-large-v2",
+        apiKey: { set: false },
+      });
+    });
+
+    it("reports a rejected key in plain words", async () => {
+      await useKey();
+      stubProvider(() =>
+        Response.json({ error: { message: `bad key ${TEST_KEY}` } }, { status: 401 }),
+      );
+      const { status, text, check } = await runTest({});
+      expect(status).toBe(200);
+      expect(check.ok).toBe(false);
+      expect(check.steps.at(-1)).toMatchObject({ id: "key", ok: false });
+      expect(text).not.toContain(TEST_KEY);
+    });
+
+    it("says there is no key without calling the provider", async () => {
+      const { check } = await runTest({});
+      expect(check.ok).toBe(false);
+      expect(check.steps[0]?.detail).toMatch(/No API key is set/);
+    });
+
+    it("rejects unusable input and requests from other origins", async () => {
+      const bad = await testSettings(req("POST", "/api/settings/test", { baseUrl: "ftp://x" }));
+      expect(bad.status).toBe(400);
+      const foreign = await testSettings(
+        req("POST", "/api/settings/test", {}, { origin: "https://evil.example" }),
+      );
+      expect(foreign.status).toBe(403);
+    });
   });
 });
 

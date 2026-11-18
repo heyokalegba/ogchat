@@ -1,6 +1,8 @@
 export type ProviderErrorCode =
   | "not_configured"
   | "invalid_key"
+  | "no_credits"
+  | "forbidden"
   | "rate_limited"
   | "provider_error"
   | "network"
@@ -28,13 +30,46 @@ export class ProviderConfigError extends ProviderError {
   }
 }
 
-/** 401 / 403: the provider rejected the API key. */
+/** What the provider itself said, appended to our own wording when it said anything. */
+function quoted(detail?: string): string {
+  return detail ? ` The provider said: "${detail}"` : "";
+}
+
+/** 401: the provider does not recognise the API key. */
 export class ProviderAuthError extends ProviderError {
-  constructor(status: number) {
+  constructor(status = 401, detail?: string) {
     super(
       "invalid_key",
-      `The provider rejected the API key (${status}). Check the key in settings.`,
+      `The provider rejected the API key (${status}). Check the key in settings.${quoted(detail)}`,
       status,
+    );
+  }
+}
+
+/** 402: the key is fine, the account behind it has nothing left to spend. */
+export class ProviderCreditsError extends ProviderError {
+  constructor(detail?: string) {
+    super(
+      "no_credits",
+      `The provider says this account is out of credits (402). The key is fine: add credits in the provider's console, then retry.${quoted(detail)}`,
+      402,
+    );
+  }
+}
+
+/**
+ * 403: the provider knows the key and still said no. Either the key may not
+ * use this model or project, or the request itself was blocked by a policy.
+ */
+export class ProviderForbiddenError extends ProviderError {
+  constructor(detail?: string) {
+    const policy = /policy|moderat|content.?filter|safety/i.test(detail ?? "");
+    super(
+      "forbidden",
+      policy
+        ? `The provider blocked this request under its policy (403). The key is not the problem.${quoted(detail)}`
+        : `The provider refused this request (403). This is usually not a wrong key: the key is not allowed to use this model or project. Check the key's permissions in the provider's console.${quoted(detail)}`,
+      403,
     );
   }
 }
@@ -78,8 +113,14 @@ export class ProviderTimeoutError extends ProviderError {
 
 /** A successful response that carried no text. */
 export class ProviderEmptyReplyError extends ProviderError {
-  constructor() {
-    super("empty_reply", "The provider returned an empty reply.");
+  /** `thoughtOnly`: the model sent reasoning and then stopped without an answer. */
+  constructor(thoughtOnly = false) {
+    super(
+      "empty_reply",
+      thoughtOnly
+        ? "The model spent its whole reply thinking and never answered. Retry."
+        : "The provider returned an empty reply.",
+    );
   }
 }
 

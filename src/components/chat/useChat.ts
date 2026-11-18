@@ -32,6 +32,8 @@ export type RetryAction =
 export interface ChatErrorState {
   code: string;
   message: string;
+  /** The provider's HTTP status, when the failure came from the provider. */
+  status?: number;
   retry: RetryAction | null;
 }
 
@@ -92,6 +94,8 @@ export function useChat(options: UseChatOptions) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [phase, setPhaseState] = useState<ChatPhase>(sessionId ? "loading" : "idle");
   const [streamText, setStreamText] = useState("");
+  /** The model is reasoning and has not started its answer yet. */
+  const [thinking, setThinking] = useState(false);
   const [error, setError] = useState<ChatErrorState | null>(null);
   const [draft, setDraft] = useState("");
   /** Files waiting in the composer to go out with the next message. */
@@ -127,6 +131,7 @@ export function useChat(options: UseChatOptions) {
     frameRef.current = 0;
     bufferRef.current = "";
     setStreamText("");
+    setThinking(false);
   }, []);
 
   /** Fetches the session and adopts whatever state the server is in. */
@@ -266,6 +271,10 @@ export function useChat(options: UseChatOptions) {
             }
             releasePreviews(previews);
             callbacks.current.onSessionUpdated?.(event.session);
+            break;
+          }
+          case "thinking": {
+            if (!bufferRef.current) setThinking(true);
             break;
           }
           case "delta": {
@@ -474,6 +483,7 @@ export function useChat(options: UseChatOptions) {
     messages,
     phase,
     streamText,
+    thinking,
     error,
     draft,
     setDraft,

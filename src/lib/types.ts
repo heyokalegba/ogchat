@@ -60,6 +60,20 @@ export interface PublicSettings {
   defaults: { baseUrl: string; model: string };
 }
 
+/** One line of a settings test: what was checked and what was found. */
+export interface SettingsCheckStep {
+  id: "settings" | "key" | "model" | "reply";
+  /** true: fine. false: this is what is wrong. null: could not tell, or worth a look. */
+  ok: boolean | null;
+  title: string;
+  detail: string;
+}
+
+export interface SettingsCheck {
+  ok: boolean;
+  steps: SettingsCheckStep[];
+}
+
 export interface ChatError {
   code: string;
   message: string;
@@ -69,6 +83,8 @@ export interface ChatError {
 /** One line of the NDJSON stream returned by POST /api/sessions/:id/messages. */
 export type StreamEvent =
   | { type: "start"; session: SessionMeta; userMessage: ChatMessage | null }
+  /** The model is reasoning before it answers. Sent at most once per reply. */
+  | { type: "thinking" }
   | { type: "delta"; text: string }
   | { type: "done"; session: SessionMeta; message: ChatMessage | null; stopped: boolean }
   | { type: "error"; session: SessionMeta; error: ChatError; message: ChatMessage | null };

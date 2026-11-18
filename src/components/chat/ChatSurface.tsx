@@ -63,7 +63,7 @@ export function ChatSurface(props: ChatSurfaceProps) {
     onSessionUpdated: props.onSessionUpdated,
     onSessionMissing: props.onSessionMissing,
   });
-  const { messages, phase, streamText, error, openCount } = chat;
+  const { messages, phase, streamText, thinking, error, openCount } = chat;
 
   // Dragging files over the chat: enter/leave fire for every child, so count them.
   const [dropping, setDropping] = useState(false);
@@ -170,7 +170,11 @@ export function ChatSurface(props: ChatSurfaceProps) {
       } in context · ready`
     : `ogchat · new session${provider?.model ? ` · ${provider.model}` : ""} · ready`;
 
-  const needsKey = error?.code === "not_configured" || error?.code === "invalid_key";
+  // Errors that are settled in the settings panel: the key, its credits or permissions, the model id.
+  const needsKey =
+    !!error &&
+    (["not_configured", "invalid_key", "no_credits", "forbidden"].includes(error.code) ||
+      error.status === 404);
 
   return (
     <section
@@ -238,7 +242,7 @@ export function ChatSurface(props: ChatSurfaceProps) {
                   fileUrl={chat.fileUrl}
                 />
               ))}
-              {busy && <StreamingMessage text={streamText} />}
+              {busy && <StreamingMessage text={streamText} thinking={thinking} />}
             </div>
 
             {error && (

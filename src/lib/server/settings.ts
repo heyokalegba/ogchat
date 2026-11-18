@@ -15,7 +15,7 @@ import { settingsFile } from "./paths";
  */
 
 export const DEFAULT_BASE_URL = "https://api.abliteration.ai/v1";
-export const DEFAULT_MODEL = "abliterated-model-large";
+export const DEFAULT_MODEL = "abliterated-model-large-v2";
 
 export interface ResolvedSettings {
   baseUrl: string;
@@ -111,6 +111,41 @@ export function publicSettings(): PublicSettings {
   };
 }
 
+/** A key as typed: null when there is none, an error when it cannot be a key. */
+function cleanKey(input: unknown): string | null {
+  if (input === null || input === "") return null;
+  if (typeof input !== "string") throw new SettingsValidationError("API key must be text.");
+  const key = input.trim();
+  if (!key) return null;
+  if (/\s/.test(key) || /[^\x21-\x7e]/.test(key)) {
+    throw new SettingsValidationError("That does not look like an API key. Paste the key only.");
+  }
+  if (key.length > 1000) throw new SettingsValidationError("API key is too long.");
+  return key;
+}
+
+function cleanModel(input: unknown): string {
+  const model = str(input);
+  if (!model) throw new SettingsValidationError("Model id is required.");
+  if (model.length > 200) throw new SettingsValidationError("Model id is too long.");
+  return model;
+}
+
+/**
+ * The settings a request would use if `patch` were saved, without saving it.
+ * Lets the settings panel test what is typed before committing to it.
+ */
+export function previewSettings(patch: SettingsPatch): ResolvedSettings {
+  const current = resolveSettings();
+  const typedKey = patch.apiKey === undefined ? null : cleanKey(patch.apiKey);
+  return {
+    baseUrl: patch.baseUrl === undefined ? current.baseUrl : normalizeBaseUrl(patch.baseUrl),
+    model: patch.model === undefined ? current.model : cleanModel(patch.model),
+    apiKey: typedKey ?? current.apiKey,
+    keySource: typedKey ? "settings" : current.keySource,
+  };
+}
+
 export function updateSettings(patch: SettingsPatch): PublicSettings {
   const stored = readStored();
 
@@ -123,33 +158,16 @@ export function updateSettings(patch: SettingsPatch): PublicSettings {
   }
 
   if (patch.model !== undefined) {
-    const model = str(patch.model);
-    if (!model) throw new SettingsValidationError("Model id is required.");
-    if (model.length > 200) throw new SettingsValidationError("Model id is too long.");
+    const model = cleanModel(patch.model);
     const fallback = env("OGCHAT_MODEL") ?? DEFAULT_MODEL;
     if (model === fallback) delete stored.model;
     else stored.model = model;
   }
 
   if (patch.apiKey !== undefined) {
-    if (patch.apiKey === null || patch.apiKey === "") {
-      delete stored.apiKey;
-    } else if (typeof patch.apiKey === "string") {
-      const key = patch.apiKey.trim();
-      if (!key) {
-        delete stored.apiKey;
-      } else if (/\s/.test(key) || /[^\x21-\x7e]/.test(key)) {
-        throw new SettingsValidationError(
-          "That does not look like an API key. Paste the key only.",
-        );
-      } else if (key.length > 1000) {
-        throw new SettingsValidationError("API key is too long.");
-      } else {
-        stored.apiKey = key;
-      }
-    } else {
-      throw new SettingsValidationError("API key must be text.");
-    }
+    const key = cleanKey(patch.apiKey);
+    if (key) stored.apiKey = key;
+    else delete stored.apiKey;
   }
 
   writeStored(stored);

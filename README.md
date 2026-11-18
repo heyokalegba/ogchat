@@ -74,8 +74,9 @@ npm run mock-provider
 
 This starts a stand-in provider at `http://127.0.0.1:8787/v1`. In settings, set
 the base URL to that address and enter any key. Messages starting with
-`/error`, `/empty`, `/slow` or `/drop` exercise the failure paths; the key
-`bad` is rejected as invalid.
+`/error`, `/empty`, `/slow` or `/drop` exercise the failure paths and `/think`
+reasons before it answers. The key `bad` is rejected as invalid (401), `broke`
+is out of credits (402) and `nope` is refused (403).
 
 ## Provider configuration
 
@@ -90,7 +91,29 @@ Per field, the settings panel wins over `.env.local`, which wins over the
 defaults:
 
 - base URL `https://api.abliteration.ai/v1`
-- model `abliterated-model-large`
+- model `abliterated-model-large-v2`
+
+`abliterated-model-large-v2` is a reasoning model: it thinks before it answers
+(the reply shows `thinking` until the answer starts) and it reads text only, so
+attached images are refused by the provider. Text files and PDFs are fine,
+because ogchat sends those as text.
+
+### If the key does not work
+
+Open settings and press **test**. It tries what is in the form, saved or not,
+and reports each step: the key (by asking the provider for its model list),
+the model id, and one tiny real message. Nothing is saved by testing. The
+errors in the chat say the same things:
+
+| Status | What it means                                                                     |
+| ------ | --------------------------------------------------------------------------------- |
+| 401    | The provider does not recognise the key. Copy the whole key again.                |
+| 402    | The key is fine; the account has no credits left. Top up in the provider console. |
+| 403    | The key may not use this model or project, or the request was blocked by policy.  |
+| 404    | Wrong model id or base URL.                                                       |
+
+Two things to remember: a key saved in the settings panel wins over the one in
+`.env.local`, and `.env.local` is only read when the server starts.
 
 The provider must speak the OpenAI chat-completions shape:
 `POST {base}/chat/completions` with `Authorization: Bearer <key>` and
@@ -131,8 +154,8 @@ The provider must speak the OpenAI chat-completions shape:
 - Stopping keeps the text received so far, marked `— stopped`.
 - A reply keeps generating on the server if you switch sessions or close the
   tab, and is there when you come back. Only Stop ends it early.
-- Provider errors, an invalid key, an empty reply and network loss all appear
-  inline with a retry. Your message is saved before the provider is called, so
+- Provider errors, an invalid key, an account out of credits, an empty reply
+  and network loss all appear inline with a retry. Your message is saved before the provider is called, so
   a failure never costs you the session.
 
 ## Attaching files
@@ -206,7 +229,7 @@ import { ChatSurface } from "@/components/chat";
   <ChatSurface
     sessionId={sessionId} // null starts a new conversation
     apiBase="/api" // where the ogchat routes are mounted
-    provider={{ ready: true, model: "abliterated-model-large" }}
+    provider={{ ready: true, model: "abliterated-model-large-v2" }}
     onSessionCreated={(session) => setSessionId(session.id)}
   />
 </div>;
@@ -257,18 +280,19 @@ still.
 
 ## API
 
-| Route                                          | Purpose                                                                                                                                                                                                       |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/sessions?q=`                         | List sessions, optionally filtered                                                                                                                                                                            |
-| `POST /api/sessions`                           | Create a session                                                                                                                                                                                              |
-| `GET /api/sessions/:id`                        | Session with messages, plus `generating` / `partial`                                                                                                                                                          |
-| `PATCH /api/sessions/:id`                      | Rename `{ title }`                                                                                                                                                                                            |
-| `DELETE /api/sessions/:id`                     | Delete                                                                                                                                                                                                        |
-| `POST /api/sessions/:id/messages`              | Send `{ content, replaceFromMessageId? }` or `{ regenerate: true }`; streams NDJSON events `start`, `delta`, `done` / `error`. With attachments, send `multipart/form-data` with the same fields plus `files` |
-| `GET /api/sessions/:id/files/:fileId`          | An attachment: images as images, everything else as plain text                                                                                                                                                |
-| `DELETE /api/sessions/:id/messages/:messageId` | Delete a user message and everything after it                                                                                                                                                                 |
-| `POST /api/sessions/:id/stop`                  | Stop the reply in progress                                                                                                                                                                                    |
-| `GET` / `PUT /api/settings`                    | Read (masked) / update provider settings                                                                                                                                                                      |
+| Route                                          | Purpose                                                                                                                                                                                                                   |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/sessions?q=`                         | List sessions, optionally filtered                                                                                                                                                                                        |
+| `POST /api/sessions`                           | Create a session                                                                                                                                                                                                          |
+| `GET /api/sessions/:id`                        | Session with messages, plus `generating` / `partial`                                                                                                                                                                      |
+| `PATCH /api/sessions/:id`                      | Rename `{ title }`                                                                                                                                                                                                        |
+| `DELETE /api/sessions/:id`                     | Delete                                                                                                                                                                                                                    |
+| `POST /api/sessions/:id/messages`              | Send `{ content, replaceFromMessageId? }` or `{ regenerate: true }`; streams NDJSON events `start`, `thinking`, `delta`, `done` / `error`. With attachments, send `multipart/form-data` with the same fields plus `files` |
+| `GET /api/sessions/:id/files/:fileId`          | An attachment: images as images, everything else as plain text                                                                                                                                                            |
+| `DELETE /api/sessions/:id/messages/:messageId` | Delete a user message and everything after it                                                                                                                                                                             |
+| `POST /api/sessions/:id/stop`                  | Stop the reply in progress                                                                                                                                                                                                |
+| `GET` / `PUT /api/settings`                    | Read (masked) / update provider settings                                                                                                                                                                                  |
+| `POST /api/settings/test`                      | Try `{ baseUrl?, model?, apiKey? }` (or the current settings) against the provider without saving; returns `{ check }`                                                                                                    |
 
 There is no login, so the API only answers requests addressed to a loopback
 host and refuses state-changing requests from other origins. To serve ogchat

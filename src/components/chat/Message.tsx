@@ -196,7 +196,7 @@ export const MessageView = memo(function MessageView(props: MessageViewProps) {
 });
 
 /** The reply while it streams in, with the blinking caret at its end. */
-export function StreamingMessage({ text }: { text: string }) {
+export function StreamingMessage({ text, thinking }: { text: string; thinking?: boolean }) {
   return (
     <article className={styles.message} data-role="assistant" aria-live="off">
       <TagRow role="assistant" time="" />
@@ -204,7 +204,10 @@ export function StreamingMessage({ text }: { text: string }) {
         {text ? (
           <Markdown content={text} />
         ) : (
-          <span className={styles.caret} aria-label="Generating" />
+          <>
+            {thinking && <span className={styles.thinkingNote}>thinking </span>}
+            <span className={styles.caret} aria-label={thinking ? "Thinking" : "Generating"} />
+          </>
         )}
       </div>
     </article>

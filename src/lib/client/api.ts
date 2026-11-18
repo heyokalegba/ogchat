@@ -4,6 +4,7 @@ import type {
   Session,
   SessionDetail,
   SessionMeta,
+  SettingsCheck,
   StreamEvent,
 } from "@/lib/types";
 
@@ -39,6 +40,8 @@ export interface ChatApi {
   stop(id: string): Promise<void>;
   getSettings(): Promise<PublicSettings>;
   saveSettings(update: SettingsUpdate): Promise<PublicSettings>;
+  /** Tests the settings as they would be with `update` applied, without saving it. */
+  testSettings(update: SettingsUpdate): Promise<SettingsCheck>;
   /** URL of a stored attachment, for thumbnails and "open file" links. */
   fileUrl(id: string, fileId: string): string;
   /** Sends a turn and reports each stream event. Resolves when the stream ends cleanly. */
@@ -130,6 +133,9 @@ export function createApi(base = "/api"): ChatApi {
     },
     async saveSettings(update) {
       return (await data<{ settings: PublicSettings }>("/settings", body("PUT", update))).settings;
+    },
+    async testSettings(update) {
+      return (await data<{ check: SettingsCheck }>("/settings/test", body("POST", update))).check;
     },
     fileUrl(id, fileId) {
       return `${base}/sessions/${id}/files/${fileId}`;

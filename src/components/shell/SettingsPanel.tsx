@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ApiError, type ChatApi } from "@/lib/client/api";
-import type { PublicSettings } from "@/lib/types";
+import type { PublicSettings, SettingsCheck } from "@/lib/types";
 import { CloseIcon } from "../chat/icons";
 import styles from "./shell.module.css";
 
@@ -18,6 +18,9 @@ export interface SettingsPanelProps {
  *
  * The key field is write-only. A saved key is shown masked in the placeholder
  * and never sent back to the browser; typing replaces it.
+ *
+ * "test" tries what is in the form right now, saved or not, and says in plain
+ * words which part works and which does not: the key, the model id, credits.
  */
 export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanelProps) {
   const [baseUrl, setBaseUrl] = useState(settings.baseUrl);
@@ -26,6 +29,8 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
   const [removeKey, setRemoveKey] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [check, setCheck] = useState<SettingsCheck | null>(null);
   const first = useRef<HTMLInputElement>(null);
   const panel = useRef<HTMLFormElement>(null);
 
@@ -65,6 +70,21 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
   const keyPlaceholder = removeKey
     ? "saved key will be removed"
     : (settings.apiKey.masked ?? "paste your API key");
+
+  const onTest = async () => {
+    if (testing) return;
+    setTesting(true);
+    setError(null);
+    setCheck(null);
+    try {
+      const typed = apiKey.trim();
+      setCheck(await api.testSettings({ baseUrl, model, ...(typed ? { apiKey: typed } : {}) }));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not run the test.");
+    } finally {
+      setTesting(false);
+    }
+  };
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -230,7 +250,43 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
             </p>
           )}
 
+          {(testing || check) && (
+            <div className={styles.check} role="status" aria-live="polite">
+              {testing ? (
+                <p className={styles.checkLine}>
+                  <span className={styles.checkMark} data-state="wait" aria-hidden="true">
+                    ··
+                  </span>
+                  <span>Asking the provider. A reasoning model can take a few seconds.</span>
+                </p>
+              ) : (
+                check?.steps.map((step) => {
+                  const state = step.ok === true ? "ok" : step.ok === false ? "fail" : "note";
+                  return (
+                    <p key={step.id} className={styles.checkLine}>
+                      <span className={styles.checkMark} data-state={state}>
+                        {state === "ok" ? "ok" : state === "fail" ? "no" : "?"}
+                      </span>
+                      <span>
+                        <b>{step.title}</b> {step.detail}
+                      </span>
+                    </p>
+                  );
+                })
+              )}
+            </div>
+          )}
+
           <div className={styles.panelActions}>
+            <button
+              type="button"
+              className={`${styles.button} ${styles.buttonTest}`}
+              onClick={onTest}
+              disabled={testing || removeKey}
+              title="Tries the key, model and base URL above with one tiny message. Nothing is saved."
+            >
+              {testing ? "testing…" : "test"}
+            </button>
             <button type="button" className={styles.button} onClick={onClose}>
               cancel
             </button>

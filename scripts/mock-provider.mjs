@@ -9,7 +9,10 @@
  * Special prompts exercise the failure paths:
  *   /empty   an empty reply          /error   a 500 from the provider
  *   /slow    a long, slow reply      /drop    the connection dies mid-reply
- * An API key of "bad" is rejected with 401.
+ *   /think   reasons for a moment before answering, like a reasoning model
+ * API keys that fail on purpose: "bad" is rejected with 401, "broke" is out
+ * of credits (402), "nope" is not allowed to use the model (403).
+ * It also answers GET /v1/models, which the settings test uses.
  */
 import http from "node:http";
 
@@ -57,20 +60,35 @@ function readBody(req) {
   });
 }
 
+const MODELS = ["abliterated-model", "abliterated-model-large", "abliterated-model-large-v2"];
+
 const server = http.createServer(async (req, res) => {
-  if (req.method !== "POST" || !req.url?.endsWith("/chat/completions")) {
-    res.writeHead(404, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: { message: "not found" } }));
-    return;
+  const fail = (status, message) => {
+    res.writeHead(status, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: { message } }));
+  };
+  const listing = req.method === "GET" && req.url?.endsWith("/models");
+  if (!listing && (req.method !== "POST" || !req.url?.endsWith("/chat/completions"))) {
+    return fail(404, "not found");
   }
   const auth = req.headers.authorization ?? "";
   if (!auth.startsWith("Bearer ") || auth === "Bearer bad") {
-    res.writeHead(401, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: { message: "Incorrect API key provided." } }));
+    return fail(401, "Incorrect API key provided.");
+  }
+  if (listing) {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({ object: "list", data: MODELS.map((id) => ({ id, object: "model" })) }),
+    );
     return;
   }
+  if (auth === "Bearer broke") return fail(402, "Insufficient credits.");
+  if (auth === "Bearer nope") return fail(403, "This key does not have access to the model.");
 
   const body = await readBody(req);
+  if (typeof body.model === "string" && body.model.startsWith("missing")) {
+    return fail(404, `The model ${body.model} does not exist.`);
+  }
   const messages = Array.isArray(body.messages) ? body.messages : [];
   // Content is a string, or OpenAI-style parts when the message carries images.
   const lastContent = messages.at(-1)?.content ?? "";
@@ -93,6 +111,14 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (body.stream === false) {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({ choices: [{ index: 0, message: { role: "assistant", content: "ok" } }] }),
+    );
+    return;
+  }
+
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache",
@@ -100,6 +126,16 @@ const server = http.createServer(async (req, res) => {
   });
   const send = (content) =>
     res.write(`data: ${JSON.stringify({ choices: [{ index: 0, delta: { content } }] })}\n\n`);
+
+  if (last.startsWith("/think")) {
+    // A reasoning model: thoughts first (not part of the reply), then the answer.
+    for (const thought of ["Let me ", "think about ", "that for ", "a moment."]) {
+      res.write(
+        `data: ${JSON.stringify({ choices: [{ index: 0, delta: { reasoning_content: thought } }] })}\n\n`,
+      );
+      await sleep(600);
+    }
+  }
 
   if (!last.startsWith("/empty")) {
     const slow = last.startsWith("/slow");

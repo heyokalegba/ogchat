@@ -333,6 +333,16 @@
   color: var(--og-text-2);
 }
 
+/* Shown while a reasoning model works out its answer. */
+.thinkingNote {
+  font-family: var(--og-font-mono);
+  font-size: calc(13px * var(--og-type));
+  font-weight: 700;
+  padding: 2px 6px;
+  color: var(--og-ink);
+  background: rgba(235, 228, 212, 0.8);
+}
+
 /* The streaming caret: same accent as the active-session marker. */
 .caret {
   display: inline-block;

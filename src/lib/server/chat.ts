@@ -172,9 +172,18 @@ export function prepareTurn(sessionId: string, input: SendInput): PreparedTurn {
   }
 }
 
-function toChatError(err: unknown): ChatError {
+/** Added when a request that carried images is turned down as malformed. */
+const IMAGE_HINT =
+  " This conversation includes an image, and some models only read text (abliterated-model-large-v2 is one). Delete the message with the image, or switch model in settings.";
+
+function toChatError(err: unknown, sentImages = false): ChatError {
   if (err instanceof ProviderError) {
-    return { code: err.code, message: err.message, ...(err.status ? { status: err.status } : {}) };
+    const hint = sentImages && (err.status === 400 || err.status === 422) ? IMAGE_HINT : "";
+    return {
+      code: err.code,
+      message: `${err.message}${hint}`,
+      ...(err.status ? { status: err.status } : {}),
+    };
   }
   return { code: "internal", message: "Something went wrong while generating the reply." };
 }
@@ -211,13 +220,19 @@ export async function runTurn(
     );
   };
 
+  let sentImages = false;
   try {
     emit({ type: "start", session: toMeta(turn.session), userMessage: turn.userMessage });
     const settings = resolveSettings();
+    const messages = buildProviderMessages(turn.session);
+    sentImages = messages.some(
+      (m) => Array.isArray(m.content) && m.content.some((part) => part.type === "image_url"),
+    );
     const stream = streamChat({
       config: { baseUrl: settings.baseUrl, apiKey: settings.apiKey, model: settings.model },
-      messages: buildProviderMessages(turn.session),
+      messages,
       signal: generation.controller.signal,
+      onThinking: () => emit({ type: "thinking" }),
     });
     for await (const text of stream) {
       generation.partial += text;
@@ -232,7 +247,7 @@ export async function runTurn(
         emit({ type: "done", session: meta(), message, stopped: true });
       } else {
         if (!(err instanceof ProviderError)) console.error("[ogchat] reply failed:", err);
-        emit({ type: "error", session: meta(), error: toChatError(err), message });
+        emit({ type: "error", session: meta(), error: toChatError(err, sentImages), message });
       }
     } catch (inner) {
       console.error("[ogchat] could not record the failed reply:", inner);
