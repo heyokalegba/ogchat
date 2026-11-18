@@ -1,3 +1,4 @@
+import { SEASON_NAMES, WEATHERS, type SeasonName, type Weather } from "@/lib/weather";
 import { SCENES, type SceneId } from "./art";
 
 /**
@@ -9,6 +10,10 @@ export interface Look {
   scene: SceneId;
   /** Milliseconds the scene's clock runs ahead of (or behind) the real one. 0 is real time. */
   clockOffsetMs: number;
+  /** The season the scene is in: the calendar's ("auto"), or one you hold it to. */
+  season: "auto" | SeasonName;
+  /** The weather: whatever is on today ("auto"), or one you hold it to. */
+  weather: "auto" | Weather;
   /** Whether people walk about in the scene. */
   people: boolean;
   /** Frozen: the scene holds still, like a picture. The light still follows the clock. */
@@ -36,6 +41,8 @@ export interface Look {
 export const DEFAULT_LOOK: Look = {
   scene: "skyline",
   clockOffsetMs: 0,
+  season: "auto",
+  weather: "auto",
   people: true,
   still: false,
   sceneStrength: 100,
@@ -94,6 +101,12 @@ function clean(value: unknown): Look {
         ? (raw.scene as SceneId)
         : DEFAULT_LOOK.scene,
     clockOffsetMs: clamp(Math.round(number(raw.clockOffsetMs, 0)), -DAY_MS, DAY_MS),
+    season: (SEASON_NAMES as readonly unknown[]).includes(raw.season)
+      ? (raw.season as SeasonName)
+      : "auto",
+    weather: (WEATHERS as readonly unknown[]).includes(raw.weather)
+      ? (raw.weather as Weather)
+      : "auto",
     people: typeof raw.people === "boolean" ? raw.people : DEFAULT_LOOK.people,
     still: typeof raw.still === "boolean" ? raw.still : DEFAULT_LOOK.still,
     sceneStrength: clamp(

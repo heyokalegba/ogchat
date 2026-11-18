@@ -13,7 +13,9 @@
     "mock-provider": "node scripts/mock-provider.mjs",
     "format": "prettier --write .",
     "art": "node scripts/make-art.mjs",
-    "app": "bash scripts/ogchat.command"
+    "app": "bash scripts/ogchat.command",
+    "mac": "cd electron && npm install && npm run build",
+    "desktop": "cd electron && npm install && npm start"
   },
   "engines": {
     "node": ">=20.9"

@@ -10,6 +10,8 @@ export interface Generation {
   controller: AbortController;
   /** Text received so far. */
   partial: string;
+  /** Reasoning received so far, when the provider shares it. */
+  thinking: string;
 }
 
 const store = globalThis as typeof globalThis & {
@@ -24,7 +26,11 @@ function registry(): Map<string, Generation> {
 export function beginGeneration(sessionId: string): Generation | null {
   const map = registry();
   if (map.has(sessionId)) return null;
-  const generation: Generation = { controller: new AbortController(), partial: "" };
+  const generation: Generation = {
+    controller: new AbortController(),
+    partial: "",
+    thinking: "",
+  };
   map.set(sessionId, generation);
   return generation;
 }

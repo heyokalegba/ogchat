@@ -211,6 +211,7 @@ export interface NewMessage {
   partial?: boolean;
   attachments?: Attachment[];
   web?: boolean;
+  thinking?: string;
 }
 
 /**
@@ -232,6 +233,7 @@ export function appendMessage(
     ...(input.partial ? { partial: true } : {}),
     ...(input.attachments?.length ? { attachments: input.attachments } : {}),
     ...(input.web ? { web: true } : {}),
+    ...(input.thinking?.trim() ? { thinking: input.thinking } : {}),
   };
   if (input.role === "user" && !file.titleLocked && !file.messages.some((m) => m.role === "user")) {
     file.title = titleFromMessage(input.content || input.attachments?.[0]?.name || "");

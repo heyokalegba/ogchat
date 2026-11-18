@@ -70,7 +70,7 @@ export function ChatSurface(props: ChatSurfaceProps) {
     onSessionUpdated: props.onSessionUpdated,
     onSessionMissing: props.onSessionMissing,
   });
-  const { messages, phase, streamText, thinking, error, openCount } = chat;
+  const { messages, phase, streamText, thinking, thinkingText, error, openCount } = chat;
 
   // Dragging files over the chat: enter/leave fire for every child, so count them.
   const [dropping, setDropping] = useState(false);
@@ -126,7 +126,7 @@ export function ChatSurface(props: ChatSurfaceProps) {
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (el && stick.current) el.scrollTop = el.scrollHeight;
-  }, [messages, streamText, error, phase]);
+  }, [messages, streamText, thinkingText, error, phase]);
 
   const onScroll = useCallback(() => {
     const el = scrollRef.current;
@@ -273,7 +273,9 @@ export function ChatSurface(props: ChatSurfaceProps) {
                   fileUrl={chat.fileUrl}
                 />
               ))}
-              {busy && <StreamingMessage text={streamText} thinking={thinking} />}
+              {busy && (
+                <StreamingMessage text={streamText} thinking={thinking} thought={thinkingText} />
+              )}
             </div>
 
             {error && (

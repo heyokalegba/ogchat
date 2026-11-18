@@ -426,6 +426,147 @@
   }
 }
 
+/* ---------------------------------------------------------------- wear */
+
+/* Marks of age (Wear.tsx): small flat rectangles laid on the scene, never moving. */
+.wear {
+  position: absolute;
+  inset: 0;
+  contain: strict;
+}
+
+.wear span {
+  position: absolute;
+}
+
+/* ---------------------------------------------------------------- weather */
+
+/* A covered sky: a flat grey over the whole scene (Weather.tsx sets how much). */
+.overcast {
+  position: absolute;
+  inset: 0;
+  transition: opacity 2s linear;
+}
+
+/* Fog lying in the street, thickest at the ground, breathing slowly. */
+.fog {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(196, 202, 208, 0.62),
+    rgba(196, 202, 208, 0.34) 45%,
+    transparent 85%
+  );
+  animation: fog-breathe 14s ease-in-out infinite alternate;
+}
+
+@keyframes fog-breathe {
+  from {
+    opacity: 0.75;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/*
+ * Something falling: a tile repeated over the scene and one tile beyond it on
+ * every side, slid by exactly one tile and started again, so it never ends.
+ */
+.fall {
+  position: absolute;
+  inset: calc(var(--tile) * -1);
+  background-repeat: repeat;
+  animation: fall 1s linear infinite;
+}
+
+@keyframes fall {
+  to {
+    transform: translate(calc(var(--tile) * var(--drift, 0)), var(--tile));
+  }
+}
+
+.rainFar {
+  --drift: -0.5;
+  opacity: 0.5;
+  animation-duration: 0.62s;
+}
+
+.rainNear {
+  --drift: -0.5;
+  animation-duration: 0.44s;
+}
+
+.rainHard {
+  --drift: -0.5;
+  animation-duration: 0.36s;
+}
+
+.snowFar {
+  opacity: 0.7;
+  animation-duration: 9s;
+}
+
+.snowNear {
+  animation-duration: 5.5s;
+}
+
+.leafFall {
+  --drift: -1;
+  animation-duration: 11s;
+}
+
+/* Snow and leaves do not fall straight: the whole fall drifts side to side. */
+.sway {
+  position: absolute;
+  inset: 0;
+  animation: sway 6s ease-in-out infinite alternate;
+}
+
+@keyframes sway {
+  from {
+    transform: translateX(calc(var(--u) * -5));
+  }
+  to {
+    transform: translateX(calc(var(--u) * 5));
+  }
+}
+
+/* Lightning: the whole scene lit for an instant, twice in a long while, never on a beat. */
+.lightning {
+  position: absolute;
+  inset: 0;
+  background: #dfe6f2;
+  opacity: 0;
+  animation: lightning 23s steps(1) infinite;
+}
+
+@keyframes lightning {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  31% {
+    opacity: 0.55;
+  }
+  31.6% {
+    opacity: 0;
+  }
+  32.1% {
+    opacity: 0.3;
+  }
+  32.6% {
+    opacity: 0;
+  }
+  77% {
+    opacity: 0.4;
+  }
+  77.5% {
+    opacity: 0;
+  }
+}
+
 /* ---------------------------------------------------------------- aircraft */
 
 /* One crossing of the sky, left to right (SkyTraffic.tsx). */

@@ -62,6 +62,26 @@ interface is see-through, over a pixel-art New York that keeps real time.
   an arm up, and a yellow cab pulls in, takes them and drives off.
 - **Warning lights.** After dark about one building in eight carries a red
   light at its top, a single pixel, blinking out of step with the others.
+- **Seasons.** The scene follows the calendar in Brooklyn. In spring the trees
+  are in fresh leaf and blossom, with petals on the pavement; in summer they
+  are full and dark; in autumn they turn and drop their leaves along the kerb,
+  and a few come down on the wind; in winter they are bare, and there is snow
+  on the roofs and cornices, the stoops, the parked cars and the pavement. The
+  skyline, with no trees, shows winter by the snow on its roofs.
+- **Weather.** Clear, cloudy, rain, thunderstorm, fog or snow, weighted by the
+  season (snow only in winter, thunder mostly in summer) and holding for hours
+  at a time. It is made up by the clock, not fetched from anywhere, so it is
+  not the real weather in Brooklyn, but the rain that is falling is still
+  falling after a reload. A covered sky hides the sun and stars and flattens
+  the light; rain and snow thin out the people on the street and call off the
+  barbecues.
+- **Wear and tear, in real time.** The street ages at the speed a real one
+  does. Each scene has some hundreds of small marks waiting (a streak under a
+  window sill, a crack across the pavement, a patch in the road, a chipped
+  kerb, a sticker on a lamp post, a scribble of paint) and each has its day,
+  spread over twenty years from the day your street was first opened. That is
+  a new mark every week or so: nothing to watch for, and a different street
+  in a few years. The look panel can show you what is coming.
 - **More birds.** Besides the flock that crosses, ones, twos and small groups
   fly through while it is light.
 
@@ -74,6 +94,9 @@ is remembered in your browser.
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | People                  | `out` or `none`. `none` empties the streets and roofs.                                                                                                                                                                                                         |
 | Motion                  | `live` or `frozen`. Frozen holds the scene still, like a picture, while you work: nothing moves and nobody arrives. The light still follows the clock.                                                                                                         |
+| Season                  | `by the calendar`, or hold the scene to spring, summer, autumn or winter.                                                                                                                                                                                      |
+| Weather                 | `as it comes`, or hold it to clear, cloudy, rain, storm, fog or snow.                                                                                                                                                                                          |
+| Wear                    | How old your street is, and a slider to look ahead at the wear to come, up to twenty years. Looking ahead is not remembered: reload and the street is its real age again.                                                                                      |
 | Strength                | How strongly the scene shows, from full down to faint. Lower it when the picture competes with the text, above all with the wall hidden.                                                                                                                       |
 | Message box colour      | The colour of the box you type in: six to choose from, or pick any. What you type turns light on a dark box.                                                                                                                                                   |
 | Chat                    | `shown` or `hidden`. Hidden puts the chat, the sidebar and the title away so there is only the scene; the corner keeps the scene switch, the clock and a `show chat` button, and Esc brings everything back. The top bar has the same switch.                  |
@@ -98,7 +121,10 @@ More screens: [first run](docs/screens/01-first-run.png) ·
 [brooklyn with people, traffic and One World Trade](docs/screens/12-street-life.png) ·
 [the skyline at night](docs/screens/13-skyline-night.png) ·
 [the scene on its own, with a rooftop barbecue](docs/screens/14-scene-only.png) ·
-[a chat in a project](docs/screens/15-project.png)
+[a chat in a project](docs/screens/15-project.png) ·
+[winter, snowing](docs/screens/16-winter-snow.png) ·
+[autumn rain](docs/screens/17-autumn-rain.png) ·
+[thinking, shown as it is written](docs/screens/18-thinking.png)
 
 ## Run it
 
@@ -123,7 +149,26 @@ Both commands bind to 127.0.0.1 only.
 
 ogchat is a local web app: a small server on your machine and a page that
 talks to it. It can still live outside your browser, in a window of its own
-with its own Dock icon. Two ways:
+with its own Dock icon. Three ways, the first being the real thing:
+
+- **A Mac app.** On the Mac, in the project folder:
+
+  ```bash
+  npm run mac
+  ```
+
+  This downloads Electron (once, about 100 MB), builds `ogchat.app` into
+  `dist-app/` and signs it for this Mac. Open it from there or drag it into
+  Applications. The app is a thin shell around the project where it lives: on
+  launch it builds the project if it has changed, starts ogchat's server on a
+  port of its own (3311) with the runtime inside the app, and shows it;
+  quitting the app stops the server. Your chats, settings and key stay where
+  they are, in the project's `data/` and `.env.local`, so the app and the
+  browser see the same conversations. Updating the project updates the app;
+  only moving the project folder means building the app again. The look
+  panel's choices are kept per window: the app remembers its own, separately
+  from your browser's. `npm run desktop` runs the same window without building
+  an app.
 
 - **Double-click `scripts/ogchat.command`** in Finder (or `npm run app`). It
   starts the server if it is not running, builds first if the app has been
@@ -261,6 +306,10 @@ The provider must speak the OpenAI chat-completions shape:
 - Code in a reply sits in a panel as wide as its longest line, at the left, and
   scrolls sideways once it reaches the full width.
 - While a reasoning model is working out its answer, `thinking` pulses slowly.
+  If the provider shares the reasoning, it appears under that heading as it
+  is written, folds away when the answer starts, and stays with the reply
+  under `thoughts` for whenever you want to read it. It is never sent back to
+  the provider.
 - Stopping keeps the text received so far, marked `— stopped`.
 - A reply keeps generating on the server if you switch sessions or close the
   tab, and is there when you come back. Only Stop ends it early.
@@ -294,6 +343,7 @@ Everything is plain JSON under `data/` (override with `OGCHAT_DATA_DIR`):
 ```
 data/
   settings.json            provider settings, including a key saved in the panel
+  world.json               the day your street was first opened: what its wear is counted from
   sessions/<id>.json       one file per session: title, timestamps, messages, its project
   projects/<id>.json       one file per project: name, instructions, its files' details
   files/<owner>/<id>       attachments and project files: image bytes, or the text taken from a file
@@ -320,6 +370,7 @@ src/
     client/api.ts                  browser client for the routes above
 tests/                             vitest: persistence, adapter, route contract, attachments, the clock, the people
 scripts/mock-provider.mjs          stand-in provider for local trials
+electron/                          the Mac app: a window and a launcher around this project (its own package)
 scripts/make-art.mjs, scripts/art/  generate the scenes, the sky, the people and the brick wall
 ```
 
@@ -380,6 +431,8 @@ Day to day, use the look panel (above). To change what it starts from:
   - `scripts/art/street.mjs`: the four lettering faces (`FONTS`), shopfronts and what is in their
     windows, street signs and billboards. The shops themselves are listed in
     `brooklyn.mjs` (`shops`), the billboards in `skyline.mjs` (`boards`).
+  - `scripts/art/wear.mjs`: the marks of age and the days they appear on.
+    `WEAR_YEARS` is how long they are spread over.
   - `scripts/art/extras.mjs`: the figures seen in windows, and the grill and
     lights for a barbecue.
 - **The people:** `src/components/shell/life.ts` decides who turns up and what
@@ -389,6 +442,10 @@ Day to day, use the look panel (above). To change what it starts from:
   likely each kind of party is to sit on a doorstep; `roofPartyAt` decides when
   there is a barbecue. `WindowLife.tsx` is who shows in the windows and
   `SkyTraffic.tsx` the aircraft and the birds.
+- **Seasons and weather:** `FOLIAGE` in `brooklyn.mjs` holds each season's
+  colours, and `snowfall` in `lib.mjs` lays the snow. `src/lib/weather.ts`
+  holds the season by month and the odds of each kind of weather in each
+  season (`ODDS`); `Weather.tsx` draws what falls.
 - **The clock:** `src/lib/daylight.ts` works out where the sun and moon are
   over Brooklyn and which light the scene is in. `BROOKLYN` at the top holds
   the place; `skyBlend` holds the sun heights at which the light changes.
@@ -429,6 +486,7 @@ still, with a few figures standing in it.
 | `POST /api/sessions/:id/stop`                    | Stop the reply in progress                                                                                                                                                                                                      |
 | `GET` / `PUT /api/settings`                      | Read (masked) / update provider settings: `baseUrl`, `model`, `apiKey`, `reasoning`, `systemPrompt`                                                                                                                             |
 | `POST /api/settings/test`                        | Try `{ baseUrl?, model?, apiKey? }` (or the current settings) against the provider without saving; returns `{ check }`                                                                                                          |
+| `GET /api/world`                                 | `{ world: { builtAt } }`: when this street was first opened                                                                                                                                                                     |
 | `GET` / `POST /api/projects`                     | List projects (with instructions, files and session counts) / create one `{ name }`                                                                                                                                             |
 | `GET` / `PATCH` / `DELETE /api/projects/:id`     | Read / update `{ name?, instructions? }` / delete a project. Its sessions are kept                                                                                                                                              |
 | `POST /api/projects/:id/files`                   | Add files (`multipart/form-data`, field `files`)                                                                                                                                                                                |

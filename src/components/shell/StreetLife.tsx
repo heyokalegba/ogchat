@@ -302,6 +302,8 @@ export function StreetLife(props: {
   now?: number;
   /** Frozen: a few people standing where they are, and nothing else. */
   still?: boolean;
+  /** How much the weather keeps people in: 0 not at all, 1 nobody about. */
+  shelter?: number;
 }) {
   const { scene, light } = props;
   const art = SCENES[scene];
@@ -317,8 +319,9 @@ export function StreetLife(props: {
   );
   const night = useRef(props.night);
   useEffect(() => {
-    night.current = props.night;
-  }, [props.night]);
+    // Bad weather empties the street the way the small hours do.
+    night.current = Math.max(props.night, props.shelter ?? 0);
+  }, [props.night, props.shelter]);
 
   const commit = useCallback((next: Party[]) => {
     live.current = next;

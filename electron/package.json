@@ -1,0 +1,15 @@
+{
+  "name": "ogchat-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ogchat as a desktop app: a window of its own around the local server.",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "build": "node build.cjs"
+  },
+  "devDependencies": {
+    "@electron/packager": "^18.3.6",
+    "electron": "^33.2.0"
+  }
+}

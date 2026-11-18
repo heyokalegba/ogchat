@@ -33,6 +33,11 @@ export interface ChatMessage {
   attachments?: Attachment[];
   /** Set on a user message that was sent with web search on, so a retry searches again. */
   web?: boolean;
+  /**
+   * On a reply: what the model reasoned before answering, when the provider
+   * shared it. Shown on request; never sent back to the provider.
+   */
+  thinking?: string;
 }
 
 /**
@@ -113,8 +118,8 @@ export interface ChatError {
 /** One line of the NDJSON stream returned by POST /api/sessions/:id/messages. */
 export type StreamEvent =
   | { type: "start"; session: SessionMeta; userMessage: ChatMessage | null }
-  /** The model is reasoning before it answers. Sent at most once per reply. */
-  | { type: "thinking" }
+  /** The model is reasoning before it answers. `text` is the next piece of that reasoning. */
+  | { type: "thinking"; text?: string }
   | { type: "delta"; text: string }
   | { type: "done"; session: SessionMeta; message: ChatMessage | null; stopped: boolean }
   | { type: "error"; session: SessionMeta; error: ChatError; message: ChatMessage | null };
@@ -138,4 +143,6 @@ export interface SessionDetail {
   generating: boolean;
   /** Text produced so far when `generating` is true. */
   partial: string;
+  /** Reasoning produced so far when `generating` is true. */
+  thinking: string;
 }

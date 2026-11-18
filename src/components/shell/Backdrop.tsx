@@ -1,10 +1,13 @@
 import type { CSSProperties } from "react";
 import { brooklynClock, type SkyView } from "@/lib/daylight";
+import { overcast, shelter, type SeasonName, type Weather } from "@/lib/weather";
 import { SCENES, SKY, type SceneId } from "./art";
 import styles from "./backdrop.module.css";
 import { roofPartyAt } from "./life";
 import { SkyTraffic } from "./SkyTraffic";
 import { StreetLife } from "./StreetLife";
+import { Wear } from "./Wear";
+import { WeatherLayer } from "./Weather";
 import { WindowLife } from "./WindowLife";
 import { WindowSwitches } from "./WindowSwitches";
 
@@ -52,11 +55,20 @@ export function Backdrop(props: {
   view: SkyView;
   /** The scene's time now, in milliseconds: what the timed events go by. */
   now: number;
+  /** How old the street is, in days: how much of its wear and tear shows. */
+  age?: number;
+  /** The season the scene is drawn in, and the weather over it. */
+  season?: SeasonName;
+  weather?: Weather;
   people?: boolean;
   /** Frozen: nothing moves, nobody arrives. The light still follows the clock. */
   still?: boolean;
 }) {
   const { scene, view, now, people = true, still = false } = props;
+  const { season = "summer", weather = "clear" } = props;
+  // A covered sky hides the sun, the moon and the stars, and keeps people in.
+  const grey = overcast(weather);
+  const indoors = shelter(weather);
   const art = SCENES[scene];
   const config = art.config;
   const { blend, sun, moon } = view;
@@ -162,10 +174,14 @@ export function Backdrop(props: {
     .map((roof, index) => ({ roof, index }))
     .filter(({ roof }) => roof.w >= 34);
   const event = roofPartyAt(now, PARTY_SALT[scene], hosts.length, minuteOfDay);
-  const party = event ? { roof: hosts[event.roof]!.index, endsAt: event.endsAt } : null;
+  // Nobody barbecues in the rain or the snow.
+  const party =
+    event && indoors < 0.3 ? { roof: hosts[event.roof]!.index, endsAt: event.endsAt } : null;
   const beaconGlow = Math.min(1, night * 1.8);
 
-  const parked = art.parked && <Blend className={styles.layer} sources={art.parked} view={view} />;
+  const parked = art.parked && (
+    <Blend className={styles.layer} sources={art.parked[season]} view={view} />
+  );
 
   return (
     <div className={`${styles.backdrop} ${still ? styles.still : ""}`} aria-hidden="true">
@@ -177,7 +193,7 @@ export function Backdrop(props: {
         </div>
 
         {night > 0.03 && (
-          <div className={styles.stars} style={{ opacity: night }}>
+          <div className={styles.stars} style={{ opacity: night * (1 - grey) }}>
             <div className={styles.starLayer} style={image(SKY.stars)} />
             <div
               className={`${styles.starLayer} ${styles.twinkle}`}
@@ -187,7 +203,10 @@ export function Backdrop(props: {
         )}
 
         {sun.up && (
-          <div className={styles.orb} style={{ left: `${sun.x}%`, top: `${sun.y}%` }}>
+          <div
+            className={styles.orb}
+            style={{ left: `${sun.x}%`, top: `${sun.y}%`, opacity: 1 - grey }}
+          >
             <div className={styles.sun} style={{ ...image(SKY.sun), opacity: 1 - sun.low }} />
             <div className={styles.sunLow} style={{ ...image(SKY.sunLow), opacity: sun.low }} />
           </div>
@@ -195,7 +214,7 @@ export function Backdrop(props: {
         {moon.up && moon.opacity > 0 && (
           <div
             className={styles.orb}
-            style={{ left: `${moon.x}%`, top: `${moon.y}%`, opacity: moon.opacity }}
+            style={{ left: `${moon.x}%`, top: `${moon.y}%`, opacity: moon.opacity * (1 - grey) }}
           >
             <div className={styles.moon}>
               <div
@@ -228,7 +247,7 @@ export function Backdrop(props: {
           <Blend className={styles.cloudLayer} sources={SKY.cloudsNear} view={view} />
         </div>
 
-        {night < 0.75 && (
+        {night < 0.75 && weather !== "storm" && (
           <div className={styles.flight} style={{ animationDuration: `${config.birds.seconds}s` }}>
             <div className={styles.birds} style={{ top: config.birds.top }}>
               <div className={styles.birdsStrip} style={image(SKY.birds)} />
@@ -236,9 +255,9 @@ export function Backdrop(props: {
           </div>
         )}
 
-        <SkyTraffic light={light} night={night} still={still} />
+        <SkyTraffic light={light} night={night} still={still || weather === "storm"} />
 
-        <Blend className={styles.layer} sources={art.city} view={view} />
+        <Blend className={styles.layer} sources={art.city[season]} view={view} />
         {art.glints && (
           <div className={styles.switches} style={{ opacity: switching }}>
             <div className={`${styles.layer} ${styles.glintsA}`} style={image(art.glints[0])} />
@@ -267,7 +286,8 @@ export function Backdrop(props: {
           </div>
         )}
 
-        <Blend className={styles.layer} sources={art.rooftops} view={view} />
+        <Blend className={styles.layer} sources={art.rooftops[season]} view={view} />
+        <Wear scene={scene} days={props.age ?? 0} night={night} />
         <WindowSwitches windows={config.switches.front} strength={switching} still={still} />
         {glow(art.glow.front, "Front")}
         {/* Cars at the kerb stand between the pavement and us; cyclists pass outside them. */}
@@ -277,6 +297,7 @@ export function Backdrop(props: {
             scene={scene}
             light={light}
             night={night}
+            shelter={indoors}
             kerb={parked}
             party={party}
             now={now}
@@ -287,6 +308,12 @@ export function Backdrop(props: {
         )}
         {smoke(true)}
         {lanes(true)}
+        <WeatherLayer
+          weather={weather}
+          grey={grey}
+          leaves={season === "autumn" && scene === "brooklyn"}
+          night={night}
+        />
       </div>
     </div>
   );

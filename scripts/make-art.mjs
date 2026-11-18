@@ -25,12 +25,24 @@
  * only needs running after a change, and it is seeded: the same script always
  * draws the same pictures.
  */
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { birds, CHAT_ART, ROOT, SHELL_ART, smoke, STATES, writePng, written } from "./art/lib.mjs";
+import {
+  birds,
+  CHAT_ART,
+  ROOT,
+  SEASONS,
+  SHELL_ART,
+  smoke,
+  STATES,
+  writePng,
+  written,
+} from "./art/lib.mjs";
 import { bricks } from "./art/bricks.mjs";
 import { brooklynScene } from "./art/brooklyn.mjs";
 import { PEOPLE_META, peopleSheet, propsSheet, wheelsSheet } from "./art/people.mjs";
+import { WEAR_YEARS } from "./art/wear.mjs";
 import {
   appIcon,
   GRILL,
@@ -40,7 +52,21 @@ import {
   SHADOW,
   shadows,
 } from "./art/extras.mjs";
-import { BIRD, bird, cloudStrip, FLIER, fliers, moon, sky, stars, sun } from "./art/sky.mjs";
+import {
+  BIRD,
+  bird,
+  cloudStrip,
+  FLIER,
+  fliers,
+  leafTile,
+  moon,
+  rainTile,
+  sky,
+  snowTile,
+  stars,
+  sun,
+  WEATHER_TILE,
+} from "./art/sky.mjs";
 import { skylineScene } from "./art/skyline.mjs";
 
 // Start from an empty folder, so a renamed picture never leaves its old self behind.
@@ -54,7 +80,20 @@ for (const size of [192, 512]) {
 
 /** name -> canvas, for everything under the shell's art folder. */
 const files = new Map();
-const add = (name, image) => files.set(name, image);
+/** A picture identical to one already kept is not written again: its name points at the first. */
+const sameAs = new Map();
+const kept = new Map();
+const add = (name, image) => {
+  const key = `${image.w}x${image.h}:${createHash("sha1").update(image.data).digest("hex")}`;
+  const first = kept.get(key);
+  if (first) {
+    sameAs.set(name, first);
+    return;
+  }
+  kept.set(key, name);
+  files.set(name, image);
+};
+const known = (name) => files.has(name) || sameAs.has(name);
 
 for (const state of STATES) {
   add(`sky-${state}.png`, sky(state));
@@ -73,6 +112,9 @@ const puff = smoke();
 add("smoke.png", puff.canvas);
 add("birds.png", birds());
 add("bird.png", bird());
+add("rain.png", rainTile());
+add("snow.png", snowTile());
+add("leaves.png", leafTile());
 add("shadows.png", shadows());
 add("party-lights.png", partyLights());
 add("grill.png", grill());
@@ -89,27 +131,30 @@ for (const [name, image] of files) writePng(path.join(SHELL_ART, name), image);
 const ident = (name) =>
   name.replace(/\.png$/, "").replace(/[^a-zA-Z0-9]+(.)/g, (_, ch) => ch.toUpperCase());
 const names = [...files.keys()];
-const src = (name) => `${ident(name)}.src`;
+const src = (name) => `${ident(sameAs.get(name) ?? name)}.src`;
 const perState = (pattern) => `{ ${STATES.map((s) => `${s}: ${src(pattern(s))}`).join(", ")} }`;
+/** A picture that exists in every season and every light. */
+const perSeason = (pattern) =>
+  `{\n      ${SEASONS.map((season) => `${season}: ${perState((s) => pattern(season, s))}`).join(",\n      ")},\n    }`;
 
 const sceneBlock = (id) => `{
-    city: ${perState((s) => `${id}/city-${s}.png`)},
-    rooftops: ${perState((s) => `${id}/rooftops-${s}.png`)},
+    city: ${perSeason((season, s) => `${id}/city-${season}-${s}.png`)},
+    rooftops: ${perSeason((season, s) => `${id}/rooftops-${season}-${s}.png`)},
     /** Cars at the kerb, drawn over the people on the pavement. Only some scenes have them. */
-    parked: ${files.has(`${id}/parked-day.png`) ? perState((s) => `${id}/parked-${s}.png`) : "null"},
+    parked: ${known(`${id}/parked-summer-day.png`) ? perSeason((season, s) => `${id}/parked-${season}-${s}.png`) : "null"},
     people: ${perState((s) => `${id}/people-${s}.png`)},
     props: ${perState((s) => `${id}/props-${s}.png`)},
     wheels: ${perState((s) => `${id}/wheels-${s}.png`)},
     /** The cab that answers a hail. Only where there is a street to hail one on. */
-    cab: ${files.has(`${id}/cab-day.png`) ? perState((s) => `${id}/cab-${s}.png`) : "null"},
+    cab: ${known(`${id}/cab-day.png`) ? perState((s) => `${id}/cab-${s}.png`) : "null"},
     /** Sparkle on the water, as two pictures that take turns. Only where there is water. */
-    glints: ${files.has(`${id}/glints-a.png`) ? `[${src(`${id}/glints-a.png`)}, ${src(`${id}/glints-b.png`)}]` : "null"},
+    glints: ${known(`${id}/glints-a.png`) ? `[${src(`${id}/glints-a.png`)}, ${src(`${id}/glints-b.png`)}]` : "null"},
     glow: {
       back: [${src(`${id}/glow-back-a.png`)}, ${src(`${id}/glow-back-b.png`)}],
       front: [${src(`${id}/glow-front-a.png`)}, ${src(`${id}/glow-front-b.png`)}],
     },
     /** The traffic strips, in each light. A scene with one picture for all hours repeats it. */
-    traffic: ${perState((s) => (files.has(`${id}/traffic-${s}.png`) ? `${id}/traffic-${s}.png` : `${id}/traffic.png`))},
+    traffic: ${perState((s) => (known(`${id}/traffic-${s}.png`) ? `${id}/traffic-${s}.png` : `${id}/traffic.png`))},
     config: ${JSON.stringify(scenes[id].config, null, 2).replace(/\n/g, "\n    ")},
   }`;
 
@@ -119,6 +164,10 @@ ${names.map((name) => `import ${ident(name)} from "./${name}";`).join("\n")}
 /** The four lights every picture comes in. The backdrop crossfades between neighbours. */
 export const SKY_STATES = ${JSON.stringify(STATES)} as const;
 export type SkyState = (typeof SKY_STATES)[number];
+
+/** The four seasons every scene comes in. */
+export const SEASONS = ${JSON.stringify(SEASONS)} as const;
+export type Season = (typeof SEASONS)[number];
 
 /** Overhead, shared by every scene. */
 export const SKY = {
@@ -136,6 +185,10 @@ export const SKY = {
   /** An airliner and a helicopter: two frames across, one row each. */
   fliers: ${perState((s) => `fliers-${s}.png`)},
   flier: ${JSON.stringify(FLIER)},
+  /** What falls: a tile each, with the tile's size in scene pixels. */
+  rain: { src: ${src("rain.png")}, size: ${WEATHER_TILE.rain} },
+  snow: { src: ${src("snow.png")}, size: ${WEATHER_TILE.snow} },
+  leaves: { src: ${src("leaves.png")}, size: ${WEATHER_TILE.leaves} },
   /** One bird, wings up and wings down. */
   bird: { src: ${src("bird.png")}, ...${JSON.stringify(BIRD)} },
   /** Figures seen against lit windows: a row each, two frames across. */
@@ -160,6 +213,29 @@ export const SCENES = {
 export type SceneId = keyof typeof SCENES;
 `;
 fs.writeFileSync(path.join(SHELL_ART, "index.ts"), manifest);
+
+// Wear and tear: each scene's marks, with the day each one appears (see wear.mjs).
+const wear = `// Generated by scripts/make-art.mjs (npm run art). Do not edit by hand.
+
+/**
+ * Small marks of age, by scene. \`marks\` is sorted by day; each is
+ * [day it appears, colour index, opacity in percent, then x, y, w, h for each
+ * rectangle], in scene pixels. Spread over ${WEAR_YEARS} years.
+ */
+export const WEAR_YEARS = ${WEAR_YEARS};
+
+export const WEAR: Record<string, { colors: string[]; marks: number[][] }> = {
+${Object.entries(scenes)
+  .map(
+    ([id, scene]) =>
+      `  ${id}: {\n    colors: ${JSON.stringify(scene.wear.colors)},\n    marks: [\n${scene.wear.marks
+        .map((mark) => `      [${mark.join(",")}],`)
+        .join("\n")}\n    ],\n  },`,
+  )
+  .join("\n")}
+};
+`;
+fs.writeFileSync(path.join(SHELL_ART, "wear.ts"), wear);
 
 // ---------------------------------------------------------------- report
 

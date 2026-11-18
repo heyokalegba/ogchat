@@ -57,6 +57,8 @@ export interface ChatApi {
   deleteMessage(id: string, messageId: string): Promise<Session>;
   stop(id: string): Promise<void>;
   getSettings(): Promise<PublicSettings>;
+  /** When this installation's street was first opened: what its wear is counted from. */
+  getWorld(): Promise<{ builtAt: string }>;
   saveSettings(update: SettingsUpdate): Promise<PublicSettings>;
   /** Tests the settings as they would be with `update` applied, without saving it. */
   testSettings(update: SettingsUpdate): Promise<SettingsCheck>;
@@ -180,6 +182,9 @@ export function createApi(base = "/api"): ChatApi {
     },
     async stop(id) {
       await call(`/sessions/${id}/stop`, body("POST", {}));
+    },
+    async getWorld() {
+      return (await data<{ world: { builtAt: string } }>("/world")).world;
     },
     async getSettings() {
       return (await data<{ settings: PublicSettings }>("/settings")).settings;

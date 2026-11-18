@@ -6,6 +6,7 @@ import { MenuIcon } from "@/components/chat/icons";
 import "@/components/chat/theme.css";
 import { createApi } from "@/lib/client/api";
 import { brooklynClock, offsetForClockTime, readSky } from "@/lib/daylight";
+import { seasonAt, weatherAt } from "@/lib/weather";
 import type { Project, PublicSettings, ReasoningEffort, SessionMeta } from "@/lib/types";
 import { SCENES, type SceneId } from "./art";
 import { Backdrop } from "./Backdrop";
@@ -66,6 +67,9 @@ export function AppShell() {
   /** The open session's details, kept even when a filter leaves it out of the list. */
   const [activeMeta, setActiveMeta] = useState<SessionMeta | null>(null);
   const projectRef = useRef<string | null>(null);
+  /** When the street was first opened (from the server), and a look ahead at its wear. */
+  const [builtAt, setBuiltAt] = useState<number | null>(null);
+  const [peekYears, setPeekYears] = useState(0);
   const queryRef = useRef("");
   const activeIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -112,6 +116,10 @@ export function AppShell() {
       () => {},
     );
     api.getSettings().then(setSettings, () => {});
+    api.getWorld().then(
+      (world) => setBuiltAt(Date.parse(world.builtAt)),
+      () => {},
+    );
     const onPop = () => {
       setActiveId(sessionFromUrl());
       setOpenToken((n) => n + 1);
@@ -349,6 +357,14 @@ export function AppShell() {
     projects.find((p) => p.id === (activeId ? activeSession?.projectId : projectId)) ?? null;
   const panelProject = projects.find((p) => p.id === editingProject) ?? null;
 
+  // How old the street is, in days, by the scene's clock: what its wear is counted from.
+  const streetDays =
+    builtAt === null || sceneNow === null ? 0 : Math.max(0, (sceneNow - builtAt) / 86_400_000);
+
+  // The season and the weather: the calendar's and the day's, unless the look panel holds them.
+  const season = look.season === "auto" ? seasonAt(sceneNow ?? 0) : look.season;
+  const weather = look.weather === "auto" ? weatherAt(sceneNow ?? 0, season) : look.weather;
+
   const provider = useMemo(
     () => (settings ? { ready: settings.apiKey.set, model: settings.model } : null),
     [settings],
@@ -366,6 +382,9 @@ export function AppShell() {
           scene={look.scene}
           view={view}
           now={sceneNow ?? 0}
+          season={season}
+          weather={weather}
+          age={streetDays + peekYears * 365}
           people={look.people}
           still={look.still}
         />
@@ -478,6 +497,11 @@ export function AppShell() {
           onSetTime={setSceneTime}
           onSnapToNow={snapToNow}
           onClose={() => setLookOpen(false)}
+          season={season}
+          weather={weather}
+          streetDays={streetDays}
+          peekYears={peekYears}
+          onPeek={setPeekYears}
         />
       )}
 

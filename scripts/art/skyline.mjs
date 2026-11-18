@@ -6,6 +6,7 @@
  * heights swell into two clusters, with slender towers, stepped crowns, spires
  * and masts breaking the roofline, so it reads as a skyline and not a band.
  */
+import { wearFor } from "./wear.mjs";
 import { chrysler, empireState, oneWorldTrade } from "./landmarks.mjs";
 import { billboard, FONTS } from "./street.mjs";
 import {
@@ -20,11 +21,13 @@ import {
   mix,
   pctX,
   pctY,
+  SEASONS,
   shade,
+  snowfall,
+  STATES,
   W,
   waterTower,
   weather,
-  STATES,
 } from "./lib.mjs";
 
 const GROUND = 320; // where the buildings stand and the river begins
@@ -69,7 +72,10 @@ const PEOPLE_GRADES = {
 const rise = (x) =>
   Math.max(Math.exp(-(((x - 140) / 100) ** 2)), 0.9 * Math.exp(-(((x - 478) / 115) ** 2)), 0.28);
 
-function city() {
+/** Snow as it looks by day, which is the light the skyline is drawn in. */
+const SNOW = hex("#dfe3ea");
+
+function city(season = "summer") {
   const skyline = canvas(W, H);
   const rooftops = canvas(W, H);
   const lights = { a: canvas(W, H), b: canvas(W, H), c: canvas(W, H) };
@@ -91,6 +97,8 @@ function city() {
   const B = dice(7102);
   /** Near windows that are lit at some hour, for what is seen moving behind them. */
   const panes = [];
+  /** Every near window, lit or not: wear keeps off the glass. */
+  const glass = [];
   const iron = G("#2b2724");
   const woods = [G("#5c4434"), G("#66493a"), G("#4f3d31")];
 
@@ -101,6 +109,7 @@ function city() {
     const useGlass = chance(0.4);
     for (let wy = y + o.top; wy + o.wh < y + h - 3; wy += o.wh + o.gapY) {
       for (let wx = x + o.left; wx + o.ww < x + w - 2; wx += o.ww + o.gapX) {
+        if (c === rooftops) glass.push({ x: wx, y: wy, w: o.ww, h: o.wh });
         const on = chance(o.lit);
         const tone = pick(lit);
         const blind = on && o.wh > 3 && chance(0.4);
@@ -641,6 +650,13 @@ function city() {
   }
 
   // The switching layers: river glints were drawn straight in; add the windows.
+  // Winter: snow on the level tops, from the mid-rise roofs down to the near ones.
+  // The far towers are too far off to show it.
+  if (season === "winter") {
+    snowfall(skyline, SNOW, { from: 96, to: GROUND - 6 });
+    snowfall(rooftops, SNOW);
+  }
+
   // The windows that come on and go off: listed one by one, so the backdrop can
   // switch them singly rather than a whole layer at a time.
   const switches = {
@@ -677,7 +693,31 @@ function city() {
     )
     .map(({ x, y, w, h, when }) => ({ x, y, w, h, when }));
   // What is left on the two light canvases is the glint on the river.
-  return { states, glow, beacons, roofs, windows: inView, switches, glints: [lights.a, lights.c] };
+  // What there is to wear up here: the walls of the near buildings and their windows.
+  const site = {
+    w: W,
+    h: H,
+    panes: glass.filter((p) => p.x >= 0 && p.x + p.w <= W && p.y + p.h < H),
+    walls: roofs
+      .filter((roof) => roof.x >= 0 && roof.x + roof.w <= W)
+      .map((roof) => ({ x: roof.x + 1, w: roof.w - 4, top: roof.top + 6, bottom: H - 3 }))
+      .filter((wall) => wall.bottom > wall.top + 4),
+    pavement: null,
+    road: null,
+    kerb: null,
+    poles: [],
+    tags: true,
+  };
+  return {
+    states,
+    glow,
+    beacons,
+    roofs,
+    windows: inView,
+    switches,
+    glints: [lights.a, lights.c],
+    site,
+  };
 }
 
 /** Two lanes of lights on the bridge, as seamless strips: headlights, then tail lights. */
@@ -697,7 +737,10 @@ function traffic() {
 }
 
 export function skylineScene(puff, cast) {
-  const scene = city();
+  // Up here the seasons differ only by the snow; the other three come out alike,
+  // and the art script keeps one copy of pictures that are the same.
+  const seasons = Object.fromEntries(SEASONS.map((season) => [season, city(season)]));
+  const scene = seasons.summer;
   const lane = W - BRIDGE_LEFT + 8;
   const images = {
     "glints-a.png": scene.glints[0],
@@ -709,14 +752,18 @@ export function skylineScene(puff, cast) {
     "traffic.png": traffic(),
   };
   for (const state of STATES) {
-    images[`city-${state}.png`] = scene.states[state].city;
-    images[`rooftops-${state}.png`] = scene.states[state].rooftops;
+    for (const season of SEASONS) {
+      const drawn = seasons[season].states[state];
+      images[`city-${season}-${state}.png`] = drawn.city;
+      images[`rooftops-${season}-${state}.png`] = drawn.rooftops;
+    }
     images[`people-${state}.png`] = cast.people.graded(grit).graded(PEOPLE_GRADES[state]);
     images[`props-${state}.png`] = cast.props.graded(grit).graded(PEOPLE_GRADES[state]);
     images[`wheels-${state}.png`] = cast.wheels.graded(grit).graded(PEOPLE_GRADES[state]);
   }
   return {
     images,
+    wear: wearFor(scene.site, 5151, 600),
     config: {
       label: "skyline",
       hint: "the harbour, the bridge and the towers",

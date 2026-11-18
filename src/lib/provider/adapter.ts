@@ -64,10 +64,11 @@ export interface StreamChatOptions {
   /** Let the provider search the web for this reply and cite what it used. */
   webSearch?: boolean;
   /**
-   * Called once if the model starts by reasoning (models such as
-   * abliterated-model-large-v2 always do) before any answer text arrives.
+   * Called with each piece of the model's reasoning as it arrives (models such
+   * as abliterated-model-large-v2 always reason before they answer). The
+   * reasoning is not part of the reply and is never yielded.
    */
-  onThinking?: () => void;
+  onThinking?: (text: string) => void;
 }
 
 // Reasoning models can take a while to start and can pause between thought and answer.
@@ -230,10 +231,27 @@ function sourcesBlock(citations: Map<string, Citation>, reply: string): string {
 }
 
 /** `text` is answer text; `thinking` marks a chunk that carried only reasoning. */
-type SseResult = { done: true } | { done: false; text: string; thinking?: boolean } | null;
+type SseResult = { done: true } | { done: false; text: string; thinking: string } | null;
 
-/** Where providers put a reasoning model's thoughts in a streamed chunk. */
+/** Where providers put a reasoning model's thoughts, in a streamed chunk or a whole message. */
 const REASONING_FIELDS = ["reasoning_content", "reasoning", "thinking"] as const;
+
+/** The reasoning text carried by a delta or a message, wherever the provider put it. */
+function reasoningOf(holder: Record<string, unknown>): string {
+  for (const field of REASONING_FIELDS) {
+    const value = holder[field];
+    if (typeof value === "string" && value) return value;
+  }
+  // Some providers send it as a list of typed parts instead.
+  const details = holder.reasoning_details;
+  if (Array.isArray(details)) {
+    return details
+      .map((part) => (part && typeof part === "object" ? (part as { text?: unknown }).text : ""))
+      .filter((text): text is string => typeof text === "string")
+      .join("");
+  }
+  return "";
+}
 
 function parseSseLine(
   line: string,
@@ -258,14 +276,10 @@ function parseSseLine(
   const delta = (payload as { choices?: { delta?: Record<string, unknown> }[] })?.choices?.[0]
     ?.delta;
   if (!delta || typeof delta !== "object") return null;
-  const text = delta.content;
-  if (typeof text === "string" && text) return { done: false, text };
-  // Thoughts are not part of the reply. They only tell us the model is alive and working.
-  const thinking = REASONING_FIELDS.some((field) => {
-    const value = delta[field];
-    return typeof value === "string" && value.length > 0;
-  });
-  return thinking ? { done: false, text: "", thinking: true } : null;
+  // Thoughts are not part of the reply; they are handed over separately.
+  const text = typeof delta.content === "string" ? delta.content : "";
+  const thinking = reasoningOf(delta);
+  return text || thinking ? { done: false, text, thinking } : null;
 }
 
 function hostOf(url: string): string {
@@ -365,8 +379,14 @@ export async function* streamChat(options: StreamChatOptions): AsyncGenerator<st
       if (detail && (payload as { error?: unknown }).error) {
         throw new ProviderHTTPError(res.status, clip(redactSecret(detail, apiKey)));
       }
-      const text = (payload as { choices?: { message?: { content?: unknown } }[] })?.choices?.[0]
-        ?.message?.content;
+      const whole = (payload as { choices?: { message?: Record<string, unknown> }[] })?.choices?.[0]
+        ?.message;
+      const text = whole?.content;
+      const reasoning = whole ? reasoningOf(whole) : "";
+      if (reasoning) {
+        thought = true;
+        options.onThinking?.(reasoning);
+      }
       collectCitations(payload, citations);
       if (typeof text === "string" && text.trim()) {
         produced = true;
@@ -404,10 +424,12 @@ export async function* streamChat(options: StreamChatOptions): AsyncGenerator<st
             if (!parsed) continue;
             if (parsed.done) {
               finished = true;
-            } else if (parsed.thinking) {
-              if (!thought && !produced) options.onThinking?.();
-              thought = true;
             } else {
+              if (parsed.thinking) {
+                thought = true;
+                options.onThinking?.(parsed.thinking);
+              }
+              if (!parsed.text) continue;
               if (parsed.text.trim()) produced = true;
               reply += parsed.text;
               yield parsed.text;

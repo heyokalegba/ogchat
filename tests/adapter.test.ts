@@ -363,7 +363,42 @@ describe("error classes", () => {
       { onThinking },
     );
     expect(await collect(options)).toEqual(["Hello", " there"]);
-    expect(onThinking).toHaveBeenCalledTimes(1);
+    // the thoughts are handed over piece by piece, and never mixed into the reply
+    expect(onThinking.mock.calls.map(([text]) => text)).toEqual([
+      "The user said hello.",
+      " I should greet them.",
+      "more thought",
+    ]);
+  });
+
+  it("finds the reasoning wherever a provider puts it", async () => {
+    const chunk = (delta: object) => `data: ${JSON.stringify({ choices: [{ delta }] })}\n\n`;
+    const onThinking = vi.fn();
+    const streamed = harness(
+      () =>
+        streamResponse([
+          chunk({ thinking: "a" }),
+          chunk({ reasoning_details: [{ type: "reasoning.text", text: "b" }, { text: "c" }] }),
+          // some providers send a thought and a word of the answer together
+          chunk({ reasoning_content: "d", content: "Hi" }),
+          "data: [DONE]\n\n",
+        ]),
+      { onThinking },
+    );
+    expect(await collect(streamed.options)).toEqual(["Hi"]);
+    expect(onThinking.mock.calls.map(([text]) => text).join("")).toBe("abcd");
+
+    // and in a reply that arrives in one piece
+    const whole = vi.fn();
+    const single = harness(
+      () =>
+        Response.json({
+          choices: [{ message: { content: "Done.", reasoning_content: "Thought it over." } }],
+        }),
+      { onThinking: whole },
+    );
+    expect(await collect(single.options)).toEqual(["Done."]);
+    expect(whole).toHaveBeenCalledWith("Thought it over.");
   });
 
   it("says so when a model only thought and never answered", async () => {

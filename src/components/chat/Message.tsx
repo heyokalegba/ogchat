@@ -210,6 +210,7 @@ export const MessageView = memo(function MessageView(props: MessageViewProps) {
         </div>
       ) : (
         <div className={styles.body}>
+          {message.thinking && <Thought text={message.thinking} live={false} />}
           <Markdown content={message.content} />
           {message.partial && <div className={styles.stoppedNote}>— stopped</div>}
         </div>
@@ -219,16 +220,55 @@ export const MessageView = memo(function MessageView(props: MessageViewProps) {
 });
 
 /** The reply while it streams in, with the blinking caret at its end. */
-export function StreamingMessage({ text, thinking }: { text: string; thinking?: boolean }) {
+/**
+ * What the model reasoned before answering. While it is still thinking the
+ * panel is open and follows along; once the answer starts, and on saved
+ * replies, it folds away behind its heading. Clicking the heading opens or
+ * closes it either way.
+ */
+function Thought({ text, live }: { text: string; live: boolean }) {
+  // null: not touched, so it opens while live and closes otherwise.
+  const [chosen, setChosen] = useState<boolean | null>(null);
+  const open = chosen ?? live;
+  const body = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // Follow the newest line while it is being written.
+    if (live && open && body.current) body.current.scrollTop = body.current.scrollHeight;
+  }, [text, live, open]);
+  return (
+    <div className={styles.thought} data-live={live}>
+      <button
+        type="button"
+        className={styles.thoughtHead}
+        aria-expanded={open}
+        onClick={() => setChosen(!open)}
+      >
+        <span className={live ? styles.thinkingNote : styles.thoughtLabel}>
+          {live ? "thinking" : "thoughts"}
+        </span>
+        <span aria-hidden="true">{open ? "▴" : "▾"}</span>
+      </button>
+      {open && (
+        <div ref={body} className={styles.thoughtBody}>
+          {text}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function StreamingMessage(props: { text: string; thinking?: boolean; thought?: string }) {
+  const { text, thinking, thought } = props;
   return (
     <article className={styles.message} data-role="assistant" aria-live="off">
       <TagRow role="assistant" time="" />
+      {thought && <Thought text={thought} live={!text} />}
       <div className={`${styles.body} ${styles.streaming}`}>
         {text ? (
           <Markdown content={text} />
         ) : (
           <>
-            {thinking && <span className={styles.thinkingNote}>thinking </span>}
+            {thinking && !thought && <span className={styles.thinkingNote}>thinking </span>}
             <span className={styles.caret} aria-label={thinking ? "Thinking" : "Generating"} />
           </>
         )}

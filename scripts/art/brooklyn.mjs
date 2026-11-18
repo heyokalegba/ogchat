@@ -8,6 +8,7 @@
  * canopy of Prospect Park with the memorial arch at its gate, and the clock
  * tower downtown catching the last light. The sun has just gone.
  */
+import { wearFor } from "./wear.mjs";
 import { empireState, oneWorldTrade } from "./landmarks.mjs";
 import {
   FONTS,
@@ -33,11 +34,13 @@ import {
   mix,
   pctX,
   pctY,
+  SEASONS,
   shade,
+  snowfall,
+  STATES,
   W,
   waterTower,
   weather,
-  STATES,
 } from "./lib.mjs";
 
 const SIDEWALK = 334; // top of the pavement; house fronts stand on it
@@ -65,7 +68,48 @@ const GRADES = {
 const WARM = ["#e0b565", "#d29a50", "#ecd08a", "#b98548", "#dfa85a"].map(hex);
 
 /** A tree crown: a ragged disc, dark below, catching sky light along its top edge. */
-function crown(c, d, cx, cy, r, tones) {
+/**
+ * What grows on the block and in the park, season by season: the street
+ * trees' leaves, the park's far and near canopy, and the ground under it.
+ * Each list is [body, shadow, lit, rim]. Spring's rims are blossom. In winter
+ * the trees are bare: only a scatter of twigs is drawn where the leaves were.
+ */
+const FOLIAGE = {
+  spring: {
+    leaves: ["#3d5630", "#2a3f25", "#5b7441", "#c4a0a8"],
+    back: ["#465a45", "#37493a", "#637350", "#b497a0"],
+    front: ["#39492f", "#2a3825", "#536242", "#a88a92"],
+    floor: "#1f2a1f",
+  },
+  summer: {
+    leaves: ["#253122", "#1b241a", "#3a4630", "#5f6238"],
+    back: ["#33413a", "#29352f", "#4d5646", "#8d7354"],
+    front: ["#273326", "#1e281e", "#3d4835", "#7b6549"],
+    floor: "#1c241d",
+  },
+  autumn: {
+    leaves: ["#6f4226", "#4b2a1c", "#8d5d30", "#ad873e"],
+    back: ["#5a4532", "#433227", "#775c3a", "#a07a48"],
+    front: ["#523a28", "#3a281e", "#6c4f30", "#96703c"],
+    floor: "#2a2219",
+  },
+  winter: {
+    bare: true,
+    leaves: ["#2a221d", "#1f1915", "#3a2f28", "#3a2f28"],
+    back: ["#3b3a3d", "#2f2e31", "#4a484a", "#55524f"],
+    front: ["#2e2b2c", "#252223", "#3d393a", "#474342"],
+    floor: "#4a4d5a",
+  },
+};
+/** Snow as it looks in the dusk this block is drawn in. */
+const SNOW = hex("#a6aabd");
+
+/**
+ * One mass of foliage. `bare`: the same shape with the leaves gone, a thin
+ * scatter of twigs. The dice are thrown the same either way, so everything
+ * drawn after a tree is the same in every season.
+ */
+function crown(c, d, cx, cy, r, tones, bare = false) {
   const [body, shadow, lit, rim] = tones;
   for (let y = -r; y <= r; y++) {
     for (let x = -r; x <= r; x++) {
@@ -76,12 +120,16 @@ function crown(c, d, cx, cy, r, tones) {
       else if (y < -r * 0.3) color = (-y - r * 0.3) / r > bayer(cx + x, cy + y) * 0.9 ? lit : body;
       if (y < 0 && dist > r - 1.8 && d.chance(0.45)) color = rim;
       if (d.chance(0.06)) color = shade(color, 0.88);
+      // Bare: keep about one pixel in seven, along diagonals, so it reads as twigs.
+      if (bare && (cx + x + (cy + y) * 2) % 7 !== 0) continue;
       c.set(cx + x, cy + y, color);
     }
   }
 }
 
-function block() {
+function block(season = "summer") {
+  const foliage = FOLIAGE[season];
+  const bare = Boolean(foliage.bare);
   const skyline = canvas(W, H);
   const rooftops = canvas(W, H);
   // The cars at the kerb get a picture of their own, so that people on the
@@ -105,6 +153,7 @@ function block() {
   const houses = []; // { x, w, top, color, shop }
   const stoops = []; // { x } the middle of each stoop
   const panes = []; // windows that are lit at some hour: { x, y, w, h, when, id }
+  const glass = []; // every window, lit or not: wear keeps off the glass
   // A few rooms are lit by coloured LED strips instead of a lamp. Dice of their own.
   const LED = dice(7001);
   const LED_TONES = ["#c2456e", "#5a7fd6", "#8a5fd0", "#3fae9a", "#d0503a"].map(hex);
@@ -239,16 +288,16 @@ function block() {
   }
 
   // ------------------------------------------------------------ the park
-  skyline.rect(0, 244, W, H - 244, hex("#1c241d"));
-  const back = ["#33413a", "#29352f", "#4d5646", "#8d7354"].map(hex);
-  const front = ["#273326", "#1e281e", "#3d4835", "#7b6549"].map(hex);
+  skyline.rect(0, 244, W, H - 244, hex(foliage.floor));
+  const back = foliage.back.map(hex);
+  const front = foliage.front.map(hex);
   for (let x = -12; x < W + 14; x += between(9, 14))
-    crown(skyline, d, x, 238 + between(-13, 2), between(10, 17), back);
+    crown(skyline, d, x, 238 + between(-13, 2), between(10, 17), back, bare);
   // a few taller specimens, so the canopy is not a hedge
   for (const x of [34, 205, 268, 352, 452, 520, 628])
-    crown(skyline, d, x, 222 + between(-6, 4), between(15, 21), back);
+    crown(skyline, d, x, 222 + between(-6, 4), between(15, 21), back, bare);
   for (let x = -10; x < W + 14; x += between(10, 16))
-    crown(skyline, d, x, 250 + between(-6, 4), between(11, 18), front);
+    crown(skyline, d, x, 250 + between(-6, 4), between(11, 18), front, bare);
   for (const x of [226, 330, 486, 636]) {
     skyline.rect(x, 252, 1, 12, iron); // park lamps
     skyline.rect(x - 1, 251, 3, 2, hex("#8c8676"));
@@ -448,6 +497,7 @@ function block() {
   ].map(D);
 
   const pane = (wx, wy, ww, wh, color, litRate) => {
+    glass.push({ x: wx, y: wy, w: ww, h: wh });
     const on = chance(litRate);
     const tone = pick(WARM);
     rooftops.rect(wx - 1, wy - 2, ww + 2, 2, shade(color, 1.24)); // lintel
@@ -751,7 +801,7 @@ function block() {
   rooftops.rect(305, SIDEWALK - 4, 5, 1, D("#8f3d2f"));
 
   // street trees
-  const leaves = ["#253122", "#1b241a", "#3a4630", "#5f6238"].map(hex);
+  const leaves = foliage.leaves.map(hex);
   for (const tx of TREES) {
     const trunk = hex("#1c1714");
     rooftops.rect(tx, 300, 2, SIDEWALK - 300, trunk);
@@ -760,9 +810,9 @@ function block() {
       rooftops.set(tx + 2 + i, 301 - i, trunk);
     }
     rooftops.rect(tx - 3, SIDEWALK - 3, 8, 1, iron); // tree guard
-    crown(rooftops, d, tx - 8, 292 + between(-3, 2), between(10, 13), leaves);
-    crown(rooftops, d, tx + 9, 291 + between(-3, 2), between(10, 13), leaves);
-    crown(rooftops, d, tx + 1, 283 + between(-3, 2), between(11, 15), leaves);
+    crown(rooftops, d, tx - 8, 292 + between(-3, 2), between(10, 13), leaves, bare);
+    crown(rooftops, d, tx + 9, 291 + between(-3, 2), between(10, 13), leaves, bare);
+    crown(rooftops, d, tx + 1, 283 + between(-3, 2), between(11, 15), leaves, bare);
   }
 
   // street lamps: bishop's crooks, just come on
@@ -809,6 +859,58 @@ function block() {
   set(13, 5, 619, 309, (c) => oneWay(c, 0, 0));
   set(5, 24, 222, SIDEWALK - 24, (c) => plateOnPole(c, 2, 24, 24, hex("#34485e"), hex("#e9e4d2")));
   set(5, 22, 556, SIDEWALK - 22, (c) => plateOnPole(c, 2, 22, 22, hex("#e9e4d2"), hex("#a8382c")));
+
+  // ------------------------------------------------------------ what the season leaves lying about
+  // All of it with dice of its own, after everything else, so the block under
+  // it is the same block in every season.
+  if (season === "autumn") {
+    // fallen leaves along the pavement and in the gutter
+    const fall = dice(1031);
+    const tones = ["#a5672b", "#c79a3c", "#7d4421", "#8f3a22"].map(hex);
+    for (let n = 0; n < 150; n++) {
+      // thickest under the trees
+      const tree = fall.pick(TREES);
+      const x = Math.round(tree + (fall.rand() - 0.5) * (fall.chance(0.7) ? 34 : 110));
+      const y = fall.chance(0.75)
+        ? fall.between(SIDEWALK, CURB - 1)
+        : fall.between(CURB + 1, CURB + 3);
+      if (!rooftops.claimed(x, y)) rooftops.set(x, y, fall.pick(tones));
+    }
+  }
+  if (season === "spring") {
+    // a few petals down
+    const fall = dice(1032);
+    for (let n = 0; n < 50; n++) {
+      const x = Math.round(fall.pick(TREES) + (fall.rand() - 0.5) * 30);
+      const y = fall.between(SIDEWALK, CURB - 1);
+      if (!rooftops.claimed(x, y)) rooftops.set(x, y, hex("#b99aa2"));
+    }
+  }
+  if (season === "winter") {
+    // Snow on every level top: roofs and cornices, chimneys, steps, cars, the park.
+    snowfall(skyline, SNOW, { from: 176 });
+    snowfall(rooftops, SNOW);
+    snowfall(parked, SNOW);
+    // On the stoops, tread by tread, where it has not been walked off.
+    for (const stoop of stoops) {
+      for (let step = 0; step < 5; step++) {
+        for (let dx = -4 - step; dx <= 4 + step; dx++) {
+          const x = stoop.x + dx;
+          const y = SIDEWALK - 10 + step * 2;
+          if (bayer(x, y) < 0.62 && !rooftops.claimed(x, y)) rooftops.set(x, y, SNOW);
+        }
+      }
+    }
+    // Trodden on the pavement, ploughed to the kerb on the road.
+    for (let x = 0; x < W; x++) {
+      for (let y = SIDEWALK; y < CURB; y++) {
+        if (bayer(x, y) < 0.55 && !rooftops.claimed(x, y)) rooftops.blend(x, y, SNOW, 0.6);
+      }
+      for (let y = CURB; y <= CURB + 3; y++) {
+        if (bayer(x + 1, y) < 0.7 - (y - CURB) * 0.15) rooftops.blend(x, y, SNOW, 0.7);
+      }
+    }
+  }
 
   // The windows that come on and go off: listed one by one, so the backdrop can
   // switch them singly rather than a whole layer at a time.
@@ -857,7 +959,39 @@ function block() {
     if (to - from >= 46) gaps.push(Math.round((from + to) / 2));
   }
   const hail = gaps.filter((x) => x > 60 && x < W - 60);
-  return { states, glow, beacons, chimneys, windows, roofs, stoops: seats, switches, hail };
+  // What there is to wear: the upper walls of the houses, their windows, the
+  // pavement, the kerb, the road and the lamp posts.
+  const site = {
+    w: W,
+    h: H,
+    panes: glass.filter((p) => p.x >= 0 && p.x + p.w <= W),
+    walls: houses
+      .filter((house) => house.x >= 0 && house.x + house.w <= W)
+      .map((house) => ({
+        x: house.x + 1,
+        w: house.w - 3,
+        top: house.top + 9,
+        bottom: SIDEWALK - 38,
+      }))
+      .filter((wall) => wall.bottom > wall.top),
+    pavement: { top: SIDEWALK, bottom: CURB - 1 },
+    road: { top: CURB + 2, bottom: H - 2 },
+    kerb: CURB,
+    poles: [96, 276, 436, 618].map((x) => ({ x, foot: SIDEWALK })),
+    tags: false,
+  };
+  return {
+    states,
+    glow,
+    beacons,
+    chimneys,
+    windows,
+    roofs,
+    stoops: seats,
+    switches,
+    hail,
+    site,
+  };
 }
 
 /** Where parked cars' wheels rest, and where each lane's do. */
@@ -944,7 +1078,9 @@ const TREES = [58, 132, 236, 318, 398, 474, 590];
 const HYDRANT = 307;
 
 export function brooklynScene(puff, cast) {
-  const scene = block();
+  // The block in every season. What is where never changes, so summer speaks for all.
+  const seasons = Object.fromEntries(SEASONS.map((season) => [season, block(season)]));
+  const scene = seasons.summer;
   const smokers = scene.chimneys.filter(([x]) => x < 215 || x > 515).slice(0, 2);
   const images = {
     "glow-back-a.png": scene.glow.backA,
@@ -956,9 +1092,12 @@ export function brooklynScene(puff, cast) {
   for (const state of STATES) {
     images[`traffic-${state}.png`] = traffic(state, layout);
     images[`cab-${state}.png`] = cab(state);
-    images[`city-${state}.png`] = scene.states[state].city;
-    images[`rooftops-${state}.png`] = scene.states[state].rooftops;
-    images[`parked-${state}.png`] = scene.states[state].parked;
+    for (const season of SEASONS) {
+      const drawn = seasons[season].states[state];
+      images[`city-${season}-${state}.png`] = drawn.city;
+      images[`rooftops-${season}-${state}.png`] = drawn.rooftops;
+      images[`parked-${season}-${state}.png`] = drawn.parked;
+    }
     // The cast is drawn in daylight colours; bring it into this block's dusk
     // palette first, then light it like everything else here.
     images[`people-${state}.png`] = cast.people.graded(dusk).graded(GRADES[state]);
@@ -967,6 +1106,7 @@ export function brooklynScene(puff, cast) {
   }
   return {
     images,
+    wear: wearFor(scene.site, 5150),
     config: {
       label: "brooklyn",
       hint: "a brownstone block by Prospect Park",

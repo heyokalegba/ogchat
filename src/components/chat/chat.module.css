@@ -354,6 +354,52 @@
   color: var(--og-text-2);
 }
 
+/*
+ * The model's reasoning, when the provider shares it: a quiet panel above the
+ * reply, in small monospace, that folds away behind its heading.
+ */
+.thought {
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 8px;
+  border: var(--og-line) solid var(--og-ink);
+  background: rgba(235, 228, 212, 0.86);
+  text-shadow: none;
+}
+
+.surface .thoughtHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px;
+  font-family: var(--og-font-mono);
+  font-size: calc(12px * var(--og-type));
+  font-weight: 700;
+  color: var(--og-ink);
+}
+
+.thoughtLabel {
+  color: var(--og-text-2);
+}
+
+.thought .thinkingNote {
+  padding: 0;
+  background: none;
+}
+
+.thoughtBody {
+  max-height: 240px;
+  padding: 2px 10px 8px;
+  overflow-y: auto;
+  border-top: 1px solid rgba(13, 12, 11, 0.25);
+  font-family: var(--og-font-mono);
+  font-size: calc(12.5px * var(--og-type));
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--og-text-2);
+}
+
 /* Shown while a reasoning model works out its answer. */
 .thinkingNote {
   font-family: var(--og-font-mono);

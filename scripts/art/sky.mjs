@@ -277,3 +277,59 @@ export function bird() {
   ].forEach(([x, y]) => c.set(BIRD.w + x, y, ink));
   return c;
 }
+
+// ---------------------------------------------------------------- weather
+
+/**
+ * What falls: one small tile each, repeated across the scene and slid
+ * along. Rain is a scatter of slanted streaks, snow a scatter of flakes, and
+ * in autumn a few leaves come down on the wind.
+ */
+export const WEATHER_TILE = { rain: 48, snow: 64, leaves: 96 };
+
+export function rainTile() {
+  const size = WEATHER_TILE.rain;
+  const c = canvas(size, size);
+  const d = dice(404);
+  const tone = hex("#b9c8d6");
+  for (let n = 0; n < 26; n++) {
+    const x = d.between(0, size - 1);
+    const y = d.between(0, size - 1);
+    const length = d.between(3, 5);
+    // falling to the left, as if on a wind from the right; wraps at the tile's edges
+    for (let i = 0; i < length; i++) {
+      c.setAlpha((x - Math.floor(i / 2) + size) % size, (y + i) % size, tone, 0.34 + i * 0.05);
+    }
+  }
+  return c;
+}
+
+export function snowTile() {
+  const size = WEATHER_TILE.snow;
+  const c = canvas(size, size);
+  const d = dice(405);
+  const tone = hex("#eef1f5");
+  for (let n = 0; n < 34; n++) {
+    const x = d.between(0, size - 1);
+    const y = d.between(0, size - 1);
+    c.setAlpha(x, y, tone, d.chance(0.4) ? 0.95 : 0.6);
+    // the nearer flakes are two pixels
+    if (d.chance(0.25)) c.setAlpha((x + 1) % size, y, tone, 0.8);
+  }
+  return c;
+}
+
+export function leafTile() {
+  const size = WEATHER_TILE.leaves;
+  const c = canvas(size, size);
+  const d = dice(406);
+  const tones = ["#b0702c", "#c79a3c", "#8f3a22", "#a5672b"].map(hex);
+  for (let n = 0; n < 9; n++) {
+    const x = d.between(1, size - 3);
+    const y = d.between(1, size - 3);
+    const tone = d.pick(tones);
+    c.set(x, y, tone);
+    c.set(x + 1, y + (d.chance(0.5) ? 1 : 0), shade(tone, 0.85));
+  }
+  return c;
+}

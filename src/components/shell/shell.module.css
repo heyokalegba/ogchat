@@ -151,6 +151,28 @@
   }
 }
 
+/* A choice in the look panel: the season, the weather. */
+.lookSelect {
+  max-width: 62%;
+  height: 28px;
+  padding: 0 6px;
+  border: var(--og-line) solid rgba(246, 241, 230, 0.5);
+  outline: none;
+  background: rgba(0, 0, 0, 0.5);
+  font-family: var(--og-font-mono);
+  font-size: calc(12.5px * var(--og-type));
+  color: var(--og-on-dark);
+}
+
+.lookSelect:focus {
+  border-color: var(--og-yellow);
+}
+
+.lookSelect option {
+  color: #0d0c0b;
+  background: #ebe4d4;
+}
+
 /* Which project's chats are listed, with buttons to edit it and to start a new one. */
 .projectRow {
   display: flex;

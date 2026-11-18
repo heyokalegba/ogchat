@@ -141,7 +141,12 @@ describe("sessions API", () => {
 
   it("returns a session with its messages", async () => {
     const session = await create();
-    expect(await detail(session.id)).toEqual({ session, generating: false, partial: "" });
+    expect(await detail(session.id)).toEqual({
+      session,
+      generating: false,
+      partial: "",
+      thinking: "",
+    });
   });
 
   it("renames a session", async () => {
@@ -278,7 +283,7 @@ describe("sending messages", () => {
     expect((await list()).map((s) => s.id)).toEqual([session.id, other.id]);
   });
 
-  it("says when a reasoning model is thinking, once, and keeps thoughts out of the reply", async () => {
+  it("passes on what a reasoning model thinks, and keeps it out of the reply", async () => {
     await useKey();
     const chunk = (delta: object) => `data: ${JSON.stringify({ choices: [{ delta }] })}\n\n`;
     stubProvider(
@@ -293,8 +298,27 @@ describe("sending messages", () => {
     );
     const session = await create();
     const events = await send(session.id, { content: "hi" });
-    expect(events.map((event) => event.type)).toEqual(["start", "thinking", "delta", "done"]);
-    expect(last(events, "done").message?.content).toBe("Hello.");
+    expect(events.map((event) => event.type)).toEqual([
+      "start",
+      "thinking",
+      "thinking",
+      "delta",
+      "done",
+    ]);
+    const thoughts = events.flatMap((event) => (event.type === "thinking" ? [event.text] : []));
+    expect(thoughts).toEqual(["They greeted me.", " Greet back."]);
+    // the reply is the answer alone; the reasoning is kept beside it
+    const saved = last(events, "done").message;
+    expect(saved?.content).toBe("Hello.");
+    expect(saved?.thinking).toBe("They greeted me. Greet back.");
+    expect((await detail(session.id)).session.messages.at(-1)?.thinking).toBe(
+      "They greeted me. Greet back.",
+    );
+
+    // and it is never sent back to the provider as part of the conversation
+    const provider = stubProvider(() => sseResponse(["ok"]));
+    await send(session.id, { content: "again" });
+    expect(JSON.stringify(provider.calls[0]?.body)).not.toContain("Greet back");
   });
 
   it("sends the system prompt first and the thinking level, when they are set", async () => {

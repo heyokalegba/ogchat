@@ -19,3 +19,7 @@ next-env.d.ts
 .DS_Store
 npm-debug.log*
 /coverage
+
+# the desktop app: its own packages, and what it builds
+/electron/node_modules
+/dist-app

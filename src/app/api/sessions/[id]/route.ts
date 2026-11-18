@@ -17,7 +17,7 @@ type Context = { params: Promise<{ id: string }> };
 
 const notFound = () => errorJson(404, "not_found", "Session not found.");
 
-/** GET /api/sessions/:id  →  { session, generating, partial } */
+/** GET /api/sessions/:id  →  { session, generating, partial, thinking } */
 export async function GET(request: Request, { params }: Context): Promise<Response> {
   const blocked = guard(request);
   if (blocked) return blocked;
@@ -29,6 +29,7 @@ export async function GET(request: Request, { params }: Context): Promise<Respon
     session,
     generating: Boolean(generation),
     partial: generation?.partial ?? "",
+    thinking: generation?.thinking ?? "",
   };
   return json(detail);
 }

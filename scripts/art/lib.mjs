@@ -87,6 +87,8 @@ export function canvas(w, h) {
     }
   };
   const owns = (x, y, id) => inside(x, y) && owner[y * w + x] === id;
+  /** Whether a pixel belongs to some light (a window, a lamp), which snow and the like must leave alone. */
+  const claimed = (x, y) => inside(x, y) && owner[y * w + x] !== 0;
   const get = (x, y) => {
     x = Math.round(x);
     y = Math.round(y);
@@ -120,11 +122,48 @@ export function canvas(w, h) {
     }
     return copy;
   };
-  return { w, h, data, set, setAlpha, get, tint, blend, rect, mark, owns, graded };
+  return { w, h, data, set, setAlpha, get, tint, blend, rect, mark, owns, claimed, graded };
 }
 
 /** The four lights a scene is drawn in. The backdrop crossfades between neighbours. */
 export const STATES = ["day", "golden", "dusk", "night"];
+
+/** The four seasons a scene is drawn in. */
+export const SEASONS = ["spring", "summer", "autumn", "winter"];
+
+/**
+ * Snow, lying where snow lies: on the top of whatever is uppermost in each
+ * column of the picture, wherever that top is level enough to hold it (a
+ * roof, a cornice, a car, a step), and not on a mast or the tip of a twig.
+ * Pixels that are lights are left alone. `from` and `to` limit the rows it
+ * may settle on.
+ */
+export function snowfall(c, snow, { from = 0, to = c.h - 1 } = {}) {
+  const tops = [];
+  for (let x = 0; x < c.w; x++) {
+    let top = -1;
+    for (let y = 0; y < c.h; y++) {
+      if (c.get(x, y)) {
+        top = y;
+        break;
+      }
+    }
+    tops.push(top);
+  }
+  for (let x = 0; x < c.w; x++) {
+    const y = tops[x];
+    if (y < from || y > to) continue;
+    const left = tops[x - 1] ?? y;
+    const right = tops[x + 1] ?? y;
+    if (Math.abs(left - y) > 1 || Math.abs(right - y) > 1) continue; // nothing to lie on
+    if (c.claimed(x, y)) continue;
+    c.set(x, y, snow);
+    // a second row here and there, so it has some depth
+    if (bayer(x, y) < 0.5 && c.get(x, y + 1) && !c.claimed(x, y + 1)) {
+      c.set(x, y + 1, shade(snow, 0.9));
+    }
+  }
+}
 
 /** Which lights are on in each state. "always" lights burn even by day. */
 const LIT_IN = {

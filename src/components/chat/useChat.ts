@@ -99,6 +99,9 @@ export function useChat(options: UseChatOptions) {
   const [streamText, setStreamText] = useState("");
   /** The model is reasoning and has not started its answer yet. */
   const [thinking, setThinking] = useState(false);
+  /** What it has reasoned so far, when the provider shares it. */
+  const [thinkingText, setThinkingText] = useState("");
+  const thinkingRef = useRef("");
   const [error, setError] = useState<ChatErrorState | null>(null);
   const [draft, setDraft] = useState("");
   /** Files waiting in the composer to go out with the next message. */
@@ -154,8 +157,10 @@ export function useChat(options: UseChatOptions) {
     if (frameRef.current) cancelAnimationFrame(frameRef.current);
     frameRef.current = 0;
     bufferRef.current = "";
+    thinkingRef.current = "";
     setStreamText("");
     setThinking(false);
+    setThinkingText("");
   }, []);
 
   /** Fetches the session and adopts whatever state the server is in. */
@@ -168,7 +173,9 @@ export function useChat(options: UseChatOptions) {
         callbacks.current.onSessionUpdated?.(metaOf(detail.session));
         if (detail.generating) {
           bufferRef.current = detail.partial;
+          thinkingRef.current = detail.thinking ?? "";
           setStreamText(detail.partial);
+          setThinkingText(thinkingRef.current);
           setPhase("following");
         } else {
           resetStream();
@@ -300,6 +307,16 @@ export function useChat(options: UseChatOptions) {
           }
           case "thinking": {
             if (!bufferRef.current) setThinking(true);
+            if (event.text) {
+              thinkingRef.current += event.text;
+              if (!frameRef.current) {
+                frameRef.current = requestAnimationFrame(() => {
+                  frameRef.current = 0;
+                  setThinkingText(thinkingRef.current);
+                  setStreamText(bufferRef.current);
+                });
+              }
+            }
             break;
           }
           case "delta": {
@@ -308,6 +325,7 @@ export function useChat(options: UseChatOptions) {
               frameRef.current = requestAnimationFrame(() => {
                 frameRef.current = 0;
                 setStreamText(bufferRef.current);
+                setThinkingText(thinkingRef.current);
               });
             }
             break;
@@ -531,6 +549,7 @@ export function useChat(options: UseChatOptions) {
     phase,
     streamText,
     thinking,
+    thinkingText,
     web,
     setWeb,
     error,

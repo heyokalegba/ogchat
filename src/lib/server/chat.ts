@@ -12,6 +12,8 @@ import { appendMessage, getSession, pruneSessionFiles, toMeta, truncateFrom } fr
 /** Turn handling: validate the request, persist the user's side, then stream the reply. */
 
 export const MAX_MESSAGE_CHARS = 400_000;
+/** How much of a reply's reasoning is kept with it. */
+const MAX_THINKING_CHARS = 200_000;
 
 export class ChatRequestError extends Error {
   constructor(
@@ -266,6 +268,8 @@ export async function runTurn(
         role: "assistant",
         content: generation.partial,
         partial,
+        // What it reasoned on the way, kept with the reply for anyone curious.
+        thinking: generation.thinking.slice(0, MAX_THINKING_CHARS),
       })?.message ?? null
     );
   };
@@ -287,7 +291,10 @@ export async function runTurn(
       signal: generation.controller.signal,
       reasoningEffort: settings.reasoning === "default" ? null : settings.reasoning,
       webSearch: web,
-      onThinking: () => emit({ type: "thinking" }),
+      onThinking: (text) => {
+        generation.thinking += text;
+        emit({ type: "thinking", text });
+      },
     });
     for await (const text of stream) {
       generation.partial += text;

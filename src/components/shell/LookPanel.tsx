@@ -1,9 +1,11 @@
 "use client";
 
+import { SEASON_NAMES, WEATHERS, type SeasonName, type Weather } from "@/lib/weather";
 import { useEffect, useRef } from "react";
 import { describeOffset, formatMinutes, type WallClock } from "@/lib/daylight";
 import { CloseIcon } from "../chat/icons";
 import { SCENES, type SceneId } from "./art";
+import { WEAR_YEARS } from "./art/wear";
 import {
   activeTextColor,
   DEFAULT_LOOK,
@@ -25,6 +27,13 @@ export interface LookPanelProps {
   onSetTime: (minutes: number) => void;
   onSnapToNow: () => void;
   onClose: () => void;
+  /** The season and weather the scene is showing right now. */
+  season: SeasonName;
+  weather: Weather;
+  /** How old the street is, in days, and a look ahead at its wear (in years; not remembered). */
+  streetDays: number;
+  peekYears: number;
+  onPeek: (years: number) => void;
 }
 
 /**
@@ -41,6 +50,11 @@ export function LookPanel({
   onSetTime,
   onSnapToNow,
   onClose,
+  season,
+  weather,
+  streetDays,
+  peekYears,
+  onPeek,
 }: LookPanelProps) {
   const panel = useRef<HTMLDivElement>(null);
 
@@ -104,6 +118,69 @@ export function LookPanel({
               </button>
             ))}
           </div>
+        </div>
+        <div className={styles.lookRow}>
+          <label className={styles.lookLabel} htmlFor="ogchat-season">
+            season
+          </label>
+          <select
+            id="ogchat-season"
+            className={styles.lookSelect}
+            value={look.season}
+            title="Follow the calendar in Brooklyn, or hold the scene to one season"
+            onChange={(event) => onChange({ season: event.target.value as Look["season"] })}
+          >
+            <option value="auto">by the calendar ({season})</option>
+            {SEASON_NAMES.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className={styles.lookRow}>
+          <label className={styles.lookLabel} htmlFor="ogchat-weather">
+            weather
+          </label>
+          <select
+            id="ogchat-weather"
+            className={styles.lookSelect}
+            value={look.weather}
+            title="Let the weather come and go, or hold it to one kind"
+            onChange={(event) => onChange({ weather: event.target.value as Look["weather"] })}
+          >
+            <option value="auto">as it comes ({weather})</option>
+            {WEATHERS.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className={styles.lookRow}>
+          <label className={styles.lookLabel} htmlFor="ogchat-wear">
+            wear
+          </label>
+          <span className={styles.lookAside}>
+            {peekYears > 0
+              ? `as in ${peekYears} ${peekYears === 1 ? "year" : "years"}`
+              : `${Math.floor(streetDays)} ${Math.floor(streetDays) === 1 ? "day" : "days"} old`}
+          </span>
+        </div>
+        <input
+          id="ogchat-wear"
+          className={styles.slider}
+          type="range"
+          min={0}
+          max={WEAR_YEARS}
+          step={1}
+          value={peekYears}
+          title="The street wears at the speed a real one does. Drag to look ahead; it goes back when you reload."
+          onChange={(event) => onPeek(Number(event.target.value))}
+        />
+        <div className={styles.ticks} aria-hidden="true">
+          <span>as it is</span>
+          <span>in {WEAR_YEARS} years</span>
         </div>
         <div className={styles.lookRow}>
           <span className={styles.lookLabel} id="ogchat-people">
