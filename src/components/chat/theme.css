@@ -1,0 +1,139 @@
+/*
+ * ogchat design tokens: "matrix terminal meets Apple".
+ *
+ * Near-black ground, one green accent, a phosphor-tinted monospace face for
+ * the chrome (tags, titles, timestamps) and a clean system sans for reading.
+ * Everything is scoped to .ogchat so the chat surface can be embedded in
+ * another app without leaking styles; override the variables to re-theme it.
+ */
+.ogchat {
+  --og-bg: #060807;
+  --og-panel: #0b0e0c;
+  --og-raised: #111512;
+  --og-hover: rgba(255, 255, 255, 0.045);
+  --og-line: rgba(255, 255, 255, 0.08);
+  --og-line-strong: rgba(255, 255, 255, 0.15);
+
+  --og-text: #e9ece9;
+  --og-text-2: #a4aca6;
+  --og-text-3: #6b736d;
+
+  /* The single accent hue: carets, status, the active session. */
+  --og-accent: #45d98b;
+  --og-accent-soft: rgba(69, 217, 139, 0.14);
+  --og-accent-faint: rgba(69, 217, 139, 0.07);
+  --og-accent-line: rgba(69, 217, 139, 0.38);
+  --og-accent-glow: rgba(69, 217, 139, 0.45);
+  --og-on-accent: #04140b;
+
+  /* Monospace text carries a faint phosphor tint. */
+  --og-phosphor: #bcdcc8;
+  --og-phosphor-dim: #7f9a8a;
+
+  --og-danger: #e3907c;
+
+  --og-font-sans:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Segoe UI", Inter, Roboto,
+    system-ui, sans-serif;
+  --og-font-mono:
+    "SF Mono", ui-monospace, "JetBrains Mono", "Cascadia Code", Menlo, Consolas, "Liberation Mono",
+    monospace;
+
+  --og-radius-s: 8px;
+  --og-radius-m: 12px;
+  --og-radius-l: 16px;
+  --og-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --og-fast: 140ms;
+
+  color: var(--og-text);
+  font-family: var(--og-font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  color-scheme: dark;
+}
+
+.ogchat *,
+.ogchat *::before,
+.ogchat *::after {
+  box-sizing: border-box;
+}
+
+.ogchat ::selection {
+  background: rgba(69, 217, 139, 0.28);
+  color: #fff;
+}
+
+:where(.ogchat button) {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+:where(.ogchat button:disabled) {
+  cursor: default;
+}
+
+:where(.ogchat input, .ogchat textarea) {
+  font: inherit;
+  color: inherit;
+}
+
+:where(.ogchat :focus-visible) {
+  outline: 1px solid var(--og-accent-line);
+  outline-offset: 2px;
+}
+
+.ogchat * {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+@keyframes og-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes og-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes og-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes og-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ogchat *,
+  .ogchat *::before,
+  .ogchat *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}
