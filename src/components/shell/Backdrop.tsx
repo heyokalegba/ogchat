@@ -1,70 +1,126 @@
+import scenes from "./art/scenes.json";
 import styles from "./backdrop.module.css";
 
 /**
- * The living city behind the interface.
+ * The living scene behind the interface.
  *
- * It is a stack of small pixel-art layers (about 70 KB in total, drawn by
- * scripts/make-art.mjs) that CSS slides and toggles: clouds drift at two
- * speeds, smoke rises from the stacks, windows and water glints switch on and
- * off, lights cross the bridge, a flock passes now and then. There is no
- * video, no canvas and no script running; the browser's compositor does the
- * work, and it all stops for people who ask for reduced motion.
+ * There are two, chosen in the top bar:
+ *   skyline    the harbour by day, under a hazy sky
+ *   brooklyn   a brownstone block at dusk, Prospect Park behind it
  *
- * Positions are percentages of the 640x360 scene, as printed by `npm run art`.
+ * Each is a stack of small pixel-art layers drawn by scripts/make-art.mjs
+ * (under 80 KB a scene; only the one on show is downloaded) that CSS slides
+ * and toggles: clouds drift at two speeds, chimneys smoke, windows switch on
+ * and off, traffic passes, a beacon blinks, a flock crosses now and then.
+ * There is no video, no canvas and no script running, and it all stands still
+ * for people who ask for reduced motion.
+ *
+ * Where the moving pieces sit comes from art/scenes.json, written by the
+ * same script, as percentages of the 640x360 scene.
  */
 
-const SMOKE = [
-  { left: "25.625%", top: "30.278%", delay: "0s" },
-  { left: "28.281%", top: "35.833%", delay: "-1.3s" },
-];
+export type SceneId = keyof typeof scenes;
 
-const BEACONS = [
-  { left: "18.438%", top: "22.778%", delay: "0s" },
-  { left: "65%", top: "54.167%", delay: "-0.8s" },
-  { left: "91.563%", top: "54.167%", delay: "-1.5s" },
-];
+export const SCENES = (Object.keys(scenes) as SceneId[]).map((id) => ({
+  id,
+  label: scenes[id].label,
+  hint: scenes[id].hint,
+}));
 
-export function Backdrop() {
+export function isSceneId(value: unknown): value is SceneId {
+  return typeof value === "string" && value in scenes;
+}
+
+export function Backdrop({ scene }: { scene: SceneId }) {
+  const config = scenes[scene];
+
+  const smoke = (front: boolean) =>
+    config.smoke
+      .filter((stack) => stack.front === front)
+      .map((stack) => (
+        <div
+          key={`${stack.left}-${stack.top}`}
+          className={styles.smoke}
+          style={{
+            left: stack.left,
+            top: stack.top,
+            width: stack.width,
+            height: stack.height,
+            opacity: stack.opacity,
+          }}
+        >
+          <div className={styles.smokeStrip} style={{ animationDelay: stack.delay }} />
+        </div>
+      ));
+
+  const lanes = (front: boolean) =>
+    config.lanes
+      .filter((lane) => lane.front === front)
+      .map((lane) => (
+        <div
+          key={`${lane.top}-${lane.row}`}
+          className={styles.lane}
+          style={{ left: lane.left, top: lane.top, width: lane.width, height: lane.height }}
+        >
+          <div
+            className={`${styles.laneStrip} ${lane.reverse ? styles.laneReverse : ""}`}
+            style={{
+              // The strip image holds every lane as a row; show this one.
+              backgroundSize: `50% ${lane.rows * 100}%`,
+              backgroundPosition: `0 ${lane.rows > 1 ? (lane.row / (lane.rows - 1)) * 100 : 0}%`,
+              animationDuration: `${lane.seconds}s`,
+              animationTimingFunction: `steps(${lane.steps})`,
+            }}
+          />
+        </div>
+      ));
+
   return (
-    <div className={styles.backdrop} aria-hidden="true">
-      <div className={styles.scene}>
+    <div
+      className={`${styles.backdrop} ${styles[scene]}`}
+      style={{ background: config.sky }}
+      aria-hidden="true"
+    >
+      {/* Keyed by scene, so switching starts the new one's motion from the top. */}
+      <div key={scene} className={styles.scene}>
         <div className={`${styles.layer} ${styles.sky}`} />
-        <div className={`${styles.clouds} ${styles.cloudsFar}`} />
-        <div className={`${styles.clouds} ${styles.cloudsNear}`} />
-        <div className={styles.flight}>
-          <div className={styles.birds}>
+        <div
+          className={`${styles.clouds} ${styles.cloudsFar}`}
+          style={{
+            top: config.clouds.far.top,
+            height: config.clouds.far.height,
+            animationDuration: `${config.clouds.far.seconds}s`,
+          }}
+        />
+        <div
+          className={`${styles.clouds} ${styles.cloudsNear}`}
+          style={{
+            top: config.clouds.near.top,
+            height: config.clouds.near.height,
+            animationDuration: `${config.clouds.near.seconds}s`,
+          }}
+        />
+        <div className={styles.flight} style={{ animationDuration: `${config.birds.seconds}s` }}>
+          <div className={styles.birds} style={{ top: config.birds.top }}>
             <div className={styles.birdsStrip} />
           </div>
         </div>
-        <div className={`${styles.layer} ${styles.skyline}`} />
+        <div className={`${styles.layer} ${styles.city}`} />
         <div className={`${styles.layer} ${styles.lightsA}`} />
         <div className={`${styles.layer} ${styles.lightsC}`} />
-        {SMOKE.map((stack) => (
-          <div
-            key={stack.left}
-            className={styles.smoke}
-            style={{ left: stack.left, top: stack.top }}
-          >
-            <div className={styles.smokeStrip} style={{ animationDelay: stack.delay }} />
-          </div>
-        ))}
-        <div className={styles.traffic}>
-          <div className={`${styles.lane} ${styles.laneIn}`}>
-            <div className={styles.laneStrip} />
-          </div>
-          <div className={`${styles.lane} ${styles.laneOut}`}>
-            <div className={styles.laneStrip} />
-          </div>
-        </div>
-        {BEACONS.map((beacon) => (
+        {smoke(false)}
+        {lanes(false)}
+        {config.beacons.map((beacon) => (
           <span
-            key={beacon.left}
+            key={`${beacon.left}-${beacon.top}`}
             className={styles.beacon}
             style={{ left: beacon.left, top: beacon.top, animationDelay: beacon.delay }}
           />
         ))}
         <div className={`${styles.layer} ${styles.rooftops}`} />
         <div className={`${styles.layer} ${styles.lightsB}`} />
+        {smoke(true)}
+        {lanes(true)}
       </div>
     </div>
   );

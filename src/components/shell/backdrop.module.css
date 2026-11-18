@@ -1,5 +1,5 @@
 /*
- * The city behind the interface: layered pixel art with a little life in it.
+ * The scene behind the interface: layered pixel art with a little life in it.
  * Everything here animates with transforms or simple on/off switches, so it
  * costs next to nothing. See Backdrop.tsx.
  */
@@ -9,14 +9,13 @@
   z-index: 0;
   inset: 0;
   overflow: hidden;
-  background: #3d6a98;
   pointer-events: none;
 }
 
 /*
  * The 16:9 scene, sized to cover the window and anchored to its bottom edge,
- * so the skyline always sits on the ground. Every layer is placed inside it
- * in percentages and therefore stays lined up at any window size.
+ * so the street or the skyline always sits on the ground. Every layer is
+ * placed inside it in percentages and therefore stays lined up at any size.
  */
 .scene {
   position: absolute;
@@ -25,6 +24,7 @@
   width: max(100vw, 177.778vh);
   aspect-ratio: 16 / 9;
   transform: translateX(-50%);
+  animation: og-fade 500ms ease-out both;
 }
 
 .scene * {
@@ -38,16 +38,64 @@
   background-size: 100% 100%;
 }
 
-.sky {
+/* ---------------------------------------------------------------- which pictures */
+
+/* Scene one: the harbour by day. */
+.skyline .sky {
   background-image: url("./art/sky.png");
 }
-
-.skyline {
+.skyline .cloudsFar {
+  background-image: url("./art/clouds-far.png");
+}
+.skyline .cloudsNear {
+  background-image: url("./art/clouds-near.png");
+}
+.skyline .city {
   background-image: url("./art/skyline.png");
 }
-
-.rooftops {
+.skyline .rooftops {
   background-image: url("./art/rooftops.png");
+}
+.skyline .lightsA {
+  background-image: url("./art/lights-a.png");
+}
+.skyline .lightsB {
+  background-image: url("./art/lights-b.png");
+}
+.skyline .lightsC {
+  background-image: url("./art/lights-c.png");
+}
+.skyline .laneStrip {
+  background-image: url("./art/traffic.png");
+}
+
+/* Scene two: a Brooklyn block at dusk. */
+.brooklyn .sky {
+  background-image: url("./art/brooklyn/sky.png");
+}
+.brooklyn .cloudsFar {
+  background-image: url("./art/brooklyn/clouds-far.png");
+}
+.brooklyn .cloudsNear {
+  background-image: url("./art/brooklyn/clouds-near.png");
+}
+.brooklyn .city {
+  background-image: url("./art/brooklyn/skyline.png");
+}
+.brooklyn .rooftops {
+  background-image: url("./art/brooklyn/rooftops.png");
+}
+.brooklyn .lightsA {
+  background-image: url("./art/brooklyn/lights-a.png");
+}
+.brooklyn .lightsB {
+  background-image: url("./art/brooklyn/lights-b.png");
+}
+.brooklyn .lightsC {
+  background-image: url("./art/brooklyn/lights-c.png");
+}
+.brooklyn .laneStrip {
+  background-image: url("./art/brooklyn/traffic.png");
 }
 
 /* ---------------------------------------------------------------- clouds */
@@ -64,17 +112,10 @@
 }
 
 .cloudsFar {
-  top: 0;
-  height: 41.667%;
-  background-image: url("./art/clouds-far.png");
   opacity: 0.9;
 }
 
 .cloudsNear {
-  top: 1.5%;
-  height: 47.222%;
-  background-image: url("./art/clouds-near.png");
-  animation-duration: 250s;
   animation-delay: -90s;
 }
 
@@ -84,21 +125,18 @@
   }
 }
 
-/* ---------------------------------------------------------------- windows, water */
+/* ---------------------------------------------------------------- windows, water, lamps */
 
-/* Lit windows and glints on the river, switched on and off. */
+/* Lit windows, glints on the river, a neon sign: switched on and off. */
 .lightsA {
-  background-image: url("./art/lights-a.png");
   animation: lights-a 13s steps(1) infinite;
 }
 
 .lightsB {
-  background-image: url("./art/lights-b.png");
   animation: lights-b 19s steps(1) infinite;
 }
 
 .lightsC {
-  background-image: url("./art/lights-c.png");
   animation: lights-c 7s steps(1) infinite;
 }
 
@@ -148,8 +186,6 @@
 
 .smoke {
   position: absolute;
-  width: 11.25%;
-  height: 17.778%;
   overflow: hidden;
 }
 
@@ -167,58 +203,32 @@
   }
 }
 
-/* ---------------------------------------------------------------- bridge traffic */
+/* ---------------------------------------------------------------- traffic */
 
-.traffic {
-  position: absolute;
-  left: 45.625%;
-  top: 81.389%;
-  width: 54.375%;
-  height: 1.111%;
-}
-
+/* One lane: a window onto a strip twice its width that slides past. */
 .lane {
   position: absolute;
-  left: 0;
-  width: 100%;
-  height: 25%;
   overflow: hidden;
 }
 
 .laneStrip {
   width: 200%;
   height: 100%;
-  background-image: url("./art/traffic.png");
   background-repeat: repeat-x;
-  background-size: 50% 400%;
+  animation: lane-forward 46s linear infinite;
 }
 
-/* Headlights coming this way, tail lights going. */
-.laneIn {
-  top: 0;
+.laneReverse {
+  animation-name: lane-reverse;
 }
 
-.laneIn .laneStrip {
-  background-position: 0 0;
-  animation: lane-in 46s steps(348) infinite;
-}
-
-.laneOut {
-  top: 50%;
-}
-
-.laneOut .laneStrip {
-  background-position: 0 66.667%;
-  animation: lane-out 64s steps(348) infinite;
-}
-
-@keyframes lane-in {
+@keyframes lane-forward {
   to {
     transform: translateX(-50%);
   }
 }
 
-@keyframes lane-out {
+@keyframes lane-reverse {
   from {
     transform: translateX(-50%);
   }
@@ -226,12 +236,12 @@
 
 /* ---------------------------------------------------------------- beacons, birds */
 
-/* Aircraft warning lights on the mast and the bridge towers. */
+/* Aircraft warning lights on the tallest things. */
 .beacon {
   position: absolute;
   width: 0.3125%;
   height: 0.5556%;
-  background: #e0563c;
+  background: #d9543b;
   animation: og-blink 2.4s steps(1) infinite;
 }
 
@@ -246,7 +256,6 @@
 .birds {
   position: absolute;
   left: 0;
-  top: 19%;
   width: 4.6875%;
   aspect-ratio: 30 / 14;
   overflow: hidden;

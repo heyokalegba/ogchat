@@ -4,11 +4,19 @@ A personal AI chat interface that runs entirely on your machine. Multi-session
 chat with streaming replies, file attachments, local history, and one
 configurable OpenAI-compatible provider. No accounts, no cloud, no telemetry.
 
-The chat is written in strong black on a worn wall of pixelated tan bricks:
-cracked, chipped and stained. The rest of the interface is see-through, over a
-gritty pixel-art New York skyline that is quietly alive: clouds drift, smoke
-rises from the stacks, windows switch on and off, lights cross the bridge, and
-a flock of birds passes now and then.
+The chat is written in strong black on an old wall of pixelated bricks where no
+two are alike: mostly muted tan, with browns, greys, dull dark reds and
+limewashed pale ones, each with its own peeling, discolouring and chipped
+corners. The rest of the interface is see-through, over a pixel-art New York
+that is quietly alive. There are two scenes, switched from the top-right corner
+and remembered in your browser:
+
+- **skyline**: the harbour by day under a hazy, moody sky. Clouds drift, the
+  stacks smoke, windows switch on and off, lights cross the bridge.
+- **brooklyn**: a brownstone block at dusk, somewhere between Prospect Heights,
+  Bed-Stuy and Flatbush. Stoops, a corner bodega, street lamps just come on,
+  cars and a bus going by, apartment houses and a steeple behind, and beyond
+  them the canopy of Prospect Park with the arch at its gate.
 
 ![ogchat conversation](docs/screens/03-conversation.png)
 
@@ -17,7 +25,8 @@ More screens: [first run](docs/screens/01-first-run.png) ·
 [attaching files](docs/screens/07-attaching.png) ·
 [inline error](docs/screens/04-inline-error.png) ·
 [settings](docs/screens/05-settings.png) ·
-[mobile](docs/screens/06-mobile.png)
+[mobile](docs/screens/06-mobile.png) ·
+[brooklyn at dusk](docs/screens/08-brooklyn.png)
 
 ## Run it
 
@@ -156,7 +165,7 @@ src/
     client/api.ts                  browser client for the routes above
 tests/                             vitest: persistence, adapter, route contract, attachments
 scripts/mock-provider.mjs          stand-in provider for local trials
-scripts/make-art.mjs               generates the city layers and the brick wall
+scripts/make-art.mjs, scripts/art/  generate the two scenes and the brick wall
 ```
 
 ### Changing provider
@@ -190,21 +199,31 @@ outlines) are CSS variables in `src/components/chat/theme.css`.
 
 - **Colors:** edit the variables at the top of `src/components/chat/theme.css`
   (ink, brick, the mud-brick red accent, muted green / blue / yellow).
-- **The art:** the city and the brick tile are drawn by `scripts/make-art.mjs`
-  (no dependencies). Change its palettes or shapes, then run `npm run art` to
-  regenerate the PNGs under `src/components/*/art/`. To make the whole scene
-  lighter or darker, change the factor in its `grit` function.
+- **The art:** everything is drawn by code with no dependencies. Run
+  `npm run art` after changing any of it to regenerate the PNGs under
+  `src/components/*/art/`.
+  - `scripts/art/bricks.mjs`: the wall. The brick colour families and how common
+    each is are at the top; the kinds of wear are further down.
+  - `scripts/art/skyline.mjs`: the harbour scene. Its `grit` function sets how
+    dark and how desaturated the whole scene is.
+  - `scripts/art/brooklyn.mjs`: the dusk block. Its `dusk` function does the
+    same job there.
 - **The motion:** `src/components/shell/Backdrop.tsx` and `backdrop.module.css`
-  stack the city's layers and move them. Speeds are the animation durations in
-  that stylesheet.
+  stack a scene's layers and move them. Cloud, traffic and bird speeds come
+  from `art/scenes.json`, which the art script writes; the rest are the
+  animation durations in that stylesheet.
+- **Another scene:** add a module like `brooklyn.mjs`, register it in
+  `scripts/make-art.mjs`, and add its image rules to `backdrop.module.css`. It
+  then appears in the switch on its own.
 
 ### What the moving backdrop costs
 
-Very little, by design. The whole scene is twelve small PNGs, about 110 KB in
-total, drawn at 640x360 and scaled up. The motion is plain CSS: layers slide
-or switch on and off. There is no video, no canvas and no script running, so it
-adds no measurable script time while idle. People who set "reduce motion" in
-their system settings get the same scene, standing still.
+Very little, by design. A scene is eleven small PNGs, about 56 KB for the
+skyline and 70 KB for Brooklyn, drawn at 640x360 and scaled up; only the scene
+on show is downloaded. The wall tile is another 76 KB. The motion is plain CSS:
+layers slide or switch on and off. There is no video, no canvas and no script
+running, so it adds no measurable script time while idle. People who set
+"reduce motion" in their system settings get the same scene, standing still.
 
 ## API
 

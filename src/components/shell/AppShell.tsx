@@ -6,12 +6,13 @@ import { MenuIcon } from "@/components/chat/icons";
 import "@/components/chat/theme.css";
 import { createApi } from "@/lib/client/api";
 import type { PublicSettings, SessionMeta } from "@/lib/types";
-import { Backdrop } from "./Backdrop";
+import { Backdrop, isSceneId, SCENES, type SceneId } from "./Backdrop";
 import { SettingsPanel } from "./SettingsPanel";
 import styles from "./shell.module.css";
 import { Sidebar } from "./Sidebar";
 
 const SEARCH_DEBOUNCE_MS = 140;
+const SCENE_KEY = "ogchat:scene";
 
 function sessionFromUrl(): string | null {
   return new URLSearchParams(window.location.search).get("s");
@@ -40,6 +41,8 @@ export function AppShell() {
   const [activeTitle, setActiveTitle] = useState<string | null>(null);
   const [openToken, setOpenToken] = useState(0);
   const [ready, setReady] = useState(false);
+  /** Which backdrop is on show. Remembered in this browser. */
+  const [scene, setScene] = useState<SceneId>("skyline");
   const [query, setQuery] = useState("");
   const [settings, setSettings] = useState<PublicSettings | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -68,6 +71,12 @@ export function AppShell() {
   // First load: which session the URL points at, the session list, the provider settings.
   useEffect(() => {
     setActiveId(sessionFromUrl());
+    try {
+      const saved = window.localStorage.getItem(SCENE_KEY);
+      if (isSceneId(saved)) setScene(saved);
+    } catch {
+      // Storage can be unavailable (private mode); the default scene is fine.
+    }
     setReady(true);
     void refreshSessions("");
     api.getSettings().then(setSettings, () => {});
@@ -198,6 +207,15 @@ export function AppShell() {
   }, [api]);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
 
+  const chooseScene = useCallback((next: SceneId) => {
+    setScene(next);
+    try {
+      window.localStorage.setItem(SCENE_KEY, next);
+    } catch {
+      // Not remembered, but still switched.
+    }
+  }, []);
+
   const provider = useMemo(
     () => (settings ? { ready: settings.apiKey.set, model: settings.model } : null),
     [settings],
@@ -205,7 +223,7 @@ export function AppShell() {
 
   return (
     <div className={`ogchat ${styles.shell}`}>
-      <Backdrop />
+      {ready && <Backdrop scene={scene} />}
       <Sidebar
         sessions={sessions}
         activeId={activeId}
@@ -236,6 +254,20 @@ export function AppShell() {
           <div className={styles.topTitle}>
             <span className={styles.topPath}>~/</span>
             {activeId ? (activeTitle ?? "session") : "new session"}
+          </div>
+          <div className={styles.sceneSwitch} role="group" aria-label="Backdrop">
+            {SCENES.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                className={`${styles.sceneButton} ${option.id === scene ? styles.sceneActive : ""}`}
+                aria-pressed={option.id === scene}
+                title={option.hint}
+                onClick={() => chooseScene(option.id)}
+              >
+                {option.label}
+              </button>
+            ))}
           </div>
         </header>
         <div className={styles.surfaceSlot}>

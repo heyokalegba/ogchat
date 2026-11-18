@@ -11,7 +11,7 @@
   height: 100dvh;
   color: var(--og-on-dark);
   /* The city itself is the Backdrop component, behind everything here. */
-  background: #3d6a98;
+  background: #1d2433;
 }
 
 :where(.shell) :where(:focus-visible) {
@@ -402,6 +402,37 @@
 
 .topPath {
   color: var(--og-yellow);
+}
+
+/* Which scene is behind the wall: two black labels, the chosen one inverted. */
+.sceneSwitch {
+  flex: none;
+  display: flex;
+  margin-left: auto;
+  border: var(--og-line) solid var(--og-ink);
+  background: var(--og-ink);
+}
+
+.shell .sceneButton {
+  height: 24px;
+  padding: 0 9px;
+  font-family: var(--og-font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--og-on-dark-2);
+  transition:
+    color var(--og-fast) var(--og-ease),
+    background var(--og-fast) var(--og-ease);
+}
+
+.shell .sceneButton:hover {
+  color: var(--og-on-dark);
+}
+
+.shell .sceneActive,
+.shell .sceneActive:hover {
+  color: var(--og-ink);
+  background: var(--og-yellow);
 }
 
 .shell .menuButton {
