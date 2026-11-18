@@ -1,7 +1,7 @@
 import { getGeneration } from "@/lib/server/generations";
 import { guard } from "@/lib/server/guard";
 import { errorJson, json } from "@/lib/server/http";
-import { getSession, truncateFrom } from "@/lib/server/store";
+import { getSession, pruneSessionFiles, truncateFrom } from "@/lib/server/store";
 
 type Context = { params: Promise<{ id: string; messageId: string }> };
 
@@ -25,5 +25,6 @@ export async function DELETE(request: Request, { params }: Context): Promise<Res
     return errorJson(400, "bad_message", "Only your own messages can be deleted.");
   }
   const updated = truncateFrom(id, messageId);
+  pruneSessionFiles(id);
   return updated ? json({ session: updated }) : errorJson(404, "not_found", "Message not found.");
 }

@@ -6,6 +6,8 @@ import {
   useLayoutEffect,
   useMemo,
   useRef,
+  useState,
+  type DragEvent,
   type KeyboardEvent,
 } from "react";
 import { createApi } from "@/lib/client/api";
@@ -63,6 +65,35 @@ export function ChatSurface(props: ChatSurfaceProps) {
   });
   const { messages, phase, streamText, error, openCount } = chat;
 
+  // Dragging files over the chat: enter/leave fire for every child, so count them.
+  const [dropping, setDropping] = useState(false);
+  const dragDepth = useRef(0);
+  const hasFiles = (event: DragEvent) => Array.from(event.dataTransfer.types).includes("Files");
+  const onDragEnter = (event: DragEvent) => {
+    if (!hasFiles(event)) return;
+    event.preventDefault();
+    dragDepth.current += 1;
+    setDropping(true);
+  };
+  const onDragOver = (event: DragEvent) => {
+    if (!hasFiles(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  };
+  const onDragLeave = (event: DragEvent) => {
+    if (!hasFiles(event)) return;
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) setDropping(false);
+  };
+  const onDrop = (event: DragEvent) => {
+    if (!hasFiles(event)) return;
+    event.preventDefault();
+    dragDepth.current = 0;
+    setDropping(false);
+    chat.addFiles(Array.from(event.dataTransfer.files));
+    inputRef.current?.focus();
+  };
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const stick = useRef(true);
@@ -115,6 +146,16 @@ export function ChatSurface(props: ChatSurfaceProps) {
     [deleteMessage],
   );
   const onStop = useCallback(() => void stop(), [stop]);
+  // Notice buttons disappear when pressed; keep the keyboard in the message box.
+  const { dismissError } = chat;
+  const onRetry = useCallback(() => {
+    retry();
+    inputRef.current?.focus();
+  }, [retry]);
+  const onDismiss = useCallback(() => {
+    dismissError();
+    inputRef.current?.focus();
+  }, [dismissError]);
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === "Escape" && busy) {
@@ -136,7 +177,16 @@ export function ChatSurface(props: ChatSurfaceProps) {
       className={`ogchat ${styles.surface} ${className ?? ""}`}
       aria-label="Chat"
       onKeyDown={onKeyDown}
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
     >
+      {dropping && (
+        <div className={styles.dropOverlay} aria-hidden="true">
+          <span className={styles.dropLabel}>drop files to attach</span>
+        </div>
+      )}
       <div className={styles.stage}>
         {phase !== "loading" && (
           <BootLine key={openCount} text={bootText} persist={messages.length === 0 && !busy} />
@@ -185,6 +235,7 @@ export function ChatSurface(props: ChatSurfaceProps) {
                   onEdit={onEdit}
                   onDelete={onDelete}
                   onRegenerate={regenerate}
+                  fileUrl={chat.fileUrl}
                 />
               ))}
               {busy && <StreamingMessage text={streamText} />}
@@ -201,7 +252,7 @@ export function ChatSurface(props: ChatSurfaceProps) {
                     <button
                       type="button"
                       className={`${styles.button} ${styles.buttonAccent}`}
-                      onClick={retry}
+                      onClick={onRetry}
                     >
                       retry
                     </button>
@@ -212,7 +263,7 @@ export function ChatSurface(props: ChatSurfaceProps) {
                     </button>
                   )}
                   {!error.retry && (
-                    <button type="button" className={styles.button} onClick={chat.dismissError}>
+                    <button type="button" className={styles.button} onClick={onDismiss}>
                       dismiss
                     </button>
                   )}
@@ -221,7 +272,7 @@ export function ChatSurface(props: ChatSurfaceProps) {
             )}
 
             {unanswered && (
-              <div className={styles.notice}>
+              <div className={`${styles.notice} ${styles.noticeQuiet}`}>
                 <div className={styles.tagRow}>
                   <span className={`${styles.tag} ${styles.tagSystem}`}>system&gt;</span>
                 </div>
@@ -230,7 +281,7 @@ export function ChatSurface(props: ChatSurfaceProps) {
                   <button
                     type="button"
                     className={`${styles.button} ${styles.buttonAccent}`}
-                    onClick={retry}
+                    onClick={onRetry}
                   >
                     retry
                   </button>
@@ -251,6 +302,9 @@ export function ChatSurface(props: ChatSurfaceProps) {
         busy={busy}
         canSend={idle}
         inputRef={inputRef}
+        files={chat.files}
+        onAddFiles={chat.addFiles}
+        onRemoveFile={chat.removeFile}
         footer={
           <div className={styles.hints}>
             <span className={styles.hintKeys}>

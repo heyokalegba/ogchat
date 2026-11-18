@@ -1,8 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { ChatMessage, Role, Session, SessionMeta } from "@/lib/types";
+import type { Attachment, ChatMessage, Role, Session, SessionMeta } from "@/lib/types";
 import { titleFromMessage } from "@/lib/title";
+import { pruneFiles, removeSessionFiles } from "./files";
 import { readJson, writeJsonAtomic } from "./fsjson";
 import { sessionsDir } from "./paths";
 
@@ -128,7 +129,11 @@ export function listSessions(query?: string): SessionMeta[] {
     if (
       needle &&
       !file.title.toLowerCase().includes(needle) &&
-      !file.messages.some((m) => m.content.toLowerCase().includes(needle))
+      !file.messages.some(
+        (m) =>
+          m.content.toLowerCase().includes(needle) ||
+          m.attachments?.some((a) => a.name.toLowerCase().includes(needle)),
+      )
     ) {
       continue;
     }
@@ -171,6 +176,7 @@ export function deleteSession(id: string): boolean {
   if (!isValidId(id)) return false;
   try {
     fs.unlinkSync(fileFor(id));
+    removeSessionFiles(id);
     return true;
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") return false;
@@ -182,6 +188,7 @@ export interface NewMessage {
   role: Role;
   content: string;
   partial?: boolean;
+  attachments?: Attachment[];
 }
 
 /**
@@ -201,9 +208,10 @@ export function appendMessage(
     content: input.content,
     createdAt: now,
     ...(input.partial ? { partial: true } : {}),
+    ...(input.attachments?.length ? { attachments: input.attachments } : {}),
   };
   if (input.role === "user" && !file.titleLocked && !file.messages.some((m) => m.role === "user")) {
-    file.title = titleFromMessage(input.content);
+    file.title = titleFromMessage(input.content || input.attachments?.[0]?.name || "");
   }
   file.messages.push(message);
   file.updatedAt = now;
@@ -211,7 +219,10 @@ export function appendMessage(
   return { session: toSession(file), message };
 }
 
-/** Removes the given message and everything after it. */
+/**
+ * Removes the given message and everything after it. Attachment files are left
+ * in place; call pruneSessionFiles once the session is in its final state.
+ */
 export function truncateFrom(id: string, messageId: string): Session | null {
   const file = load(id);
   if (!file) return null;
@@ -221,4 +232,15 @@ export function truncateFrom(id: string, messageId: string): Session | null {
   file.updatedAt = stamp();
   save(file);
   return toSession(file);
+}
+
+/** Deletes attachment files that no remaining message refers to. */
+export function pruneSessionFiles(id: string): void {
+  const file = load(id);
+  if (!file) return;
+  const keep = new Set<string>();
+  for (const message of file.messages) {
+    for (const attachment of message.attachments ?? []) keep.add(attachment.id);
+  }
+  pruneFiles(id, keep);
 }

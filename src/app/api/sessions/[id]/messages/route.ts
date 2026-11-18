@@ -1,7 +1,7 @@
 import type { StreamEvent } from "@/lib/types";
-import { ChatRequestError, parseSendInput, prepareTurn, runTurn } from "@/lib/server/chat";
+import { ChatRequestError, prepareTurn, readSendInput, runTurn } from "@/lib/server/chat";
 import { guard } from "@/lib/server/guard";
-import { BadRequest, errorJson, readBody } from "@/lib/server/http";
+import { BadRequest, errorJson } from "@/lib/server/http";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -10,6 +10,8 @@ type Context = { params: Promise<{ id: string }> };
  *   { content, replaceFromMessageId? }   send a message (optionally replacing
  *                                        an earlier user message and what followed)
  *   { regenerate: true }                 retry the reply to the last user message
+ *   multipart/form-data                  the same fields plus `files`, to attach
+ *                                        text files, PDFs or images to the message
  *
  * The provider is called with the session's full stored history. The response
  * is an NDJSON stream of StreamEvent lines: start, delta…, then done or error.
@@ -23,7 +25,7 @@ export async function POST(request: Request, { params }: Context): Promise<Respo
 
   let turn;
   try {
-    turn = prepareTurn(id, parseSendInput(await readBody(request)));
+    turn = prepareTurn(id, await readSendInput(request));
   } catch (err) {
     if (err instanceof ChatRequestError) return errorJson(err.status, err.code, err.message);
     if (err instanceof BadRequest) return errorJson(400, "bad_request", err.message);

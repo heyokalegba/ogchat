@@ -34,8 +34,10 @@ export function BootLine({ text, persist }: { text: string; persist: boolean }) 
       aria-hidden="true"
     >
       <div className={styles.bootInner}>
-        <span className={styles.bootText}>{text}</span>
-        <span className={styles.bootCaret} />
+        <span className={styles.bootLabel}>
+          <span className={styles.bootText}>{text}</span>
+          <span className={styles.bootCaret} />
+        </span>
       </div>
     </div>
   );

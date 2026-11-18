@@ -39,6 +39,8 @@ export interface ChatApi {
   stop(id: string): Promise<void>;
   getSettings(): Promise<PublicSettings>;
   saveSettings(update: SettingsUpdate): Promise<PublicSettings>;
+  /** URL of a stored attachment, for thumbnails and "open file" links. */
+  fileUrl(id: string, fileId: string): string;
   /** Sends a turn and reports each stream event. Resolves when the stream ends cleanly. */
   send(
     id: string,
@@ -70,7 +72,9 @@ export function createApi(base = "/api"): ChatApi {
     try {
       res = await fetch(`${base}${path}`, {
         ...init,
-        headers: init?.body ? { "Content-Type": "application/json" } : undefined,
+        // Form data sets its own content type (with the multipart boundary).
+        headers:
+          typeof init?.body === "string" ? { "Content-Type": "application/json" } : undefined,
         cache: "no-store",
       });
     } catch (err) {
@@ -127,8 +131,27 @@ export function createApi(base = "/api"): ChatApi {
     async saveSettings(update) {
       return (await data<{ settings: PublicSettings }>("/settings", body("PUT", update))).settings;
     },
+    fileUrl(id, fileId) {
+      return `${base}/sessions/${id}/files/${fileId}`;
+    },
     async send(id, payload, onEvent, signal) {
-      const res = await call(`/sessions/${id}/messages`, { ...body("POST", payload), signal });
+      let init: RequestInit;
+      if ("files" in payload && payload.files?.length) {
+        // Files travel as multipart form data alongside the message text.
+        const form = new FormData();
+        form.set("content", payload.content);
+        if (payload.replaceFromMessageId) {
+          form.set("replaceFromMessageId", payload.replaceFromMessageId);
+        }
+        for (const file of payload.files) form.append("files", file, file.name);
+        init = { method: "POST", body: form };
+      } else if ("content" in payload) {
+        const { content, replaceFromMessageId } = payload;
+        init = body("POST", { content, replaceFromMessageId });
+      } else {
+        init = body("POST", payload);
+      }
+      const res = await call(`/sessions/${id}/messages`, { ...init, signal });
       if (!res.body) throw new ApiError("connection_lost", UNREACHABLE);
       const reader = res.body.getReader();
       const decoder = new TextDecoder();

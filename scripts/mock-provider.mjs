@@ -72,7 +72,17 @@ const server = http.createServer(async (req, res) => {
 
   const body = await readBody(req);
   const messages = Array.isArray(body.messages) ? body.messages : [];
-  const last = String(messages.at(-1)?.content ?? "");
+  // Content is a string, or OpenAI-style parts when the message carries images.
+  const lastContent = messages.at(-1)?.content ?? "";
+  const parts = Array.isArray(lastContent)
+    ? lastContent
+    : [{ type: "text", text: String(lastContent) }];
+  const last = parts
+    .filter((part) => part.type === "text")
+    .map((part) => part.text)
+    .join("\n");
+  const images = parts.filter((part) => part.type === "image_url").length;
+  const fileBlocks = (last.match(/^Attached file: /gm) ?? []).length;
   console.log(
     `[mock-provider] model=${body.model} messages=${messages.length} last=${JSON.stringify(last.slice(0, 60))}`,
   );
@@ -97,7 +107,7 @@ const server = http.createServer(async (req, res) => {
       ? Array.from({ length: 120 }, (_, i) => `Line ${i + 1} of a deliberately long reply.`).join(
           "\n\n",
         )
-      : `${REPLY}${last.replace(/\s+/g, " ").slice(0, 200)}\n\nThat was message ${messages.length} of this session's context.`;
+      : `${REPLY}${last.replace(/\s+/g, " ").slice(0, 200)}\n\nThat was message ${messages.length} of this session's context. Attachments received with it: ${fileBlocks} file(s) as text, ${images} image(s).`;
     const tokens = text.match(/\s*\S+/g) ?? [];
     let closed = false;
     res.on("close", () => (closed = true));

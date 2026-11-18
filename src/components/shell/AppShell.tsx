@@ -239,6 +239,7 @@ export function AppShell() {
         <div className={styles.surfaceSlot}>
           {ready && (
             <ChatSurface
+              className={styles.wall}
               sessionId={activeId}
               openToken={openToken}
               provider={provider}

@@ -4,13 +4,15 @@ import {
   useImperativeHandle,
   useLayoutEffect,
   useRef,
+  type ClipboardEvent,
   type FormEvent,
   type KeyboardEvent,
   type ReactNode,
   type Ref,
 } from "react";
+import { PendingFiles } from "./Attachments";
 import styles from "./chat.module.css";
-import { SendIcon, StopIcon } from "./icons";
+import { PaperclipIcon, SendIcon, StopIcon } from "./icons";
 
 export interface ComposerProps {
   value: string;
@@ -22,14 +24,23 @@ export interface ComposerProps {
   /** Sending is not possible right now (for example while the session loads). Typing still is. */
   canSend: boolean;
   inputRef: Ref<HTMLTextAreaElement>;
+  /** Files queued to go out with the next message. */
+  files: File[];
+  onAddFiles: (files: File[]) => void;
+  onRemoveFile: (index: number) => void;
   footer?: ReactNode;
 }
 
-/** Enter sends, Shift+Enter inserts a newline, Escape stops a reply in progress. */
+/**
+ * Enter sends, Shift+Enter inserts a newline, Escape stops a reply in progress.
+ * Files are attached with the paperclip, by pasting, or by dropping them on the chat.
+ */
 export function Composer(props: ComposerProps) {
   const { value, onChange, onSubmit, onStop, busy, canSend, inputRef, footer } = props;
-  const ready = canSend && !busy && value.trim().length > 0;
+  const { files, onAddFiles, onRemoveFile } = props;
+  const ready = canSend && !busy && (value.trim().length > 0 || files.length > 0);
   const textarea = useRef<HTMLTextAreaElement>(null);
+  const picker = useRef<HTMLInputElement>(null);
   useImperativeHandle(inputRef, () => textarea.current as HTMLTextAreaElement, []);
 
   // Grow with the text, up to the max-height set in CSS.
@@ -53,45 +64,84 @@ export function Composer(props: ComposerProps) {
     submit();
   };
 
+  const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
+    const pasted = Array.from(event.clipboardData.files);
+    if (pasted.length === 0) return;
+    event.preventDefault();
+    onAddFiles(pasted);
+  };
+
   return (
     <form className={styles.composer} onSubmit={submit}>
       <div className={styles.inputPanel}>
-        <span className={styles.prompt} aria-hidden="true">
-          &gt;
-        </span>
-        <textarea
-          ref={textarea}
-          className={styles.input}
-          rows={1}
-          value={value}
-          placeholder="Message"
-          aria-label="Message"
-          autoComplete="off"
-          spellCheck
-          onChange={(event) => onChange(event.target.value)}
-          onKeyDown={onKeyDown}
+        <PendingFiles
+          files={files}
+          onRemove={(index) => {
+            onRemoveFile(index);
+            // The removed chip took focus with it; hand it back to the message box.
+            textarea.current?.focus();
+          }}
         />
-        {busy ? (
+        <div className={styles.inputRow}>
+          <span className={styles.prompt} aria-hidden="true">
+            &gt;
+          </span>
+          <textarea
+            ref={textarea}
+            className={styles.input}
+            rows={1}
+            value={value}
+            placeholder="Message"
+            aria-label="Message"
+            autoComplete="off"
+            spellCheck
+            onChange={(event) => onChange(event.target.value)}
+            onKeyDown={onKeyDown}
+            onPaste={onPaste}
+          />
+          <input
+            ref={picker}
+            type="file"
+            multiple
+            hidden
+            tabIndex={-1}
+            onChange={(event) => {
+              onAddFiles(Array.from(event.target.files ?? []));
+              event.target.value = "";
+              textarea.current?.focus();
+            }}
+          />
           <button
             type="button"
-            className={`${styles.send} ${styles.stop}`}
-            onClick={onStop}
-            aria-label="Stop generating"
-            title="Stop (Esc)"
+            className={styles.attach}
+            onClick={() => picker.current?.click()}
+            aria-label="Attach files"
+            title="Attach files: text, PDF or images"
           >
-            <StopIcon />
+            <PaperclipIcon />
           </button>
-        ) : (
-          <button
-            type="submit"
-            className={styles.send}
-            disabled={!ready}
-            aria-label="Send message"
-            title="Send (Enter)"
-          >
-            <SendIcon />
-          </button>
-        )}
+          {busy ? (
+            <button
+              type="button"
+              className={`${styles.send} ${styles.stop}`}
+              onClick={onStop}
+              aria-label="Stop generating"
+              title="Stop (Esc)"
+            >
+              <StopIcon />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              className={styles.send}
+              disabled={!ready}
+              aria-label="Send message"
+              title="Send (Enter)"
+            >
+              <SendIcon />
+            </button>
+          )}
+        </div>
       </div>
       {footer}
     </form>

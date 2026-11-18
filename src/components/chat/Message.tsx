@@ -2,7 +2,8 @@
 
 import { memo, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { clockTime } from "@/lib/format";
-import type { ChatMessage } from "@/lib/types";
+import type { Attachment, ChatMessage } from "@/lib/types";
+import { MessageAttachments } from "./Attachments";
 import styles from "./chat.module.css";
 import { CopyButton, Markdown } from "./Markdown";
 
@@ -15,6 +16,8 @@ export interface MessageViewProps {
   onEdit?: (messageId: string, content: string) => void;
   onDelete?: (messageId: string) => void;
   onRegenerate?: () => void;
+  /** Where to load an attachment from (thumbnails, "open file" links). */
+  fileUrl: (attachment: Attachment) => string;
 }
 
 const CONFIRM_MS = 3000;
@@ -43,7 +46,13 @@ function TagRow({
   );
 }
 
-function Editor(props: { initial: string; onCancel: () => void; onSave: (text: string) => void }) {
+function Editor(props: {
+  initial: string;
+  /** The message has files, so it may be saved with no text at all. */
+  allowEmpty: boolean;
+  onCancel: () => void;
+  onSave: (text: string) => void;
+}) {
   const [text, setText] = useState(props.initial);
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -68,7 +77,7 @@ function Editor(props: { initial: string; onCancel: () => void; onSave: (text: s
       props.onCancel();
     } else if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
-      if (text.trim()) props.onSave(text);
+      if (text.trim() || props.allowEmpty) props.onSave(text);
     }
   };
 
@@ -90,7 +99,7 @@ function Editor(props: { initial: string; onCancel: () => void; onSave: (text: s
         <button
           type="button"
           className={`${styles.button} ${styles.buttonAccent}`}
-          disabled={!text.trim()}
+          disabled={!text.trim() && !props.allowEmpty}
           onClick={() => props.onSave(text)}
         >
           save &amp; send
@@ -102,7 +111,8 @@ function Editor(props: { initial: string; onCancel: () => void; onSave: (text: s
 
 /** One persisted message. User text is shown as written; replies render as markdown. */
 export const MessageView = memo(function MessageView(props: MessageViewProps) {
-  const { message, canEdit, canRegenerate, onEdit, onDelete, onRegenerate } = props;
+  const { message, canEdit, canRegenerate, onEdit, onDelete, onRegenerate, fileUrl } = props;
+  const attachments = message.attachments ?? [];
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const isUser = message.role === "user";
@@ -117,8 +127,10 @@ export const MessageView = memo(function MessageView(props: MessageViewProps) {
     return (
       <article className={styles.message} data-role="user">
         <TagRow role="user" time={clockTime(message.createdAt)} />
+        <MessageAttachments attachments={attachments} fileUrl={fileUrl} />
         <Editor
           initial={message.content}
+          allowEmpty={attachments.length > 0}
           onCancel={() => setEditing(false)}
           onSave={(text) => {
             setEditing(false);
@@ -167,7 +179,12 @@ export const MessageView = memo(function MessageView(props: MessageViewProps) {
         </div>
       </TagRow>
       {isUser ? (
-        <div className={`${styles.body} ${styles.userBody}`}>{message.content}</div>
+        <div className={styles.userPlate}>
+          {message.content && (
+            <div className={`${styles.body} ${styles.userBody}`}>{message.content}</div>
+          )}
+          <MessageAttachments attachments={attachments} fileUrl={fileUrl} />
+        </div>
       ) : (
         <div className={styles.body}>
           <Markdown content={message.content} />

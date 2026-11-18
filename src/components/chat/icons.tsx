@@ -84,3 +84,16 @@ export const CheckIcon = () => (
     <path d="m3.5 8.5 3 3 6-7" />
   </Icon>
 );
+
+export const PaperclipIcon = () => (
+  <Icon>
+    <path d="M12.6 7.4 7.5 12.5a2.9 2.9 0 0 1-4.1-4.1l5.6-5.6a1.95 1.95 0 0 1 2.75 2.75L6.4 10.9a1 1 0 0 1-1.4-1.4l4.7-4.7" />
+  </Icon>
+);
+
+export const FileIcon = () => (
+  <Icon>
+    <path d="M4 2.5h5l3 3v8H4v-11Z" />
+    <path d="M9 2.5v3h3" />
+  </Icon>
+);

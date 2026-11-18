@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "mock-provider": "node scripts/mock-provider.mjs",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "art": "node scripts/make-art.mjs"
   },
   "engines": {
     "node": ">=20.9"
@@ -22,7 +23,8 @@
     "react-dom": "19.3.1",
     "react-markdown": "^10.1.0",
     "rehype-highlight": "^7.0.2",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "unpdf": "^1.9.1"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

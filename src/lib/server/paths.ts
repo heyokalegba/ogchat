@@ -18,3 +18,8 @@ export function sessionsDir(): string {
 export function settingsFile(): string {
   return path.join(dataDir(), "settings.json");
 }
+
+/** Uploaded attachments: <data>/files/<sessionId>/<attachmentId>. */
+export function filesDir(sessionId: string): string {
+  return path.join(dataDir(), "files", sessionId);
+}

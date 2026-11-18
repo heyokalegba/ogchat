@@ -30,9 +30,13 @@ export interface ProviderConfig {
   model: string;
 }
 
+export type ProviderContentPart =
+  { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
+
 export interface ProviderMessage {
   role: Role;
-  content: string;
+  /** Plain text, or OpenAI-style content parts when the message carries images. */
+  content: string | ProviderContentPart[];
 }
 
 export interface ProviderLogger {

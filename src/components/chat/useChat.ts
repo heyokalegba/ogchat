@@ -2,7 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, type ChatApi } from "@/lib/client/api";
-import type { ChatMessage, SendBody, Session, SessionMeta, StreamEvent } from "@/lib/types";
+import { formatBytes, MAX_FILE_BYTES, MAX_FILES_PER_MESSAGE } from "@/lib/limits";
+import type {
+  Attachment,
+  ChatMessage,
+  SendBody,
+  Session,
+  SessionMeta,
+  StreamEvent,
+} from "@/lib/types";
 
 /**
  * State for one open conversation: loading it, sending turns, following the
@@ -46,6 +54,32 @@ function metaOf(session: Session): SessionMeta {
   return { id, title, createdAt, updatedAt, messageCount };
 }
 
+/** Requests the server refused because of what was sent; sending the same thing again cannot work. */
+function isRefusal(err: unknown): boolean {
+  return err instanceof ApiError && [400, 413, 415, 422].includes(err.status);
+}
+
+/** Stand-in attachments shown on a message while its files upload. */
+function previewAttachments(files: File[]): Attachment[] {
+  return files.map((file, index) => {
+    const image = file.type.startsWith("image/");
+    return {
+      id: `pending-file-${index}`,
+      name: file.name,
+      mime: file.type,
+      size: file.size,
+      kind: image ? "image" : "text",
+      ...(image ? { previewUrl: URL.createObjectURL(file) } : {}),
+    };
+  });
+}
+
+function releasePreviews(attachments: Attachment[]): void {
+  for (const attachment of attachments) {
+    if (attachment.previewUrl) URL.revokeObjectURL(attachment.previewUrl);
+  }
+}
+
 function describe(err: unknown): { code: string; message: string } {
   if (err instanceof ApiError) return { code: err.code, message: err.message };
   return { code: "unknown", message: "Something went wrong. Retry in a moment." };
@@ -60,6 +94,13 @@ export function useChat(options: UseChatOptions) {
   const [streamText, setStreamText] = useState("");
   const [error, setError] = useState<ChatErrorState | null>(null);
   const [draft, setDraft] = useState("");
+  /** Files waiting in the composer to go out with the next message. */
+  const [files, setFilesState] = useState<File[]>([]);
+  const filesRef = useRef<File[]>([]);
+  const setFiles = useCallback((next: File[]) => {
+    filesRef.current = next;
+    setFilesState(next);
+  }, []);
   /** Counts session opens; drives the boot line and composer focus. */
   const [openCount, setOpenCount] = useState(0);
 
@@ -144,6 +185,7 @@ export function useChat(options: UseChatOptions) {
     setMessages([]);
     setError(null);
     setDraft("");
+    setFiles([]);
     resetStream();
     setOpenCount((n) => n + 1);
     if (sessionId) {
@@ -152,7 +194,7 @@ export function useChat(options: UseChatOptions) {
     } else {
       setPhase("idle");
     }
-  }, [sessionId, openToken, load, resetStream, setPhase]);
+  }, [sessionId, openToken, load, resetStream, setFiles, setPhase]);
 
   // While the server generates without us, poll until it is done.
   useEffect(() => {
@@ -180,6 +222,8 @@ export function useChat(options: UseChatOptions) {
       const epoch = epochRef.current;
       const isRegenerate = "regenerate" in body;
       const tempId = `pending-${Date.now()}`;
+      const sending = !isRegenerate && body.files ? body.files : [];
+      const previews = previewAttachments(sending);
 
       setError(null);
       resetStream();
@@ -192,9 +236,17 @@ export function useChat(options: UseChatOptions) {
           ? current.findIndex((m) => m.id === body.replaceFromMessageId)
           : -1;
         const kept = cut === -1 ? current : current.slice(0, cut);
+        // An edited message keeps the files it already had.
+        const attachments = [...(cut === -1 ? [] : (current[cut]?.attachments ?? [])), ...previews];
         return [
           ...kept,
-          { id: tempId, role: "user", content: body.content, createdAt: new Date().toISOString() },
+          {
+            id: tempId,
+            role: "user",
+            content: body.content,
+            createdAt: new Date().toISOString(),
+            ...(attachments.length ? { attachments } : {}),
+          },
         ];
       });
 
@@ -212,6 +264,7 @@ export function useChat(options: UseChatOptions) {
             if (userMessage) {
               setMessages((current) => current.map((m) => (m.id === tempId ? userMessage : m)));
             }
+            releasePreviews(previews);
             callbacks.current.onSessionUpdated?.(event.session);
             break;
           }
@@ -271,36 +324,81 @@ export function useChat(options: UseChatOptions) {
           }
           return;
         }
-        // Nothing was accepted: put the transcript back and keep the text within reach.
+        // Nothing was accepted: put the transcript back and keep the text and files within reach.
         setMessages((current) => current.filter((m) => m.id !== tempId));
+        releasePreviews(previews);
         if (!isRegenerate) {
           setDraft((current) => (current.trim() ? current : body.content));
+          if (sending.length && filesRef.current.length === 0) setFiles(sending);
         }
         if (id && (isRegenerate || body.replaceFromMessageId)) void load(id, epoch);
         else setPhase("idle");
-        setError({ ...describe(err), retry: { kind: "resubmit", body } });
+        // A refused request (bad file, too large…) needs changing, not repeating.
+        setError({ ...describe(err), retry: isRefusal(err) ? null : { kind: "resubmit", body } });
       } finally {
         if (abortRef.current === controller) abortRef.current = null;
       }
     },
-    [api, load, resetStream, setPhase],
+    [api, load, resetStream, setFiles, setPhase],
   );
 
   const send = useCallback(
     (content: string) => {
       const text = content.trim();
-      if (!text || phaseRef.current !== "idle") return false;
+      const attached = filesRef.current;
+      if ((!text && attached.length === 0) || phaseRef.current !== "idle") return false;
       setDraft("");
-      void submit({ content: text });
+      setFiles([]);
+      void submit({ content: text, ...(attached.length ? { files: attached } : {}) });
       return true;
     },
-    [submit],
+    [setFiles, submit],
+  );
+
+  /** Queues files for the next message. Oversized or surplus files are refused with a note. */
+  const addFiles = useCallback(
+    (incoming: File[]) => {
+      if (incoming.length === 0) return;
+      const accepted = [...filesRef.current];
+      const problems: string[] = [];
+      for (const file of incoming) {
+        if (file.size > MAX_FILE_BYTES) {
+          problems.push(
+            `"${file.name}" is ${formatBytes(file.size)}; the limit is ${formatBytes(MAX_FILE_BYTES)} per file.`,
+          );
+        } else if (accepted.length >= MAX_FILES_PER_MESSAGE) {
+          problems.push(
+            `Only ${MAX_FILES_PER_MESSAGE} files fit on one message; "${file.name}" was left out.`,
+          );
+        } else if (!accepted.some((f) => f.name === file.name && f.size === file.size)) {
+          accepted.push(file);
+        }
+      }
+      setFiles(accepted);
+      if (problems.length)
+        setError({ code: "attachment", message: problems.join(" "), retry: null });
+    },
+    [setFiles],
+  );
+
+  const removeFile = useCallback(
+    (index: number) => setFiles(filesRef.current.filter((_, i) => i !== index)),
+    [setFiles],
+  );
+
+  const fileUrl = useCallback(
+    (attachment: Attachment) => {
+      if (attachment.previewUrl) return attachment.previewUrl;
+      const id = activeIdRef.current;
+      return id && !attachment.id.startsWith("pending-") ? api.fileUrl(id, attachment.id) : "";
+    },
+    [api],
   );
 
   const editAndResend = useCallback(
     (messageId: string, content: string) => {
       const text = content.trim();
-      if (!text || phaseRef.current !== "idle") return false;
+      if (phaseRef.current !== "idle") return false;
       void submit({ content: text, replaceFromMessageId: messageId });
       return true;
     },
@@ -319,12 +417,15 @@ export function useChat(options: UseChatOptions) {
       void load(id, epochRef.current);
     } else if (action.kind === "resubmit") {
       const { body } = action;
-      if ("content" in body) setDraft((current) => (current === body.content ? "" : current));
+      if ("content" in body) {
+        setDraft((current) => (current === body.content ? "" : current));
+        if (body.files && filesRef.current === body.files) setFiles([]);
+      }
       void submit(body);
     } else {
       void submit({ regenerate: true });
     }
-  }, [error, load, setPhase, submit]);
+  }, [error, load, setFiles, setPhase, submit]);
 
   const stop = useCallback(async () => {
     const id = activeIdRef.current;
@@ -376,6 +477,10 @@ export function useChat(options: UseChatOptions) {
     error,
     draft,
     setDraft,
+    files,
+    addFiles,
+    removeFile,
+    fileUrl,
     openCount,
     send,
     editAndResend,

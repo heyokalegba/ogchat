@@ -1,13 +1,17 @@
 # ogchat
 
 A personal AI chat interface that runs entirely on your machine. Multi-session
-chat with streaming replies, local history, and one configurable
-OpenAI-compatible provider. No accounts, no cloud, no telemetry.
+chat with streaming replies, file attachments, local history, and one
+configurable OpenAI-compatible provider. No accounts, no cloud, no telemetry.
+
+The chat is written in strong black on a wall of pixelated tan bricks. The rest
+of the interface is see-through, over a pixel-art New York skyline.
 
 ![ogchat conversation](docs/screens/03-conversation.png)
 
 More screens: [first run](docs/screens/01-first-run.png) ·
 [streaming](docs/screens/02-streaming.png) ·
+[attaching files](docs/screens/07-attaching.png) ·
 [inline error](docs/screens/04-inline-error.png) ·
 [settings](docs/screens/05-settings.png) ·
 [mobile](docs/screens/06-mobile.png)
@@ -91,12 +95,33 @@ The provider must speak the OpenAI chat-completions shape:
   entries behind.
 - Hover the last message you sent to edit or delete it; hover the last reply to
   copy or retry it. Editing replaces the message and its reply, then asks again.
+- Attach files with the paperclip, by dropping them on the chat, or by pasting
+  (see below).
 - Stopping keeps the text received so far, marked `— stopped`.
 - A reply keeps generating on the server if you switch sessions or close the
   tab, and is there when you come back. Only Stop ends it early.
 - Provider errors, an invalid key, an empty reply and network loss all appear
   inline with a retry. Your message is saved before the provider is called, so
   a failure never costs you the session.
+
+## Attaching files
+
+Up to 8 files per message, 20 MB each (8 MB for images).
+
+| File                                                | How the model receives it                                                                                  |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Text of any kind (code, Markdown, CSV, JSON, logs…) | Inlined into your message as a labelled block. Works with every model.                                     |
+| PDF                                                 | Its text is extracted and inlined the same way. Scanned PDFs with no text layer are refused.               |
+| Images (PNG, JPEG, GIF, WebP)                       | Sent as an image part. This needs a model that can see; one that cannot will answer with a provider error. |
+
+What a file is gets decided from its contents, not its name. Anything else
+(archives, Office documents, audio…) is refused with a message, and your draft
+and the other files stay in the composer. Text longer than 200,000 characters
+per file is cut and marked as truncated.
+
+Attachments stay part of the conversation: they are re-sent as context on every
+later turn of that session, kept when you edit the message, and deleted from
+disk when the message or session is deleted.
 
 ## Data
 
@@ -106,6 +131,7 @@ Everything is plain JSON under `data/` (override with `OGCHAT_DATA_DIR`):
 data/
   settings.json            provider settings, including a key saved in the panel
   sessions/<id>.json       one file per session: title, timestamps, messages
+  files/<session>/<id>     attachments: image bytes, or the text taken from a file
 ```
 
 Back up or move the folder to keep your history. Delete it to start clean.
@@ -125,8 +151,9 @@ src/
     provider/adapter.ts            the only module that talks to the provider
     server/                        persistence, settings, turn handling, request guard
     client/api.ts                  browser client for the routes above
-tests/                             vitest: persistence, adapter, route contract
+tests/                             vitest: persistence, adapter, route contract, attachments
 scripts/mock-provider.mjs          stand-in provider for local trials
+scripts/make-art.mjs               generates the skyline and the brick wall
 ```
 
 ### Changing provider
@@ -154,21 +181,30 @@ import { ChatSurface } from "@/components/chat";
 ```
 
 Its styles are scoped to the `.ogchat` class; the design tokens (colors, fonts,
-radii) are CSS variables in `src/components/chat/theme.css`.
+outlines) are CSS variables in `src/components/chat/theme.css`.
+
+### Changing the look
+
+- **Colors:** edit the variables at the top of `src/components/chat/theme.css`
+  (ink, brick, the mud-brick red accent, muted green / blue / yellow).
+- **The art:** the skyline and the brick tile are drawn by
+  `scripts/make-art.mjs` (no dependencies). Change its palettes or shapes, then
+  run `npm run art` to regenerate the two PNGs under `src/components/*/art/`.
 
 ## API
 
-| Route                                          | Purpose                                                                                                                       |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/sessions?q=`                         | List sessions, optionally filtered                                                                                            |
-| `POST /api/sessions`                           | Create a session                                                                                                              |
-| `GET /api/sessions/:id`                        | Session with messages, plus `generating` / `partial`                                                                          |
-| `PATCH /api/sessions/:id`                      | Rename `{ title }`                                                                                                            |
-| `DELETE /api/sessions/:id`                     | Delete                                                                                                                        |
-| `POST /api/sessions/:id/messages`              | Send `{ content, replaceFromMessageId? }` or `{ regenerate: true }`; streams NDJSON events `start`, `delta`, `done` / `error` |
-| `DELETE /api/sessions/:id/messages/:messageId` | Delete a user message and everything after it                                                                                 |
-| `POST /api/sessions/:id/stop`                  | Stop the reply in progress                                                                                                    |
-| `GET` / `PUT /api/settings`                    | Read (masked) / update provider settings                                                                                      |
+| Route                                          | Purpose                                                                                                                                                                                                       |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/sessions?q=`                         | List sessions, optionally filtered                                                                                                                                                                            |
+| `POST /api/sessions`                           | Create a session                                                                                                                                                                                              |
+| `GET /api/sessions/:id`                        | Session with messages, plus `generating` / `partial`                                                                                                                                                          |
+| `PATCH /api/sessions/:id`                      | Rename `{ title }`                                                                                                                                                                                            |
+| `DELETE /api/sessions/:id`                     | Delete                                                                                                                                                                                                        |
+| `POST /api/sessions/:id/messages`              | Send `{ content, replaceFromMessageId? }` or `{ regenerate: true }`; streams NDJSON events `start`, `delta`, `done` / `error`. With attachments, send `multipart/form-data` with the same fields plus `files` |
+| `GET /api/sessions/:id/files/:fileId`          | An attachment: images as images, everything else as plain text                                                                                                                                                |
+| `DELETE /api/sessions/:id/messages/:messageId` | Delete a user message and everything after it                                                                                                                                                                 |
+| `POST /api/sessions/:id/stop`                  | Stop the reply in progress                                                                                                                                                                                    |
+| `GET` / `PUT /api/settings`                    | Read (masked) / update provider settings                                                                                                                                                                      |
 
 There is no login, so the API only answers requests addressed to a loopback
 host and refuses state-changing requests from other origins. To serve ogchat
@@ -182,6 +218,7 @@ who can reach the port can use your key.
 npm run typecheck    # next typegen + tsc --noEmit
 npm test             # vitest, provider stubbed, no network
 npm run format       # prettier
+npm run art          # regenerate the pixel art
 ```
 
 Tests never touch the network: `fetch` is replaced with a stub provider, and
