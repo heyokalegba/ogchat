@@ -27,12 +27,12 @@ interface is see-through, over a pixel-art New York that keeps real time.
 Click the clock in the top-right corner. Everything applies as you move it and
 is remembered in your browser.
 
-| Control                 | What it does                                                                                                                                           |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Time in Brooklyn        | Drag to set the scene to any time of day. **The clock cannot be paused:** it runs on from wherever you leave it. `now` snaps it back to the real time. |
-| Wall                    | Darker and grittier to the left, paler to the right.                                                                                                   |
-| Text size               | 80% to 150%. Scales all the type in the app.                                                                                                           |
-| Text colour on the wall | Six colours that sit well on brick, or pick any. The halo behind the letters turns dark when you pick a light colour, so text stays outlined.          |
+| Control                 | What it does                                                                                                                                                                                                                                                   |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Time in Brooklyn        | Drag to set the scene to any time of day. **The clock cannot be paused:** it runs on from wherever you leave it. `now` snaps it back to the real time.                                                                                                         |
+| Wall                    | `brick` or `none`. With `none` the wall goes away and the chat floats over the scene; its text then has its own colour (chalk to start with) and a stronger outline. The lightness slider makes the brick darker and grittier to the left, paler to the right. |
+| Text size               | 80% to 150%. Scales all the type in the app.                                                                                                                                                                                                                   |
+| Text colour on the wall | Six colours that sit well on brick, or pick any. The halo behind the letters turns dark when you pick a light colour, so text stays outlined.                                                                                                                  |
 
 ![ogchat conversation](docs/screens/03-conversation.png)
 
@@ -44,7 +44,8 @@ More screens: [first run](docs/screens/01-first-run.png) ·
 [mobile](docs/screens/06-mobile.png) ·
 [brooklyn](docs/screens/08-brooklyn.png) ·
 [brooklyn at night](docs/screens/09-night.png) ·
-[the look panel](docs/screens/10-look-panel.png)
+[the look panel](docs/screens/10-look-panel.png) ·
+[without the wall](docs/screens/11-no-wall.png)
 
 ## Run it
 

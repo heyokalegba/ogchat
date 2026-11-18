@@ -9,23 +9,25 @@
   min-height: 0;
   height: 100%;
   color: var(--og-text);
-  background-color: var(--og-brick);
 }
 
 /*
  * The bricks are their own layer behind everything on the wall, so the look
- * panel's lightness slider can brighten or darken them without touching the
- * text. A 320x320 tile, shown at 3x with hard pixels.
+ * panel can brighten or darken them, or take the wall away altogether,
+ * without touching the text. A 320x320 tile, shown at 3x with hard pixels.
  */
 .surface::before {
   content: "";
   position: absolute;
   z-index: -1;
   inset: 0;
+  background-color: var(--og-brick);
   background-image: url("./art/bricks.png");
   background-size: 960px 960px;
   image-rendering: pixelated;
   filter: brightness(var(--og-wall-light));
+  opacity: var(--og-wall-opacity);
+  transition: opacity 450ms var(--og-ease);
 }
 
 .surface * {

@@ -9,21 +9,33 @@ export interface Look {
   scene: SceneId;
   /** Milliseconds the scene's clock runs ahead of (or behind) the real one. 0 is real time. */
   clockOffsetMs: number;
+  /** Whether the brick wall is there. Without it the chat floats over the scene. */
+  wallShown: boolean;
   /** Wall lightness, 0 (dark and gritty) to 100 (pale). 50 is the wall as drawn. */
   wall: number;
   /** Text size in percent of the standard size. */
   textSize: number;
   /** Colour of the text written on the wall, as #rrggbb. */
   textColor: string;
+  /** Colour of the same text when the wall is hidden and it sits over the scene. */
+  textColorOpen: string;
 }
 
 export const DEFAULT_LOOK: Look = {
   scene: "skyline",
   clockOffsetMs: 0,
+  wallShown: true,
   wall: 50,
   textSize: 100,
   textColor: "#0d0c0b",
+  // Over the open scene, chalk with a dark outline reads at any hour.
+  textColorOpen: "#f4eee0",
 };
+
+/** The text colour in force: the one for the wall, or the one for the open scene. */
+export function activeTextColor(look: Look): string {
+  return look.wallShown ? look.textColor : look.textColorOpen;
+}
 
 export const TEXT_SIZE = { min: 80, max: 150, step: 5 };
 
@@ -52,6 +64,7 @@ function clean(value: unknown): Look {
         ? (raw.scene as SceneId)
         : DEFAULT_LOOK.scene,
     clockOffsetMs: clamp(Math.round(number(raw.clockOffsetMs, 0)), -DAY_MS, DAY_MS),
+    wallShown: typeof raw.wallShown === "boolean" ? raw.wallShown : DEFAULT_LOOK.wallShown,
     wall: clamp(Math.round(number(raw.wall, DEFAULT_LOOK.wall)), 0, 100),
     textSize: clamp(
       Math.round(number(raw.textSize, DEFAULT_LOOK.textSize)),
@@ -62,6 +75,10 @@ function clean(value: unknown): Look {
       typeof raw.textColor === "string" && HEX.test(raw.textColor)
         ? raw.textColor.toLowerCase()
         : DEFAULT_LOOK.textColor,
+    textColorOpen:
+      typeof raw.textColorOpen === "string" && HEX.test(raw.textColorOpen)
+        ? raw.textColorOpen.toLowerCase()
+        : DEFAULT_LOOK.textColorOpen,
   };
 }
 
@@ -96,13 +113,29 @@ function lightness(color: string): number {
  *
  * The wall slider is a brightness factor around the wall as drawn (0.72 to
  * 1.28). The halo behind wall text flips from pale to dark when the text
- * itself is light, so it always outlines rather than washes out.
+ * itself is light, so it always outlines rather than washes out. With the
+ * wall hidden the text sits on buildings and sky, so the halo is made much
+ * stronger: a solid outline first, then the soft glow.
  */
 export function lookVariables(look: Look): Record<string, string> {
+  const color = activeTextColor(look);
+  const halo = lightness(color) > 0.5 ? "20, 16, 12" : "246, 240, 227";
   return {
     "--og-wall-light": (0.72 + (look.wall / 100) * 0.56).toFixed(3),
+    "--og-wall-opacity": look.wallShown ? "1" : "0",
     "--og-type": (look.textSize / 100).toFixed(2),
-    "--og-wall-text": look.textColor,
-    "--og-halo-rgb": lightness(look.textColor) > 0.5 ? "20, 16, 12" : "246, 240, 227",
+    "--og-wall-text": color,
+    "--og-halo-rgb": halo,
+    ...(look.wallShown
+      ? {}
+      : {
+          "--og-halo": [
+            `0 0 1px rgba(${halo}, 1)`,
+            `0 0 2px rgba(${halo}, 1)`,
+            `0 1px 3px rgba(${halo}, 0.95)`,
+            `0 0 7px rgba(${halo}, 0.85)`,
+            `0 0 14px rgba(${halo}, 0.6)`,
+          ].join(", "),
+        }),
   };
 }

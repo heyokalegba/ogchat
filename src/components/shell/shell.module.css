@@ -638,6 +638,11 @@
   background: var(--og-yellow);
 }
 
+.slider:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .shell .slider:focus-visible {
   outline: 2px solid var(--og-white);
   outline-offset: 2px;
@@ -708,6 +713,15 @@
   border: 3px solid var(--og-ink);
   border-bottom: 0;
   box-shadow: 10px 0 0 rgba(0, 0, 0, 0.28);
+  transition:
+    border-color 450ms var(--og-ease),
+    box-shadow 450ms var(--og-ease);
+}
+
+/* With the wall taken away, its outline and shadow go too. */
+.noWall .wall {
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .scrim {

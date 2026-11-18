@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { describeOffset, formatMinutes, type WallClock } from "@/lib/daylight";
 import { CloseIcon } from "../chat/icons";
 import { SCENES, type SceneId } from "./art";
-import { DEFAULT_LOOK, TEXT_SIZE, TEXT_SWATCHES, type Look } from "./look";
+import { activeTextColor, DEFAULT_LOOK, TEXT_SIZE, TEXT_SWATCHES, type Look } from "./look";
 import styles from "./shell.module.css";
 
 export interface LookPanelProps {
@@ -53,11 +53,17 @@ export function LookPanel({
   }, [onClose]);
 
   const shifted = look.clockOffsetMs !== 0;
-  const custom = !TEXT_SWATCHES.some((swatch) => swatch.value === look.textColor);
+  // The colour picker edits whichever colour is in force: on the wall, or over the open scene.
+  const textColor = activeTextColor(look);
+  const setTextColor = (value: string) =>
+    onChange(look.wallShown ? { textColor: value } : { textColorOpen: value });
+  const custom = !TEXT_SWATCHES.some((swatch) => swatch.value === textColor);
   const changed =
+    look.wallShown !== DEFAULT_LOOK.wallShown ||
     look.wall !== DEFAULT_LOOK.wall ||
     look.textSize !== DEFAULT_LOOK.textSize ||
-    look.textColor !== DEFAULT_LOOK.textColor;
+    look.textColor !== DEFAULT_LOOK.textColor ||
+    look.textColorOpen !== DEFAULT_LOOK.textColorOpen;
 
   return (
     <div ref={panel} className={styles.look} role="dialog" aria-label="Look">
@@ -135,11 +141,41 @@ export function LookPanel({
 
       <section className={styles.lookSection}>
         <div className={styles.lookRow}>
-          <label className={styles.lookLabel} htmlFor="ogchat-wall">
+          <span className={styles.lookLabel} id="ogchat-wall-shown">
             wall
+          </span>
+          <div className={styles.sceneSwitch} role="group" aria-labelledby="ogchat-wall-shown">
+            <button
+              type="button"
+              className={`${styles.sceneButton} ${look.wallShown ? styles.sceneActive : ""}`}
+              aria-pressed={look.wallShown}
+              onClick={() => onChange({ wallShown: true })}
+            >
+              brick
+            </button>
+            <button
+              type="button"
+              className={`${styles.sceneButton} ${look.wallShown ? "" : styles.sceneActive}`}
+              aria-pressed={!look.wallShown}
+              title="Take the wall away and let the chat float over the scene"
+              onClick={() => onChange({ wallShown: false })}
+            >
+              none
+            </button>
+          </div>
+        </div>
+        <div className={styles.lookRow}>
+          <label className={styles.lookLabel} htmlFor="ogchat-wall">
+            lightness
           </label>
           <span className={styles.lookAside}>
-            {look.wall === 50 ? "as built" : look.wall < 50 ? "darker" : "lighter"}
+            {!look.wallShown
+              ? "no wall"
+              : look.wall === 50
+                ? "as built"
+                : look.wall < 50
+                  ? "darker"
+                  : "lighter"}
           </span>
         </div>
         <input
@@ -150,6 +186,7 @@ export function LookPanel({
           max={100}
           step={1}
           value={look.wall}
+          disabled={!look.wallShown}
           onChange={(event) => onChange({ wall: Number(event.target.value) })}
         />
         <div className={styles.ticks} aria-hidden="true">
@@ -184,7 +221,7 @@ export function LookPanel({
       <section className={styles.lookSection}>
         <div className={styles.lookRow}>
           <span className={styles.lookLabel} id="ogchat-text-color">
-            text colour on the wall
+            {look.wallShown ? "text colour on the wall" : "text colour over the scene"}
           </span>
         </div>
         <div className={styles.swatches} role="group" aria-labelledby="ogchat-text-color">
@@ -192,24 +229,24 @@ export function LookPanel({
             <button
               key={swatch.value}
               type="button"
-              className={`${styles.swatch} ${swatch.value === look.textColor ? styles.swatchActive : ""}`}
+              className={`${styles.swatch} ${swatch.value === textColor ? styles.swatchActive : ""}`}
               style={{ background: swatch.value }}
               aria-label={swatch.name}
-              aria-pressed={swatch.value === look.textColor}
+              aria-pressed={swatch.value === textColor}
               title={swatch.name}
-              onClick={() => onChange({ textColor: swatch.value })}
+              onClick={() => setTextColor(swatch.value)}
             />
           ))}
           <label
             className={`${styles.swatch} ${styles.swatchCustom} ${custom ? styles.swatchActive : ""}`}
-            style={custom ? { background: look.textColor } : undefined}
+            style={custom ? { background: textColor } : undefined}
             title="Pick any colour"
           >
             <input
               type="color"
-              value={look.textColor}
+              value={textColor}
               aria-label="Pick any colour"
-              onChange={(event) => onChange({ textColor: event.target.value })}
+              onChange={(event) => setTextColor(event.target.value)}
             />
             {!custom && <span aria-hidden="true">+</span>}
           </label>
@@ -223,9 +260,11 @@ export function LookPanel({
           disabled={!changed}
           onClick={() =>
             onChange({
+              wallShown: DEFAULT_LOOK.wallShown,
               wall: DEFAULT_LOOK.wall,
               textSize: DEFAULT_LOOK.textSize,
               textColor: DEFAULT_LOOK.textColor,
+              textColorOpen: DEFAULT_LOOK.textColorOpen,
             })
           }
         >

@@ -51,15 +51,6 @@
     "SF Mono", ui-monospace, "JetBrains Mono", "Cascadia Code", Menlo, Consolas, "Liberation Mono",
     monospace;
 
-  /*
-   * Lettering written straight onto the bricks carries a soft pale halo, like
-   * chalk dust round the paint, so it stays sharp on a dark brick as well as a
-   * light one.
-   */
-  --og-halo:
-    0 0 1px rgba(var(--og-halo-rgb), 0.95), 0 0 3px rgba(var(--og-halo-rgb), 0.8),
-    0 0 8px rgba(var(--og-halo-rgb), 0.45);
-
   /* pixel-art edges: square corners, hard outlines, hard offset shadows */
   --og-line: 2px;
   --og-shadow: 4px 4px 0 var(--og-ink);
@@ -86,7 +77,16 @@
   --og-type: 1; /* text size, as a multiple of the standard size */
   --og-wall-text: var(--og-ink); /* colour of text written on the wall */
   --og-wall-light: 1; /* wall brightness: below 1 darker, above 1 lighter */
+  --og-wall-opacity: 1; /* 1 shows the brick wall, 0 takes it away */
   --og-halo-rgb: 246, 240, 227; /* the halo behind wall text: pale for dark text, dark for pale */
+  /*
+   * Lettering written straight onto the bricks carries a soft halo, like
+   * chalk dust round the paint, so it stays sharp on a dark brick as well as
+   * a light one. The app makes it stronger when the wall is hidden.
+   */
+  --og-halo:
+    0 0 1px rgba(var(--og-halo-rgb), 0.95), 0 0 3px rgba(var(--og-halo-rgb), 0.8),
+    0 0 8px rgba(var(--og-halo-rgb), 0.45);
 }
 
 .ogchat *,

@@ -255,7 +255,10 @@ export function AppShell() {
   );
 
   return (
-    <div className={`ogchat ${styles.shell}`} style={lookVariables(look) as CSSProperties}>
+    <div
+      className={`ogchat ${styles.shell} ${look.wallShown ? "" : styles.noWall}`}
+      style={lookVariables(look) as CSSProperties}
+    >
       {ready && view && <Backdrop scene={look.scene} view={view} />}
       <Sidebar
         sessions={sessions}
