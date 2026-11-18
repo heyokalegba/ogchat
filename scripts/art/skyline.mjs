@@ -7,7 +7,7 @@
  * and masts breaking the roofline, so it reads as a skyline and not a band.
  */
 import { chrysler, empireState, oneWorldTrade } from "./landmarks.mjs";
-import { billboard } from "./street.mjs";
+import { billboard, FONTS } from "./street.mjs";
 import {
   bayer,
   canvas,
@@ -615,8 +615,21 @@ function city() {
 
   // Two billboards on the near roofs, lit from above after dark.
   const boards = [
-    { at: 150, lines: ["HOTEL"], face: hex("#2a2420"), ink: hex("#e9c46a") },
-    { at: 500, lines: ["BKLYN", "PIZZA"], face: hex("#d6cfbd"), ink: hex("#8f2a1f") },
+    {
+      at: 150,
+      lines: [{ text: "HOTEL", font: FONTS.tall }],
+      face: hex("#2a2420"),
+      ink: hex("#e9c46a"),
+    },
+    {
+      at: 500,
+      lines: [
+        { text: "bklyn", font: FONTS.lower },
+        { text: "PIZZA", font: FONTS.bold },
+      ],
+      face: hex("#d6cfbd"),
+      ink: hex("#8f2a1f"),
+    },
   ];
   for (const board of boards) {
     const roof = roofs

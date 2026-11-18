@@ -43,7 +43,9 @@ interface is see-through, over a pixel-art New York that keeps real time.
   already sitting out when you open the scene.
 - **Shops and signs.** A bodega, a bakery and a pizza place, each with its name
   on the sign, a word in neon in the window, goods on the shelves and a board
-  out on the pavement. Street signs on the lamp posts, a bus stop, a no-parking
+  out on the pavement. No two are lettered alike: small capitals, a
+  hand-lettered lower case, chunky block capitals, and tall narrow ones on the
+  hotel's roof sign. A street sign on a lamp post, a bus stop, a no-parking
   plate. On the skyline's roofs, two billboards lit after dark.
 - **Barbecues.** Now and then somebody has one on a roof: a string of lights
   goes up, a grill smokes, and people come up a few at a time. It lasts about
@@ -55,7 +57,7 @@ interface is see-through, over a pixel-art New York that keeps real time.
   in fifty or so is lit red, blue, violet or green by an LED strip instead of a
   lamp.
 - **Warning lights.** After dark about one building in eight carries a red
-  light at its top, blinking out of step with the others.
+  light at its top, a single pixel, blinking out of step with the others.
 - **More birds.** Besides the flock that crosses, ones, twos and small groups
   fly through while it is light.
 
@@ -341,7 +343,7 @@ Day to day, use the look panel (above). To change what it starts from:
     on the street is `PARKED` and `MOVING` in `brooklyn.mjs`.
   - `scripts/art/landmarks.mjs`: One World Trade, the Empire State and the
     Chrysler Building.
-  - `scripts/art/street.mjs`: the lettering, shopfronts and what is in their
+  - `scripts/art/street.mjs`: the four lettering faces (`FONTS`), shopfronts and what is in their
     windows, street signs and billboards. The shops themselves are listed in
     `brooklyn.mjs` (`shops`), the billboards in `skyline.mjs` (`boards`).
   - `scripts/art/extras.mjs`: the figures seen in windows, and the grill and

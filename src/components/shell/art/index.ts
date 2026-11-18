@@ -1298,7 +1298,7 @@ export const SCENES = {
             "y": 333
           },
           {
-            "x": 493,
+            "x": 478,
             "y": 333
           },
           {
@@ -1737,18 +1737,18 @@ export const SCENES = {
           "when": "night"
         },
         {
+          "x": 466,
+          "y": 306,
+          "w": 5,
+          "h": 14,
+          "when": "evening"
+        },
+        {
           "x": 502,
           "y": 266,
           "w": 5,
           "h": 10,
           "when": "always"
-        },
-        {
-          "x": 502,
-          "y": 306,
-          "w": 5,
-          "h": 14,
-          "when": "evening"
         },
         {
           "x": 547,

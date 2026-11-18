@@ -374,10 +374,11 @@
   transition: opacity 900ms linear;
 }
 
+/* One pixel of the scene: a pinprick of red, as they look from across the river. */
 .beacon {
   position: absolute;
-  width: 0.3125%;
-  height: 0.5556%;
+  width: var(--u);
+  height: var(--u);
   background: #d9543b;
   animation: og-blink 2.4s steps(1) infinite;
 }

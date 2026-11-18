@@ -10,7 +10,7 @@
  */
 import { empireState, oneWorldTrade } from "./landmarks.mjs";
 import {
-  flyers,
+  FONTS,
   neon,
   oneWay,
   plateOnPole,
@@ -669,23 +669,33 @@ function block() {
   const shops = [
     {
       at: 346,
-      name: "BAKERY",
+      // hand-lettered, in lower case, on a sign a row taller to fit it
+      name: "bakery",
+      font: FONTS.lower,
+      band: 8,
       sign: D("#39503f"),
       ink: hex("#e9e4d2"),
       awning: [D("#c9c2ae"), D("#39503f")],
       goods: "bread",
-      word: "BREAD",
-      neonDull: hex("#8a6a2c"),
+      word: "fresh",
+      short: "open",
+      wordFont: FONTS.lower,
+      neonDull: hex("#5a3a22"),
       neonTone: hex("#fff0c0"),
     },
     {
-      at: 462,
+      at: 512,
+      // block capitals you can read from across the street
       name: "PIZZA",
+      font: FONTS.bold,
       sign: D("#8f2a1f"),
       ink: hex("#f0e2b0"),
       awning: [D("#d6cfbd"), D("#8f2a1f")],
       goods: "pies",
-      word: "SLICE",
+      word: "HOT",
+      short: "HOT",
+      wordFont: FONTS.bold,
+      shortFont: FONTS.caps,
       neonDull: hex("#7a2f25"),
       neonTone: hex("#ff7a5c"),
     },
@@ -696,8 +706,10 @@ function block() {
     house.taken = true;
     storefront(rooftops, emit, {
       ...shop,
-      // a shorter word where the window is narrow
-      word: house.w - 16 >= 22 ? shop.word : "OPEN",
+      // a shorter word, or a smaller face, where the window is narrow
+      ...(house.w - 16 >= 23
+        ? {}
+        : { word: shop.short, wordFont: shop.shortFont ?? shop.wordFont }),
       x: house.x,
       w: house.w,
       base: SIDEWALK,
@@ -793,10 +805,9 @@ function block() {
   // Signs on the lamp posts and along the kerb: where you are, which way the
   // street runs, where the bus stops and where not to park.
   set(40, 7, 97, 307, (c) => streetSign(c, 0, 0, "PARK PL"));
-  set(30, 7, 416, 307, (c) => streetSign(c, 0, 0, "7 AV"));
   set(13, 5, 619, 309, (c) => oneWay(c, 0, 0));
   set(5, 24, 222, SIDEWALK - 24, (c) => plateOnPole(c, 2, 24, 24, hex("#34485e"), hex("#e9e4d2")));
-  set(5, 22, 520, SIDEWALK - 22, (c) => plateOnPole(c, 2, 22, 22, hex("#e9e4d2"), hex("#a8382c")));
+  set(5, 22, 556, SIDEWALK - 22, (c) => plateOnPole(c, 2, 22, 22, hex("#e9e4d2"), hex("#a8382c")));
 
   emit.switching(skyline, "a", lights.a);
   emit.switching(skyline, "c", lights.c);
