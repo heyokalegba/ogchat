@@ -71,6 +71,9 @@ function crown(c, d, cx, cy, r, tones) {
 function block() {
   const skyline = canvas(W, H);
   const rooftops = canvas(W, H);
+  // The cars at the kerb get a picture of their own, so that people on the
+  // pavement can pass behind them.
+  const parked = canvas(W, H);
   const lights = { a: canvas(W, H), b: canvas(W, H), c: canvas(W, H) };
   const d = dice(1127);
   const { rand, pick, between, chance } = d;
@@ -591,24 +594,24 @@ function block() {
     if (chance(0.2)) continue;
     const body = pick(paints);
     const y = 338;
-    rooftops.rect(x + 6, y, 14, 4, body); // cabin
-    rooftops.rect(x + 7, y + 1, 5, 3, hex("#1b1d26"));
-    rooftops.rect(x + 13, y + 1, 6, 3, hex("#1b1d26"));
-    rooftops.set(x + 8, y + 1, hex("#474a66"));
-    rooftops.rect(x, y + 4, 28, 5, body);
-    rooftops.rect(x, y + 4, 28, 1, shade(body, 1.25));
-    rooftops.rect(x, y + 8, 28, 1, shade(body, 0.6));
-    rooftops.rect(x + 3, y + 8, 5, 3, hex("#0e0e11")); // wheels
-    rooftops.rect(x + 20, y + 8, 5, 3, hex("#0e0e11"));
-    rooftops.set(x, y + 5, hex("#8a3a30")); // tail light
-    rooftops.set(x + 27, y + 5, hex("#bdb48c"));
+    parked.rect(x + 6, y, 14, 4, body); // cabin
+    parked.rect(x + 7, y + 1, 5, 3, hex("#1b1d26"));
+    parked.rect(x + 13, y + 1, 6, 3, hex("#1b1d26"));
+    parked.set(x + 8, y + 1, hex("#474a66"));
+    parked.rect(x, y + 4, 28, 5, body);
+    parked.rect(x, y + 4, 28, 1, shade(body, 1.25));
+    parked.rect(x, y + 8, 28, 1, shade(body, 0.6));
+    parked.rect(x + 3, y + 8, 5, 3, hex("#0e0e11")); // wheels
+    parked.rect(x + 20, y + 8, 5, 3, hex("#0e0e11"));
+    parked.set(x, y + 5, hex("#8a3a30")); // tail light
+    parked.set(x + 27, y + 5, hex("#bdb48c"));
   }
   rooftops.rect(306, SIDEWALK - 6, 3, 6, D("#8f3d2f")); // a hydrant
   rooftops.rect(305, SIDEWALK - 4, 5, 1, D("#8f3d2f"));
 
   // street trees
   const leaves = ["#253122", "#1b241a", "#3a4630", "#5f6238"].map(hex);
-  for (const tx of [58, 132, 236, 318, 398, 474, 590]) {
+  for (const tx of TREES) {
     const trunk = hex("#1c1714");
     rooftops.rect(tx, 300, 2, SIDEWALK - 300, trunk);
     for (let i = 0; i < 7; i++) {
@@ -677,6 +680,7 @@ function block() {
     states[state] = {
       city: emit.render(skyline, state, GRADES[state]),
       rooftops: emit.render(rooftops, state, GRADES[state]),
+      parked: emit.render(parked, state, GRADES[state]),
     };
   }
   return { states, lights, glow, beacons, chimneys };
@@ -728,7 +732,11 @@ function traffic() {
   return c;
 }
 
-export function brooklynScene(puff) {
+/** Things on the pavement worth stopping at, by x. */
+const TREES = [58, 132, 236, 318, 398, 474, 590];
+const HYDRANT = 307;
+
+export function brooklynScene(puff, cast) {
   const scene = block();
   const smokers = scene.chimneys.filter(([x]) => x < 215 || x > 515).slice(0, 2);
   const images = {
@@ -744,6 +752,11 @@ export function brooklynScene(puff) {
   for (const state of STATES) {
     images[`city-${state}.png`] = scene.states[state].city;
     images[`rooftops-${state}.png`] = scene.states[state].rooftops;
+    images[`parked-${state}.png`] = scene.states[state].parked;
+    // The cast is drawn in daylight colours; bring it into this block's dusk
+    // palette first, then light it like everything else here.
+    images[`people-${state}.png`] = cast.people.graded(dusk).graded(GRADES[state]);
+    images[`props-${state}.png`] = cast.props.graded(dusk).graded(GRADES[state]);
   }
   return {
     images,
@@ -791,6 +804,19 @@ export function brooklynScene(puff) {
       ],
       beacons: scene.beacons.map(([x, y]) => ({ left: pctX(x), top: pctY(y), delay: "0s" })),
       birds: { top: "13%", seconds: 84 },
+      // Street life: people cross the whole picture along the pavement.
+      life: {
+        kind: "street",
+        // where feet may fall: from just in front of the railings to the kerb
+        near: CURB - 1,
+        far: SIDEWALK + 2,
+        from: -14,
+        to: W + 14,
+        // where a dog insists on stopping, and where people tend to
+        sniff: [...TREES.map((x) => x + 1), HYDRANT],
+        linger: [164, 176, 300, 452],
+        roofs: [],
+      },
     },
   };
 }

@@ -21,6 +21,13 @@ interface is see-through, over a pixel-art New York that keeps real time.
 - **Night lights.** Windows and street lamps come on as it gets dark, and their
   halos swell and settle on uneven rhythms, so the city shimmers.
 - **Always moving.** Clouds drift, chimneys smoke, traffic passes, birds cross.
+- **People.** A few are out at any time, usually three to five: someone alone,
+  a couple, a dog pulling its walker toward a tree, a runner, a parent with a
+  pram or a child. They stop to look at a phone or let the dog sniff, then walk
+  on. Now and then a group comes through, and there are never more than twenty.
+  In Brooklyn they walk the pavement, passing behind the parked cars; over the
+  skyline they come up onto the roofs to look at the view. Fewer are out at
+  night. Everyone is dealt at random from a cast of 36 people and 8 dogs.
 
 ## The look panel
 
@@ -29,6 +36,7 @@ is remembered in your browser.
 
 | Control                 | What it does                                                                                                                                                                                                                                                   |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| People                  | `out` or `none`. `none` empties the streets and roofs.                                                                                                                                                                                                         |
 | Time in Brooklyn        | Drag to set the scene to any time of day. **The clock cannot be paused:** it runs on from wherever you leave it. `now` snaps it back to the real time.                                                                                                         |
 | Wall                    | `brick` or `none`. With `none` the wall goes away and the chat floats over the scene; its text then has its own colour (chalk to start with) and a stronger outline. The lightness slider makes the brick darker and grittier to the left, paler to the right. |
 | Text size               | 80% to 150%. Scales all the type in the app.                                                                                                                                                                                                                   |
@@ -45,7 +53,8 @@ More screens: [first run](docs/screens/01-first-run.png) ·
 [brooklyn](docs/screens/08-brooklyn.png) ·
 [brooklyn at night](docs/screens/09-night.png) ·
 [the look panel](docs/screens/10-look-panel.png) ·
-[without the wall](docs/screens/11-no-wall.png)
+[without the wall](docs/screens/11-no-wall.png) ·
+[people on the pavement](docs/screens/12-street-life.png)
 
 ## Run it
 
@@ -110,7 +119,7 @@ errors in the chat say the same things:
 | 401    | The provider does not recognise the key. Copy the whole key again.                |
 | 402    | The key is fine; the account has no credits left. Top up in the provider console. |
 | 403    | The key may not use this model or project, or the request was blocked by policy.  |
-| 404    | Wrong model id or base URL.                                                       |
+| 404    | Wrong model id or base URL. The base URL ends in `/v1` for every model.           |
 
 Two things to remember: a key saved in the settings panel wins over the one in
 `.env.local`, and `.env.local` is only read when the server starts.
@@ -206,9 +215,9 @@ src/
     daylight.ts                    sun, moon and clock over Brooklyn
     server/                        persistence, settings, turn handling, request guard
     client/api.ts                  browser client for the routes above
-tests/                             vitest: persistence, adapter, route contract, attachments, the clock
+tests/                             vitest: persistence, adapter, route contract, attachments, the clock, the people
 scripts/mock-provider.mjs          stand-in provider for local trials
-scripts/make-art.mjs, scripts/art/  generate the scenes, the sky and the brick wall
+scripts/make-art.mjs, scripts/art/  generate the scenes, the sky, the people and the brick wall
 ```
 
 ### Changing provider
@@ -257,6 +266,13 @@ Day to day, use the look panel (above). To change what it starts from:
   - `scripts/art/skyline.mjs` and `brooklyn.mjs`: the scenes. Each is drawn
     once and turned out in four lights; `GRADES` near the top of each sets how
     the other three differ from the one it was drawn in.
+  - `scripts/art/people.mjs`: the cast. Each person and dog is dealt from
+    lists of skin, hair, hat, coat and trouser colours at the top; `CAST` and
+    `DOGS` set how many there are.
+- **The people:** `src/components/shell/life.ts` decides who turns up and what
+  they do. `STREET_MIX` is how often each kind of party appears, `wantedHeads`
+  how many people the street aims for (three to five by day), `MAX_HEADS` the
+  ceiling (20). `StreetLife.tsx` holds how often groups come by.
 - **The clock:** `src/lib/daylight.ts` works out where the sun and moon are
   over Brooklyn and which light the scene is in. `BROOKLYN` at the top holds
   the place; `skyBlend` holds the sun heights at which the light changes.
@@ -273,10 +289,14 @@ Very little, by design. Every picture is small pixel art drawn at 640x360 and
 scaled up: about 100 KB of a scene is on show at any one time, plus 85 KB of
 shared sky and 76 KB for the wall, all served from your own machine. The motion
 is plain CSS sliding and fading layers. There is no video and no canvas; the
-only script is a clock that looks at the time every fifteen seconds. Idle, it
-uses a few milliseconds of script per ten seconds, by day or by night. People
-who set "reduce motion" in their system settings get the same scene, standing
-still.
+only script is a clock that looks at the time every fifteen seconds, and a
+once-a-second look at whether somebody new should walk in. Idle, it uses a few
+milliseconds of script per ten seconds, by day or by night: measured at about
+3 ms without the people and 6 ms with them. The people are a handful of tiny
+sprites that the browser slides and steps on its own, and nobody new arrives
+while the tab is in the background. People who set "reduce motion" in their
+system settings get the same scene, standing still, with a few figures standing
+in it.
 
 ## API
 

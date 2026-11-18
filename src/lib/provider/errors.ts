@@ -87,8 +87,13 @@ export class ProviderRateLimitError extends ProviderError {
 
 /** Any other failure reported by the provider itself. */
 export class ProviderHTTPError extends ProviderError {
-  constructor(status: number, detail?: string) {
-    const hint = status === 404 ? " Check the API base URL and model id in settings." : "";
+  /** `advice` replaces the stock hint when the adapter knows exactly what is wrong. */
+  constructor(status: number, detail?: string, advice?: string) {
+    const hint = advice
+      ? ` ${advice}`
+      : status === 404
+        ? " Check the API base URL and model id in settings."
+        : "";
     super(
       "provider_error",
       `The provider returned an error (${status})${detail ? `: ${detail}` : "."}${hint}`,

@@ -10,6 +10,7 @@
  *   sky.mjs        what both scenes share overhead: skies, clouds, stars, sun, moon
  *   skyline.mjs    scene one: the harbour, the bridge and the towers
  *   brooklyn.mjs   scene two: a brownstone block by Prospect Park
+ *   people.mjs     the people, dogs and prams who walk through both
  *   lib.mjs        the canvas, the PNG writer, and the light recorder
  *
  * Every scene is drawn once and turned out in four lights (day, golden hour,
@@ -29,6 +30,7 @@ import path from "node:path";
 import { birds, CHAT_ART, ROOT, SHELL_ART, smoke, STATES, writePng, written } from "./art/lib.mjs";
 import { bricks } from "./art/bricks.mjs";
 import { brooklynScene } from "./art/brooklyn.mjs";
+import { PEOPLE_META, peopleSheet, propsSheet } from "./art/people.mjs";
 import { cloudStrip, moon, sky, stars, sun } from "./art/sky.mjs";
 import { skylineScene } from "./art/skyline.mjs";
 
@@ -57,7 +59,8 @@ const puff = smoke();
 add("smoke.png", puff.canvas);
 add("birds.png", birds());
 
-const scenes = { skyline: skylineScene(puff), brooklyn: brooklynScene(puff) };
+const cast = { people: peopleSheet(), props: propsSheet() };
+const scenes = { skyline: skylineScene(puff, cast), brooklyn: brooklynScene(puff, cast) };
 for (const [id, scene] of Object.entries(scenes)) {
   for (const [name, image] of Object.entries(scene.images)) add(`${id}/${name}`, image);
 }
@@ -74,6 +77,10 @@ const perState = (pattern) => `{ ${STATES.map((s) => `${s}: ${src(pattern(s))}`)
 const sceneBlock = (id) => `{
     city: ${perState((s) => `${id}/city-${s}.png`)},
     rooftops: ${perState((s) => `${id}/rooftops-${s}.png`)},
+    /** Cars at the kerb, drawn over the people on the pavement. Only some scenes have them. */
+    parked: ${files.has(`${id}/parked-day.png`) ? perState((s) => `${id}/parked-${s}.png`) : "null"},
+    people: ${perState((s) => `${id}/people-${s}.png`)},
+    props: ${perState((s) => `${id}/props-${s}.png`)},
     lights: { a: ${src(`${id}/lights-a.png`)}, b: ${src(`${id}/lights-b.png`)}, c: ${src(`${id}/lights-c.png`)} },
     glow: {
       back: [${src(`${id}/glow-back-a.png`)}, ${src(`${id}/glow-back-b.png`)}],
@@ -104,6 +111,13 @@ export const SKY = {
   smoke: ${src("smoke.png")},
   birds: ${src("birds.png")},
 } as const;
+
+/**
+ * How the people and props sheets are cut up: every row is one character,
+ * the first columns are a walk cycle and the last two are standing about.
+ * \`cast\` gives [first row, count] for each kind of character.
+ */
+export const PEOPLE = ${JSON.stringify(PEOPLE_META, null, 2)} as const;
 
 export const SCENES = {
   skyline: ${sceneBlock("skyline")},

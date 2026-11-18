@@ -145,7 +145,24 @@ async function readFailure(res: Response, key: string): Promise<string> {
   return clip(redactSecret(detail, key));
 }
 
-function httpError(status: number, detail: string): ProviderError {
+/**
+ * A known provider reached at an address it does not serve. The usual way to
+ * get here is to put the "v2" of a model name into the address as well.
+ */
+export function baseUrlAdvice(baseUrl: string): string {
+  let url: URL;
+  try {
+    url = new URL(baseUrl.trim());
+  } catch {
+    return "";
+  }
+  if (url.host !== "api.abliteration.ai" || /^\/v1(\/|$)/.test(url.pathname)) return "";
+  return 'The API base URL is wrong: for abliteration.ai it is https://api.abliteration.ai/v1, whichever model you use (the "v2" belongs in the model id only). In settings, press "use default" next to API base URL, then save.';
+}
+
+function httpError(status: number, detail: string, baseUrl = ""): ProviderError {
+  const advice = status === 404 ? baseUrlAdvice(baseUrl) : "";
+  if (advice) return new ProviderHTTPError(status, detail, advice);
   if (status === 401) return new ProviderAuthError(status, detail);
   if (status === 402) return new ProviderCreditsError(detail);
   if (status === 403) return new ProviderForbiddenError(detail);
@@ -259,7 +276,7 @@ export async function* streamChat(options: StreamChatOptions): AsyncGenerator<st
     }
 
     if (!res.ok) {
-      throw httpError(res.status, await readFailure(res, apiKey));
+      throw httpError(res.status, await readFailure(res, apiKey), config.baseUrl);
     }
 
     const contentType = res.headers.get("content-type") ?? "";
@@ -438,18 +455,22 @@ export async function checkProvider(options: CheckOptions): Promise<ProviderChec
   const host = hostOf(chatUrl);
   // abliteration.ai keys all start with "ak_". Anything else was probably copied from the wrong place.
   const oddKey = host === "api.abliteration.ai" && !apiKey.startsWith("ak_");
+  const wrongAddress = baseUrlAdvice(config.baseUrl);
   steps.push({
     id: "settings",
-    ok: oddKey ? null : true,
+    ok: wrongAddress ? false : oddKey ? null : true,
     title: "settings",
     detail: safe(
-      `Sending key ${maskKey(apiKey)} to ${host}, model ${model}.${
-        oddKey
-          ? " Keys from abliteration.ai start with ak_ and this one does not, so it may not be the API key."
-          : ""
-      }`,
+      wrongAddress ||
+        `Sending key ${maskKey(apiKey)} to ${host}, model ${model}.${
+          oddKey
+            ? " Keys from abliteration.ai start with ak_ and this one does not, so it may not be the API key."
+            : ""
+        }`,
     ),
   });
+  // Nothing sent to a wrong address can say anything about the key. Stop here.
+  if (wrongAddress) return report();
 
   const call = async (url: string, init: RequestInit): Promise<Response | null> => {
     try {
@@ -547,7 +568,7 @@ export async function checkProvider(options: CheckOptions): Promise<ProviderChec
       id: "reply",
       ok: false,
       title: "test message",
-      detail: safe(httpError(sent.status, await readFailure(sent, apiKey)).message),
+      detail: safe(httpError(sent.status, await readFailure(sent, apiKey), config.baseUrl).message),
     });
     return report();
   }

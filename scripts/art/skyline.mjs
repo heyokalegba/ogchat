@@ -53,6 +53,16 @@ const GRADES = {
   night: grade({ gain: [0.3, 0.33, 0.46], tint: "#131a30", amount: 0.3 }),
 };
 
+/**
+ * People on the near roofs are lit a little more kindly than the masonry after
+ * dark, or they would vanish into it.
+ */
+const PEOPLE_GRADES = {
+  ...GRADES,
+  dusk: grade({ gain: [0.7, 0.67, 0.78], tint: "#3a3050", amount: 0.2 }),
+  night: grade({ gain: [0.44, 0.46, 0.58], tint: "#131a30", amount: 0.24 }),
+};
+
 /** How tall the city stands at x: two clusters with lower ground between and beside them. */
 const rise = (x) =>
   Math.max(Math.exp(-(((x - 140) / 100) ** 2)), 0.9 * Math.exp(-(((x - 478) / 115) ** 2)), 0.28);
@@ -456,6 +466,8 @@ function city() {
   ].map(G);
   const tags = ["#a8934a", "#74907c", "#9a5544", "#8097aa", "#b9b3a2"].map(hex);
   const nearFlicker = { allowed: () => true, layer: () => "b" };
+  /** The flat tops of the near buildings, for the people who come up to them. */
+  const roofs = [];
   for (let x = -10; x < W;) {
     const tall = chance(0.2);
     const w = tall ? between(24, 36) : between(30, 60);
@@ -463,6 +475,7 @@ function city() {
     const color = pick(near);
     const top = H - h;
     rooftops.rect(x, top, w, h, color);
+    roofs.push({ x, w, top });
     weather(rooftops, d, x, top, w, h);
     for (let y = top + 4; y < H; y += 4) {
       for (let bx = x + ((y / 4) % 2 ? 0 : 4); bx < x + w; bx += 8) rooftops.tint(bx, y, 0.82); // coursing
@@ -564,7 +577,7 @@ function city() {
       rooftops: emit.render(rooftops, state, GRADES[state]),
     };
   }
-  return { states, lights, glow, beacons };
+  return { states, lights, glow, beacons, roofs };
 }
 
 /** Two lanes of lights on the bridge, as seamless strips: headlights, then tail lights. */
@@ -583,7 +596,7 @@ function traffic() {
   return c;
 }
 
-export function skylineScene(puff) {
+export function skylineScene(puff, cast) {
   const scene = city();
   const lane = W - BRIDGE_LEFT + 8;
   const images = {
@@ -599,6 +612,8 @@ export function skylineScene(puff) {
   for (const state of STATES) {
     images[`city-${state}.png`] = scene.states[state].city;
     images[`rooftops-${state}.png`] = scene.states[state].rooftops;
+    images[`people-${state}.png`] = cast.people.graded(grit).graded(PEOPLE_GRADES[state]);
+    images[`props-${state}.png`] = cast.props.graded(grit).graded(PEOPLE_GRADES[state]);
   }
   return {
     images,
@@ -650,6 +665,20 @@ export function skylineScene(puff) {
         delay: `${(-i * 0.8).toFixed(1)}s`,
       })),
       birds: { top: "19%", seconds: 70 },
+      // Street life: there is no street here, so people come up onto the roofs.
+      life: {
+        kind: "roofs",
+        near: 0,
+        far: 0,
+        from: 0,
+        to: 0,
+        sniff: [],
+        linger: [],
+        // Roofs wide enough to stroll on, and wholly in the picture.
+        roofs: scene.roofs
+          .filter((roof) => roof.w >= 30 && roof.x >= 0 && roof.x + roof.w <= W && roof.top > 236)
+          .map(({ x, w, top }) => ({ x, w, top })),
+      },
     },
   };
 }

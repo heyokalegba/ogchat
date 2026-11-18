@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import type { SkyView } from "@/lib/daylight";
 import { SCENES, SKY, type SceneId } from "./art";
 import styles from "./backdrop.module.css";
+import { StreetLife } from "./StreetLife";
 
 /**
  * The living scene behind the interface.
@@ -14,8 +15,9 @@ import styles from "./backdrop.module.css";
  *
  * It is all small pixel-art layers (scripts/make-art.mjs) that CSS slides and
  * fades. There is no video, no canvas and no animation loop in script; the
- * only script is the clock that hands in a new `view` a few times a minute.
- * Everything stands still for people who ask for reduced motion.
+ * only script is the clock that hands in a new `view` a few times a minute,
+ * and the once-a-second decision about who walks into the picture next
+ * (StreetLife). Everything stands still for people who ask for reduced motion.
  */
 
 const image = (src: string): CSSProperties => ({ backgroundImage: `url(${src})` });
@@ -37,11 +39,14 @@ function Blend(props: {
   );
 }
 
-export function Backdrop({ scene, view }: { scene: SceneId; view: SkyView }) {
+export function Backdrop(props: { scene: SceneId; view: SkyView; people?: boolean }) {
+  const { scene, view, people = true } = props;
   const art = SCENES[scene];
   const config = art.config;
   const { blend, sun, moon } = view;
   const night = blend.night;
+  // People are drawn in one light at a time: whichever the scene is nearer to.
+  const light = blend.mix > 0.5 ? blend.to : blend.from;
   // Windows that switch on and off are faint by day and full at night.
   const switching = 0.3 + 0.7 * night;
 
@@ -194,6 +199,9 @@ export function Backdrop({ scene, view }: { scene: SceneId; view: SkyView }) {
           style={{ ...image(art.lights.b), opacity: switching }}
         />
         {glow(art.glow.front, "Front")}
+        {people && <StreetLife scene={scene} light={light} night={night} />}
+        {/* Cars at the kerb stand between the pavement and us. */}
+        {art.parked && <Blend className={styles.layer} sources={art.parked} view={view} />}
         {smoke(true)}
         {lanes(true)}
       </div>

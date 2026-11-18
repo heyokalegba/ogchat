@@ -28,12 +28,20 @@ import skylineGlowFrontB from "./skyline/glow-front-b.png";
 import skylineTraffic from "./skyline/traffic.png";
 import skylineCityDay from "./skyline/city-day.png";
 import skylineRooftopsDay from "./skyline/rooftops-day.png";
+import skylinePeopleDay from "./skyline/people-day.png";
+import skylinePropsDay from "./skyline/props-day.png";
 import skylineCityGolden from "./skyline/city-golden.png";
 import skylineRooftopsGolden from "./skyline/rooftops-golden.png";
+import skylinePeopleGolden from "./skyline/people-golden.png";
+import skylinePropsGolden from "./skyline/props-golden.png";
 import skylineCityDusk from "./skyline/city-dusk.png";
 import skylineRooftopsDusk from "./skyline/rooftops-dusk.png";
+import skylinePeopleDusk from "./skyline/people-dusk.png";
+import skylinePropsDusk from "./skyline/props-dusk.png";
 import skylineCityNight from "./skyline/city-night.png";
 import skylineRooftopsNight from "./skyline/rooftops-night.png";
+import skylinePeopleNight from "./skyline/people-night.png";
+import skylinePropsNight from "./skyline/props-night.png";
 import brooklynLightsA from "./brooklyn/lights-a.png";
 import brooklynLightsB from "./brooklyn/lights-b.png";
 import brooklynLightsC from "./brooklyn/lights-c.png";
@@ -44,12 +52,24 @@ import brooklynGlowFrontB from "./brooklyn/glow-front-b.png";
 import brooklynTraffic from "./brooklyn/traffic.png";
 import brooklynCityDay from "./brooklyn/city-day.png";
 import brooklynRooftopsDay from "./brooklyn/rooftops-day.png";
+import brooklynParkedDay from "./brooklyn/parked-day.png";
+import brooklynPeopleDay from "./brooklyn/people-day.png";
+import brooklynPropsDay from "./brooklyn/props-day.png";
 import brooklynCityGolden from "./brooklyn/city-golden.png";
 import brooklynRooftopsGolden from "./brooklyn/rooftops-golden.png";
+import brooklynParkedGolden from "./brooklyn/parked-golden.png";
+import brooklynPeopleGolden from "./brooklyn/people-golden.png";
+import brooklynPropsGolden from "./brooklyn/props-golden.png";
 import brooklynCityDusk from "./brooklyn/city-dusk.png";
 import brooklynRooftopsDusk from "./brooklyn/rooftops-dusk.png";
+import brooklynParkedDusk from "./brooklyn/parked-dusk.png";
+import brooklynPeopleDusk from "./brooklyn/people-dusk.png";
+import brooklynPropsDusk from "./brooklyn/props-dusk.png";
 import brooklynCityNight from "./brooklyn/city-night.png";
 import brooklynRooftopsNight from "./brooklyn/rooftops-night.png";
+import brooklynParkedNight from "./brooklyn/parked-night.png";
+import brooklynPeopleNight from "./brooklyn/people-night.png";
+import brooklynPropsNight from "./brooklyn/props-night.png";
 
 /** The four lights every picture comes in. The backdrop crossfades between neighbours. */
 export const SKY_STATES = ["day","golden","dusk","night"] as const;
@@ -70,10 +90,54 @@ export const SKY = {
   birds: birds.src,
 } as const;
 
+/**
+ * How the people and props sheets are cut up: every row is one character,
+ * the first columns are a walk cycle and the last two are standing about.
+ * `cast` gives [first row, count] for each kind of character.
+ */
+export const PEOPLE = {
+  "frames": 6,
+  "walkFrames": 4,
+  "person": {
+    "w": 9,
+    "h": 15,
+    "rows": 36
+  },
+  "prop": {
+    "w": 12,
+    "h": 9,
+    "rows": 10
+  },
+  "cast": {
+    "adults": [
+      0,
+      26
+    ],
+    "children": [
+      26,
+      6
+    ],
+    "runners": [
+      32,
+      4
+    ],
+    "dogs": [
+      0,
+      8
+    ],
+    "pram": 8,
+    "lead": 9
+  }
+} as const;
+
 export const SCENES = {
   skyline: {
     city: { day: skylineCityDay.src, golden: skylineCityGolden.src, dusk: skylineCityDusk.src, night: skylineCityNight.src },
     rooftops: { day: skylineRooftopsDay.src, golden: skylineRooftopsGolden.src, dusk: skylineRooftopsDusk.src, night: skylineRooftopsNight.src },
+    /** Cars at the kerb, drawn over the people on the pavement. Only some scenes have them. */
+    parked: null,
+    people: { day: skylinePeopleDay.src, golden: skylinePeopleGolden.src, dusk: skylinePeopleDusk.src, night: skylinePeopleNight.src },
+    props: { day: skylinePropsDay.src, golden: skylinePropsGolden.src, dusk: skylinePropsDusk.src, night: skylinePropsNight.src },
     lights: { a: skylineLightsA.src, b: skylineLightsB.src, c: skylineLightsC.src },
     glow: {
       back: [skylineGlowBackA.src, skylineGlowBackB.src],
@@ -161,12 +225,97 @@ export const SCENES = {
       "birds": {
         "top": "19%",
         "seconds": 70
+      },
+      "life": {
+        "kind": "roofs",
+        "near": 0,
+        "far": 0,
+        "from": 0,
+        "to": 0,
+        "sniff": [],
+        "linger": [],
+        "roofs": [
+          {
+            "x": 27,
+            "w": 42,
+            "top": 291
+          },
+          {
+            "x": 69,
+            "w": 45,
+            "top": 324
+          },
+          {
+            "x": 114,
+            "w": 57,
+            "top": 301
+          },
+          {
+            "x": 171,
+            "w": 50,
+            "top": 295
+          },
+          {
+            "x": 221,
+            "w": 42,
+            "top": 307
+          },
+          {
+            "x": 263,
+            "w": 33,
+            "top": 335
+          },
+          {
+            "x": 296,
+            "w": 59,
+            "top": 299
+          },
+          {
+            "x": 355,
+            "w": 38,
+            "top": 293
+          },
+          {
+            "x": 393,
+            "w": 36,
+            "top": 324
+          },
+          {
+            "x": 429,
+            "w": 31,
+            "top": 306
+          },
+          {
+            "x": 460,
+            "w": 48,
+            "top": 325
+          },
+          {
+            "x": 508,
+            "w": 56,
+            "top": 323
+          },
+          {
+            "x": 564,
+            "w": 41,
+            "top": 291
+          },
+          {
+            "x": 605,
+            "w": 33,
+            "top": 322
+          }
+        ]
       }
     },
   },
   brooklyn: {
     city: { day: brooklynCityDay.src, golden: brooklynCityGolden.src, dusk: brooklynCityDusk.src, night: brooklynCityNight.src },
     rooftops: { day: brooklynRooftopsDay.src, golden: brooklynRooftopsGolden.src, dusk: brooklynRooftopsDusk.src, night: brooklynRooftopsNight.src },
+    /** Cars at the kerb, drawn over the people on the pavement. Only some scenes have them. */
+    parked: { day: brooklynParkedDay.src, golden: brooklynParkedGolden.src, dusk: brooklynParkedDusk.src, night: brooklynParkedNight.src },
+    people: { day: brooklynPeopleDay.src, golden: brooklynPeopleGolden.src, dusk: brooklynPeopleDusk.src, night: brooklynPeopleNight.src },
+    props: { day: brooklynPropsDay.src, golden: brooklynPropsGolden.src, dusk: brooklynPropsDusk.src, night: brooklynPropsNight.src },
     lights: { a: brooklynLightsA.src, b: brooklynLightsB.src, c: brooklynLightsC.src },
     glow: {
       back: [brooklynGlowBackA.src, brooklynGlowBackB.src],
@@ -244,6 +393,30 @@ export const SCENES = {
       "birds": {
         "top": "13%",
         "seconds": 84
+      },
+      "life": {
+        "kind": "street",
+        "near": 341,
+        "far": 336,
+        "from": -14,
+        "to": 654,
+        "sniff": [
+          59,
+          133,
+          237,
+          319,
+          399,
+          475,
+          591,
+          307
+        ],
+        "linger": [
+          164,
+          176,
+          300,
+          452
+        ],
+        "roofs": []
       }
     },
   },

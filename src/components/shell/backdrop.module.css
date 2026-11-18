@@ -26,6 +26,8 @@
   aspect-ratio: 16 / 9;
   transform: translateX(-50%);
   animation: og-fade 500ms ease-out both;
+  /* One pixel of the 640-wide scene, as it comes out on screen. */
+  --u: calc(max(100vw, 177.778vh) / 640);
 }
 
 .scene * {
@@ -392,6 +394,79 @@
 }
 
 @keyframes flap {
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+/* ---------------------------------------------------------------- people */
+
+/*
+ * A few people out walking (StreetLife.tsx). A party is a point that slides
+ * along; its members are tiny windows onto sprite strips whose legs step.
+ */
+.life {
+  position: absolute;
+  inset: 0;
+}
+
+/* A window above one roof line. People come up into it from below its bottom edge. */
+.roof {
+  position: absolute;
+  overflow: hidden;
+}
+
+.roofLine {
+  position: absolute;
+  left: 0;
+}
+
+.party {
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+}
+
+/* Everybody is drawn facing right. Walking left, the whole formation is mirrored. */
+.party[data-facing="left"] .formation {
+  transform: scaleX(-1);
+}
+
+.member {
+  position: absolute;
+  overflow: hidden;
+}
+
+/* Six poses side by side: four of a walk cycle, then two of standing about. */
+.frames {
+  width: 600%;
+  height: 100%;
+  background-repeat: no-repeat;
+  transform: translateX(-66.667%);
+}
+
+.party[data-gait="walk"] .frames {
+  animation: life-walk var(--cadence, 1s) steps(4) var(--phase, 0s) infinite;
+}
+
+.party[data-gait="idle"] .frames {
+  animation: life-idle var(--idle, 2s) steps(2) infinite;
+}
+
+@keyframes life-walk {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-66.667%);
+  }
+}
+
+@keyframes life-idle {
+  from {
+    transform: translateX(-66.667%);
+  }
   to {
     transform: translateX(-100%);
   }

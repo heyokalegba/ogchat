@@ -9,6 +9,8 @@ export interface Look {
   scene: SceneId;
   /** Milliseconds the scene's clock runs ahead of (or behind) the real one. 0 is real time. */
   clockOffsetMs: number;
+  /** Whether people walk about in the scene. */
+  people: boolean;
   /** Whether the brick wall is there. Without it the chat floats over the scene. */
   wallShown: boolean;
   /** Wall lightness, 0 (dark and gritty) to 100 (pale). 50 is the wall as drawn. */
@@ -24,6 +26,7 @@ export interface Look {
 export const DEFAULT_LOOK: Look = {
   scene: "skyline",
   clockOffsetMs: 0,
+  people: true,
   wallShown: true,
   wall: 50,
   textSize: 100,
@@ -64,6 +67,7 @@ function clean(value: unknown): Look {
         ? (raw.scene as SceneId)
         : DEFAULT_LOOK.scene,
     clockOffsetMs: clamp(Math.round(number(raw.clockOffsetMs, 0)), -DAY_MS, DAY_MS),
+    people: typeof raw.people === "boolean" ? raw.people : DEFAULT_LOOK.people,
     wallShown: typeof raw.wallShown === "boolean" ? raw.wallShown : DEFAULT_LOOK.wallShown,
     wall: clamp(Math.round(number(raw.wall, DEFAULT_LOOK.wall)), 0, 100),
     textSize: clamp(

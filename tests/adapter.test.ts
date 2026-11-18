@@ -227,6 +227,26 @@ describe("error classes", () => {
     );
   });
 
+  it("says what the address should be when a 404 comes from a mistyped one", async () => {
+    const wrong = harness(() => Response.json({ detail: "Not found" }, { status: 404 }), {
+      config: { ...config, baseUrl: "https://api.abliteration.ai/v2" },
+    });
+    const err = await failure(wrong.options);
+    expect(err).toBeInstanceOf(ProviderHTTPError);
+    expect(err.status).toBe(404);
+    expect(err.message).toContain("https://api.abliteration.ai/v1");
+    expect(err.message).toMatch(/use default/);
+
+    // The right address with a wrong model id keeps the general hint.
+    const right = harness(() => Response.json({ detail: "Not found" }, { status: 404 }));
+    expect((await failure(right.options)).message).toMatch(/base URL and model id/);
+    // Another provider's addresses are none of our business.
+    const other = harness(() => Response.json({ detail: "Not found" }, { status: 404 }), {
+      config: { ...config, baseUrl: "http://127.0.0.1:8787/v2" },
+    });
+    expect((await failure(other.options)).message).not.toContain("abliteration.ai/v1");
+  });
+
   it("maps 429 to ProviderRateLimitError", async () => {
     const { options } = harness(() =>
       Response.json({ error: { message: "Slow down" } }, { status: 429 }),
@@ -565,6 +585,19 @@ describe("connection test", () => {
     const check = await checkProvider({ config, fetchImpl });
     expect(check.ok).toBe(true);
     expect(states(check)).toEqual({ settings: null, key: null, reply: true });
+  });
+
+  it("catches the model's v2 typed into the address, and sends nothing there", async () => {
+    const never = vi.fn() as unknown as typeof fetch;
+    const check = await checkProvider({
+      config: { ...config, baseUrl: "https://api.abliteration.ai/v2" },
+      fetchImpl: never,
+    });
+    expect(check.ok).toBe(false);
+    expect(check.steps).toHaveLength(1);
+    expect(check.steps[0]).toMatchObject({ id: "settings", ok: false });
+    expect(check.steps[0]?.detail).toContain("https://api.abliteration.ai/v1");
+    expect(never).not.toHaveBeenCalled();
   });
 
   it("reports an unreachable provider and missing settings without throwing", async () => {

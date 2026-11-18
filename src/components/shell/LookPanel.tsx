@@ -93,6 +93,31 @@ export function LookPanel({
             ))}
           </div>
         </div>
+        <div className={styles.lookRow}>
+          <span className={styles.lookLabel} id="ogchat-people">
+            people
+          </span>
+          <div className={styles.sceneSwitch} role="group" aria-labelledby="ogchat-people">
+            <button
+              type="button"
+              className={`${styles.sceneButton} ${look.people ? styles.sceneActive : ""}`}
+              aria-pressed={look.people}
+              title="A few people out walking, and now and then a group"
+              onClick={() => onChange({ people: true })}
+            >
+              out
+            </button>
+            <button
+              type="button"
+              className={`${styles.sceneButton} ${look.people ? "" : styles.sceneActive}`}
+              aria-pressed={!look.people}
+              title="Empty streets"
+              onClick={() => onChange({ people: false })}
+            >
+              none
+            </button>
+          </div>
+        </div>
       </section>
 
       <section className={styles.lookSection}>

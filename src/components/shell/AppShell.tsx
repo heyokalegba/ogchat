@@ -259,7 +259,7 @@ export function AppShell() {
       className={`ogchat ${styles.shell} ${look.wallShown ? "" : styles.noWall}`}
       style={lookVariables(look) as CSSProperties}
     >
-      {ready && view && <Backdrop scene={look.scene} view={view} />}
+      {ready && view && <Backdrop scene={look.scene} view={view} people={look.people} />}
       <Sidebar
         sessions={sessions}
         activeId={activeId}
