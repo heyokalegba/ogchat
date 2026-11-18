@@ -38,6 +38,26 @@ interface is see-through, over a pixel-art New York that keeps real time.
   at the view. Fewer are out at night. Everyone is dealt at random from a cast
   of 56 people and 8 dogs. The cast is a quarter East Asian, a quarter Black,
   a quarter brown and a quarter white, exactly, for every kind of character.
+- **Doorsteps.** In Brooklyn people sit down on the stoops: someone alone, a
+  couple, now and then a whole group that was passing. There is often somebody
+  already sitting out when you open the scene.
+- **Shops and signs.** A bodega, a bakery and a pizza place, each with its name
+  on the sign, a word in neon in the window, goods on the shelves and a board
+  out on the pavement. Street signs on the lamp posts, a bus stop, a no-parking
+  plate. On the skyline's roofs, two billboards lit after dark.
+- **Barbecues.** Now and then somebody has one on a roof: a string of lights
+  goes up, a grill smokes, and people come up a few at a time. It lasts about
+  an hour. They are decided by the clock rather than by chance at the moment,
+  a handful a week between late morning and mid-evening, so one that is on is
+  still on after a reload, and setting the time back finds it again.
+- **Behind the windows.** In windows that are lit, somebody crosses a room or
+  comes to look out; a cat settles on a sill; a dog gets its paws up. One room
+  in fifty or so is lit red, blue, violet or green by an LED strip instead of a
+  lamp.
+- **Warning lights.** After dark about one building in eight carries a red
+  light at its top, blinking out of step with the others.
+- **More birds.** Besides the flock that crosses, ones, twos and small groups
+  fly through while it is light.
 
 ## The look panel
 
@@ -48,6 +68,9 @@ is remembered in your browser.
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | People                  | `out` or `none`. `none` empties the streets and roofs.                                                                                                                                                                                                         |
 | Strength                | How strongly the scene shows, from full down to faint. Lower it when the picture competes with the text, above all with the wall hidden.                                                                                                                       |
+| Message box colour      | The colour of the box you type in: six to choose from, or pick any. What you type turns light on a dark box.                                                                                                                                                   |
+| Chat                    | `shown` or `hidden`. Hidden puts the chat, the sidebar and the title away so there is only the scene; the corner keeps the scene switch, the clock and a `show chat` button, and Esc brings everything back. The top bar has the same switch.                  |
+| Sidebar width           | How wide the sessions sidebar is. The chat takes the room it leaves. You can also drag the sidebar's right edge.                                                                                                                                               |
 | Time in Brooklyn        | Drag to set the scene to any time of day. **The clock cannot be paused:** it runs on from wherever you leave it. `now` snaps it back to the real time.                                                                                                         |
 | Wall                    | `brick` or `none`. With `none` the wall goes away and the chat floats over the scene; its text then has its own colour (chalk to start with) and a stronger outline. The lightness slider makes the brick darker and grittier to the left, paler to the right. |
 | Text size               | 80% to 150%. Scales all the type in the app.                                                                                                                                                                                                                   |
@@ -66,7 +89,9 @@ More screens: [first run](docs/screens/01-first-run.png) ·
 [the look panel](docs/screens/10-look-panel.png) ·
 [without the wall](docs/screens/11-no-wall.png) ·
 [brooklyn with people, traffic and One World Trade](docs/screens/12-street-life.png) ·
-[the skyline at night](docs/screens/13-skyline-night.png)
+[the skyline at night](docs/screens/13-skyline-night.png) ·
+[the scene on its own, with a rooftop barbecue](docs/screens/14-scene-only.png) ·
+[a chat in a project](docs/screens/15-project.png)
 
 ## Run it
 
@@ -186,6 +211,14 @@ The provider must speak the OpenAI chat-completions shape:
 
 - Sessions are titled from their first message and listed most recently active
   first. Search matches titles and message text.
+- **Projects** group sessions that share context. Pick one in the box under the
+  search field (or `all chats`), start one with the `+` beside it, and open its
+  panel with the button between them. A project has a name, instructions, and
+  up to 20 files (text, PDFs, images, the same as on a message). In every chat
+  filed under it, the instructions and the text of the files are sent ahead of
+  the conversation, after your system prompt. Chats started while a project is
+  selected are filed under it; the panel can also move the chat on screen in
+  or out. Deleting a project keeps its chats.
 - A session is saved on its first message, so "new session" never leaves empty
   entries behind.
 - Hover the last message you sent to edit or delete it; hover the last reply to
@@ -225,8 +258,9 @@ Everything is plain JSON under `data/` (override with `OGCHAT_DATA_DIR`):
 ```
 data/
   settings.json            provider settings, including a key saved in the panel
-  sessions/<id>.json       one file per session: title, timestamps, messages
-  files/<session>/<id>     attachments: image bytes, or the text taken from a file
+  sessions/<id>.json       one file per session: title, timestamps, messages, its project
+  projects/<id>.json       one file per project: name, instructions, its files' details
+  files/<owner>/<id>       attachments and project files: image bytes, or the text taken from a file
 ```
 
 Back up or move the folder to keep your history. Delete it to start clean.
@@ -238,6 +272,7 @@ src/
   app/
     page.tsx, layout.tsx           mounts the shell
     api/sessions/...               session + message routes (NDJSON streaming)
+    api/projects/...               projects and their files
     api/settings/route.ts          provider settings (key masked)
   components/
     chat/                          the chat surface: transcript, composer, markdown
@@ -245,7 +280,7 @@ src/
   lib/
     provider/adapter.ts            the only module that talks to the provider
     daylight.ts                    sun, moon and clock over Brooklyn
-    server/                        persistence, settings, turn handling, request guard
+    server/                        persistence, projects, settings, turn handling, request guard
     client/api.ts                  browser client for the routes above
 tests/                             vitest: persistence, adapter, route contract, attachments, the clock, the people
 scripts/mock-provider.mjs          stand-in provider for local trials
@@ -306,10 +341,18 @@ Day to day, use the look panel (above). To change what it starts from:
     on the street is `PARKED` and `MOVING` in `brooklyn.mjs`.
   - `scripts/art/landmarks.mjs`: One World Trade, the Empire State and the
     Chrysler Building.
+  - `scripts/art/street.mjs`: the lettering, shopfronts and what is in their
+    windows, street signs and billboards. The shops themselves are listed in
+    `brooklyn.mjs` (`shops`), the billboards in `skyline.mjs` (`boards`).
+  - `scripts/art/extras.mjs`: the figures seen in windows, and the grill and
+    lights for a barbecue.
 - **The people:** `src/components/shell/life.ts` decides who turns up and what
   they do. `STREET_MIX` is how often each kind of party appears, `wantedHeads`
   how many people the street aims for (three to five by day), `MAX_HEADS` the
-  ceiling (20). `StreetLife.tsx` holds how often groups come by.
+  ceiling (20). `StreetLife.tsx` holds how often groups come by. `SITS` is how
+  likely each kind of party is to sit on a doorstep; `roofPartyAt` decides when
+  there is a barbecue. `WindowLife.tsx` is who shows in the windows and
+  `SkyTraffic.tsx` the aircraft and the birds.
 - **The clock:** `src/lib/daylight.ts` works out where the sun and moon are
   over Brooklyn and which light the scene is in. `BROOKLYN` at the top holds
   the place; `skyBlend` holds the sun heights at which the light changes.
@@ -323,33 +366,37 @@ Day to day, use the look panel (above). To change what it starts from:
 ### What the moving backdrop costs
 
 Very little, by design. Every picture is small pixel art drawn at 640x360 and
-scaled up: about 120 to 130 KB of a scene is on show at any one time, plus 86 KB of
-shared sky and 76 KB for the wall, all served from your own machine. The motion
-is plain CSS sliding and fading layers. There is no video and no canvas; the
-only script is a clock that looks at the time every fifteen seconds, and a
-once-a-second look at whether somebody new should walk in. Idle, it uses a few
-milliseconds of script per ten seconds, by day or by night: measured at about
-3 ms without the people and 6 ms with them. The people are a handful of tiny
-sprites that the browser slides and steps on its own, and nobody new arrives
-while the tab is in the background. People who set "reduce motion" in their
-system settings get the same scene, standing still, with a few figures standing
-in it.
+scaled up: about 125 to 140 KB of a scene is on show at any one time, plus 86 KB
+of shared sky and 76 KB for the wall, all served from your own machine. The
+motion is plain CSS sliding and fading layers. There is no video and no canvas.
+The only script is a clock that looks at the time every fifteen seconds and a
+few timers that decide, once every second or few, whether somebody new should
+walk in, a bird should cross or a figure should show at a window. Idle, that
+measures at about 9 ms of script per ten seconds, with the people or without.
+Everyone on screen is a tiny sprite that the browser slides and steps on its
+own, and nothing new arrives while the tab is in the background. People who
+set "reduce motion" in their system settings get the same scene, standing
+still, with a few figures standing in it.
 
 ## API
 
-| Route                                          | Purpose                                                                                                                                                                                                                         |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/sessions?q=`                         | List sessions, optionally filtered                                                                                                                                                                                              |
-| `POST /api/sessions`                           | Create a session                                                                                                                                                                                                                |
-| `GET /api/sessions/:id`                        | Session with messages, plus `generating` / `partial`                                                                                                                                                                            |
-| `PATCH /api/sessions/:id`                      | Rename `{ title }`                                                                                                                                                                                                              |
-| `DELETE /api/sessions/:id`                     | Delete                                                                                                                                                                                                                          |
-| `POST /api/sessions/:id/messages`              | Send `{ content, replaceFromMessageId?, web? }` or `{ regenerate: true }`; streams NDJSON events `start`, `thinking`, `delta`, `done` / `error`. With attachments, send `multipart/form-data` with the same fields plus `files` |
-| `GET /api/sessions/:id/files/:fileId`          | An attachment: images as images, everything else as plain text                                                                                                                                                                  |
-| `DELETE /api/sessions/:id/messages/:messageId` | Delete a user message and everything after it                                                                                                                                                                                   |
-| `POST /api/sessions/:id/stop`                  | Stop the reply in progress                                                                                                                                                                                                      |
-| `GET` / `PUT /api/settings`                    | Read (masked) / update provider settings: `baseUrl`, `model`, `apiKey`, `reasoning`, `systemPrompt`                                                                                                                             |
-| `POST /api/settings/test`                      | Try `{ baseUrl?, model?, apiKey? }` (or the current settings) against the provider without saving; returns `{ check }`                                                                                                          |
+| Route                                            | Purpose                                                                                                                                                                                                                         |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/sessions?q=&project=`                  | List sessions, optionally filtered by text and by project (`project` is an id, or `none`)                                                                                                                                       |
+| `POST /api/sessions`                             | Create a session, optionally in a project `{ projectId? }`                                                                                                                                                                      |
+| `GET /api/sessions/:id`                          | Session with messages, plus `generating` / `partial`                                                                                                                                                                            |
+| `PATCH /api/sessions/:id`                        | Rename `{ title }`, or file under a project `{ projectId }` (null takes it out)                                                                                                                                                 |
+| `DELETE /api/sessions/:id`                       | Delete                                                                                                                                                                                                                          |
+| `POST /api/sessions/:id/messages`                | Send `{ content, replaceFromMessageId?, web? }` or `{ regenerate: true }`; streams NDJSON events `start`, `thinking`, `delta`, `done` / `error`. With attachments, send `multipart/form-data` with the same fields plus `files` |
+| `GET /api/sessions/:id/files/:fileId`            | An attachment: images as images, everything else as plain text                                                                                                                                                                  |
+| `DELETE /api/sessions/:id/messages/:messageId`   | Delete a user message and everything after it                                                                                                                                                                                   |
+| `POST /api/sessions/:id/stop`                    | Stop the reply in progress                                                                                                                                                                                                      |
+| `GET` / `PUT /api/settings`                      | Read (masked) / update provider settings: `baseUrl`, `model`, `apiKey`, `reasoning`, `systemPrompt`                                                                                                                             |
+| `POST /api/settings/test`                        | Try `{ baseUrl?, model?, apiKey? }` (or the current settings) against the provider without saving; returns `{ check }`                                                                                                          |
+| `GET` / `POST /api/projects`                     | List projects (with instructions, files and session counts) / create one `{ name }`                                                                                                                                             |
+| `GET` / `PATCH` / `DELETE /api/projects/:id`     | Read / update `{ name?, instructions? }` / delete a project. Its sessions are kept                                                                                                                                              |
+| `POST /api/projects/:id/files`                   | Add files (`multipart/form-data`, field `files`)                                                                                                                                                                                |
+| `GET` / `DELETE /api/projects/:id/files/:fileId` | A project file as the model receives it / remove it                                                                                                                                                                             |
 
 There is no login, so the API only answers requests addressed to a loopback
 host and refuses state-changing requests from other origins. To serve ogchat

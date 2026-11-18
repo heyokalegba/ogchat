@@ -246,3 +246,34 @@ export function fliers(state) {
   }
   return c;
 }
+
+// ---------------------------------------------------------------- one bird
+
+/** A single bird's cell: two frames, wings up and wings down. */
+export const BIRD = { w: 7, h: 5, frames: 2 };
+
+export function bird() {
+  const c = canvas(BIRD.w * BIRD.frames, BIRD.h);
+  const ink = hex("#1c1917");
+  // wings up: a shallow V
+  [
+    [0, 0],
+    [1, 1],
+    [2, 2],
+    [3, 2],
+    [4, 1],
+    [5, 0],
+    [3, 3],
+  ].forEach(([x, y]) => c.set(x, y, ink));
+  // wings down: an arch
+  [
+    [0, 3],
+    [1, 2],
+    [2, 1],
+    [3, 1],
+    [4, 2],
+    [5, 3],
+    [3, 2],
+  ].forEach(([x, y]) => c.set(BIRD.w + x, y, ink));
+  return c;
+}

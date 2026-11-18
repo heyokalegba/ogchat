@@ -48,6 +48,24 @@ export interface SessionMeta {
   createdAt: string;
   updatedAt: string;
   messageCount: number;
+  /** The project this session belongs to, or null for a chat on its own. */
+  projectId: string | null;
+}
+
+/**
+ * A project: a set of sessions that share standing context. Its instructions
+ * and its files are sent ahead of every conversation in it.
+ */
+export interface Project {
+  id: string;
+  name: string;
+  /** What the model should know or do in every chat of this project. */
+  instructions: string;
+  files: Attachment[];
+  createdAt: string;
+  updatedAt: string;
+  /** How many sessions are filed under it. */
+  sessionCount: number;
 }
 
 export interface Session extends SessionMeta {

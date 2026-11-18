@@ -28,6 +28,8 @@ export interface ChatSurfaceProps {
   apiBase?: string;
   /** Provider status for the status line and the empty state; null while unknown. */
   provider?: { ready: boolean; model: string } | null;
+  /** The project a new conversation here is filed under, if any. */
+  projectId?: string | null;
   /** How hard the model thinks, and what to do when the composer changes it. */
   reasoning?: ReasoningEffort;
   onReasoningChange?: (next: ReasoningEffort) => void;
@@ -62,6 +64,7 @@ export function ChatSurface(props: ChatSurfaceProps) {
     sessionId,
     openToken,
     api,
+    projectId: props.projectId,
     onSessionCreated: props.onSessionCreated,
     onSessionUpdated: props.onSessionUpdated,
     onSessionMissing: props.onSessionMissing,

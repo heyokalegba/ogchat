@@ -5,6 +5,7 @@ import {
   castWalkers,
   HATCH_DEPTH,
   MAX_HEADS,
+  roofPartyAt,
   wantedHeads,
   type LifeConfig,
   type LifeMeta,
@@ -38,6 +39,12 @@ const street: LifeConfig = {
   from: -14,
   to: 654,
   road: 351,
+  stoops: [
+    { x: 60, y: 333 },
+    { x: 210, y: 333 },
+    { x: 380, y: 333 },
+    { x: 560, y: 333 },
+  ],
   sniff: [59, 133, 237, 307, 319, 399, 475, 591],
   linger: [164, 176, 300, 452],
   roofs: [],
@@ -50,6 +57,7 @@ const roofs: LifeConfig = {
   from: 0,
   to: 0,
   road: 0,
+  stoops: [],
   sniff: [],
   linger: [],
   roofs: [
@@ -111,7 +119,8 @@ describe("walkers on the pavement", () => {
         expect(step.kind).not.toBe("climb");
         expect(step.seconds).toBeGreaterThan(0);
         if (step.kind !== "walk") {
-          expect(step.seconds).toBeLessThanOrEqual(14);
+          // a pause is short; sitting down on a doorstep is not
+          expect(step.seconds).toBeLessThanOrEqual(step.kind === "sit" ? 160 : 14);
           continue;
         }
         expect(rightward ? step.to > at : step.to < at).toBe(true);
@@ -226,6 +235,122 @@ describe("walkers on the pavement", () => {
     }
     const squeezed = castWalkers(seeded(1), meta, street, { group: 14, room: 6 });
     expect(squeezed.heads).toBe(6);
+  });
+});
+
+describe("sitting on a doorstep", () => {
+  const parties = many(1500, (rand) => castWalkers(rand, meta, street));
+  const sat = parties.filter((p) => p.steps.some((s) => s.kind === "sit"));
+
+  it("happens now and then, at a real doorstep, with a seat for each person", () => {
+    expect(sat.length).toBeGreaterThan(60);
+    expect(sat.length).toBeLessThan(500);
+    for (const party of sat) {
+      const at = party.steps.findIndex((s) => s.kind === "sit");
+      const before = party.steps[at - 1];
+      // they walk to the doorstep first
+      expect(before?.kind).toBe("walk");
+      const x = before?.kind === "walk" ? before.to : NaN;
+      expect(street.stoops.map((stoop) => stoop.x)).toContain(x);
+      // and walk on afterwards
+      expect(party.steps.at(-1)?.kind).toBe("walk");
+      const seated = people(party).filter((m) => m.seat);
+      expect(seated.length).toBe(Math.min(6, people(party).length));
+      const stoop = street.stoops.find((candidate) => candidate.x === x)!;
+      const places = new Set<string>();
+      for (const member of seated) {
+        const feet = party.y + member.dy + member.seat!.dy;
+        const across = member.dx + member.seat!.dx;
+        // on one of the steps, within the doorstep's width, nobody on anybody's lap
+        expect(feet).toBeLessThanOrEqual(stoop.y);
+        expect(feet).toBeGreaterThanOrEqual(stoop.y - 6);
+        expect(Math.abs(across + 5)).toBeLessThanOrEqual(6);
+        places.add(`${across},${feet}`);
+      }
+      expect(places.size).toBe(seated.length);
+    }
+    // groups are the likeliest to stop, and nobody on wheels or running does
+    expect(sat.some((p) => p.heads >= 3)).toBe(true);
+    for (const party of sat) {
+      expect(party.road).toBe(false);
+      expect(party.members.some((m) => m.sheet === "wheels")).toBe(false);
+    }
+  });
+
+  it("can open on somebody already sitting there", () => {
+    for (const party of many(60, (rand) =>
+      castWalkers(rand, meta, street, { seated: true, room: 3 }),
+    )) {
+      expect(party.steps[0]?.kind).toBe("sit");
+      expect(street.stoops.map((stoop) => stoop.x)).toContain(party.x);
+      expect(party.heads).toBeLessThanOrEqual(3);
+      expect(people(party).every((m) => m.seat)).toBe(true);
+    }
+  });
+
+  it("never happens where there are no doorsteps", () => {
+    const bare = { ...street, stoops: [] };
+    for (const party of many(300, (rand) => castWalkers(rand, meta, bare))) {
+      expect(party.steps.some((s) => s.kind === "sit")).toBe(false);
+    }
+  });
+});
+
+describe("a barbecue on a roof", () => {
+  // Noon to noon, New York time, as minutes of the day (UTC-5, no daylight saving in January).
+  const minuteOfDay = (ms: number) => (((Math.floor(ms / 60_000) - 300) % 1440) + 1440) % 1440;
+  const start = Date.UTC(2027, 0, 4);
+  const day = 86_400_000;
+
+  it("is decided by the clock: the same answer whenever it is asked", () => {
+    for (let t = start; t < start + 3 * day; t += 7 * 60_000) {
+      expect(roofPartyAt(t, 23, 5, minuteOfDay)).toEqual(roofPartyAt(t, 23, 5, minuteOfDay));
+    }
+  });
+
+  it("lasts about an hour, in the afternoon or evening, on one roof throughout", () => {
+    const seen = new Map<number, { roof: number; endsAt: number; minutes: number }>();
+    for (let t = start; t < start + 40 * day; t += 60_000) {
+      const party = roofPartyAt(t, 23, 5, minuteOfDay);
+      if (!party) continue;
+      expect(t).toBeGreaterThanOrEqual(party.startsAt);
+      expect(t).toBeLessThan(party.endsAt);
+      const known = seen.get(party.startsAt);
+      if (known) {
+        expect(party.roof).toBe(known.roof);
+        known.minutes += 1;
+      } else {
+        seen.set(party.startsAt, { roof: party.roof, endsAt: party.endsAt, minutes: 1 });
+      }
+    }
+    const parties = [...seen.entries()];
+    // some days have one, some two, some none: a handful a week
+    expect(parties.length).toBeGreaterThan(20);
+    expect(parties.length).toBeLessThan(90);
+    for (const [startsAt, { roof, endsAt, minutes }] of parties) {
+      const length = (endsAt - startsAt) / 60_000;
+      expect(length).toBeGreaterThanOrEqual(50);
+      expect(length).toBeLessThanOrEqual(75);
+      expect(minutes).toBe(length); // on for every minute of it, with no gaps
+      expect(roof).toBeGreaterThanOrEqual(0);
+      expect(roof).toBeLessThan(5);
+      const began = minuteOfDay(startsAt);
+      expect(began).toBeGreaterThanOrEqual(11 * 60);
+      expect(began).toBeLessThanOrEqual(21.5 * 60);
+    }
+    // not always the same roof
+    expect(new Set(parties.map(([, p]) => p.roof)).size).toBeGreaterThan(2);
+  });
+
+  it("keeps a different diary for each scene, and none where there is no roof for it", () => {
+    let differ = 0;
+    for (let t = start; t < start + 20 * day; t += 30 * 60_000) {
+      const a = roofPartyAt(t, 11, 5, minuteOfDay);
+      const b = roofPartyAt(t, 23, 5, minuteOfDay);
+      if (Boolean(a) !== Boolean(b)) differ++;
+      expect(roofPartyAt(t, 11, 0, minuteOfDay)).toBeNull();
+    }
+    expect(differ).toBeGreaterThan(10);
   });
 });
 

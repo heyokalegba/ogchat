@@ -7,6 +7,7 @@
  * and masts breaking the roofline, so it reads as a skyline and not a band.
  */
 import { chrysler, empireState, oneWorldTrade } from "./landmarks.mjs";
+import { billboard } from "./street.mjs";
 import {
   bayer,
   canvas,
@@ -83,6 +84,13 @@ function city() {
     L.chance(evening) ? "evening" : L.chance(night) ? "night" : null;
 
   const lit = ["#d8c478", "#c9ae5c", "#ddd096", "#bd9a50"].map(hex);
+  // A few rooms are lit by coloured LED strips instead of a lamp, and some of
+  // the tall buildings carry a red warning light. Dice of their own for both.
+  const LED = dice(7101);
+  const LED_TONES = ["#c2456e", "#5a7fd6", "#8a5fd0", "#3fae9a", "#d0503a"].map(hex);
+  const B = dice(7102);
+  /** Near windows that are lit at some hour, for what is seen moving behind them. */
+  const panes = [];
   const iron = G("#2b2724");
   const woods = [G("#5c4434"), G("#66493a"), G("#4f3d31")];
 
@@ -108,7 +116,11 @@ function city() {
         }
         when ??= later(0.13, 0.3);
         if (!when) continue;
-        const id = emit.light(c, wx, wy, o.ww, o.wh, color2, when);
+        const led = o.ww >= 2 && LED.chance(0.02);
+        const id = emit.light(c, wx, wy, o.ww, o.wh, led ? LED.pick(LED_TONES) : color2, when);
+        if (c === rooftops && when !== "b") {
+          panes.push({ x: wx, y: wy, w: o.ww, h: o.wh, when, id });
+        }
         if (blind) emit.detail(c, id, wx, wy, o.ww, 1, shade(tone, 0.72), when);
       }
     }
@@ -360,6 +372,7 @@ function city() {
       }
     }
     // what breaks the roofline
+    let peak = top;
     const roof = rand();
     const cx = x + Math.floor(w / 2);
     if (pencil || roof < 0.2) {
@@ -379,10 +392,13 @@ function city() {
       }
       const mast = between(8, 26);
       skyline.rect(cx, y - mast, 1, mast, iron);
+      peak = y - mast;
       if (chance(0.5)) skyline.rect(cx - 1, y - mast + 4, 3, 1, iron);
     } else if (roof < 0.36) {
       const tip = crown(skyline, cx, top, w, color, between(4, 7));
-      skyline.rect(cx, tip - between(6, 14), 1, 14, iron);
+      const up = between(6, 14);
+      skyline.rect(cx, tip - up, 1, 14, iron);
+      peak = tip - up;
     } else if (roof < 0.62) {
       waterTower(
         skyline,
@@ -404,6 +420,8 @@ function city() {
       skyline.rect(x + 3, top - 4, 7, 1, G("#9a9890"));
       skyline.rect(x + w - 8, top - 9, 3, 9, G("#55524d"));
     }
+    // The tall ones are marked for aircraft: a red light at the very top, on about one in three.
+    if (h > 120 && B.chance(0.32)) beacons.push([cx, peak - 1]);
     x += w + between(0, 2);
   }
 
@@ -595,6 +613,20 @@ function city() {
     x += w;
   }
 
+  // Two billboards on the near roofs, lit from above after dark.
+  const boards = [
+    { at: 150, lines: ["HOTEL"], face: hex("#2a2420"), ink: hex("#e9c46a") },
+    { at: 500, lines: ["BKLYN", "PIZZA"], face: hex("#d6cfbd"), ink: hex("#8f2a1f") },
+  ];
+  for (const board of boards) {
+    const roof = roofs
+      .filter((r) => !r.board && r.w >= 40 && r.x >= 0 && r.x + r.w <= W && r.top > 250)
+      .sort((a, b) => Math.abs(a.x + a.w / 2 - board.at) - Math.abs(b.x + b.w / 2 - board.at))[0];
+    if (!roof) continue;
+    roof.board = true;
+    billboard(rooftops, emit, { ...board, x: roof.x + 5, roofTop: roof.top, tint: grit });
+  }
+
   // The switching layers: river glints were drawn straight in; add the windows.
   emit.switching(skyline, "a", lights.a);
   emit.switching(skyline, "c", lights.c);
@@ -618,7 +650,17 @@ function city() {
       rooftops: emit.render(rooftops, state, GRADES[state]),
     };
   }
-  return { states, lights, glow, beacons, roofs };
+  const inView = panes
+    .filter(
+      (p) =>
+        p.x >= 0 &&
+        p.x + p.w <= W &&
+        p.y + p.h < H - 2 &&
+        rooftops.owns(p.x, p.y, p.id) &&
+        rooftops.owns(p.x + p.w - 1, p.y + p.h - 1, p.id),
+    )
+    .map(({ x, y, w, h, when }) => ({ x, y, w, h, when }));
+  return { states, lights, glow, beacons, roofs, windows: inView };
 }
 
 /** Two lanes of lights on the bridge, as seamless strips: headlights, then tail lights. */
@@ -721,9 +763,16 @@ export function skylineScene(puff, cast) {
         linger: [],
         // Roofs wide enough to stroll on, and wholly in the picture.
         roofs: scene.roofs
-          .filter((roof) => roof.w >= 30 && roof.x >= 0 && roof.x + roof.w <= W && roof.top > 236)
+          .filter(
+            (roof) =>
+              // not the ones a billboard stands on: people would only get in front of it
+              !roof.board && roof.w >= 30 && roof.x >= 0 && roof.x + roof.w <= W && roof.top > 236,
+          )
           .map(({ x, w, top }) => ({ x, w, top })),
+        stoops: [],
       },
+      // Lit windows in plain view, for the people and pets seen moving behind them.
+      windows: scene.windows,
     },
   };
 }

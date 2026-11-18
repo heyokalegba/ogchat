@@ -3,6 +3,7 @@ import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   ChatMessage,
+  Project,
   PublicSettings,
   Session,
   SessionDetail,
@@ -18,6 +19,13 @@ import {
 } from "@/app/api/sessions/[id]/route";
 import { POST as stopSession } from "@/app/api/sessions/[id]/stop/route";
 import { GET as listSessions, POST as createSession } from "@/app/api/sessions/route";
+import {
+  DELETE as deleteProjectFile,
+  GET as getProjectFile,
+} from "@/app/api/projects/[id]/files/[fileId]/route";
+import { POST as addProjectFiles } from "@/app/api/projects/[id]/files/route";
+import { DELETE as deleteProject, PATCH as patchProject } from "@/app/api/projects/[id]/route";
+import { GET as listProjects, POST as createProject } from "@/app/api/projects/route";
 import { GET as getSettings, PUT as putSettings } from "@/app/api/settings/route";
 import { POST as testSettings } from "@/app/api/settings/test/route";
 import {
@@ -117,6 +125,7 @@ describe("sessions API", () => {
         createdAt: session.createdAt,
         updatedAt: session.updatedAt,
         messageCount: 0,
+        projectId: null,
       },
     ]);
   });
@@ -898,6 +907,195 @@ describe("settings API", () => {
       );
       expect(foreign.status).toBe(403);
     });
+  });
+});
+
+describe("projects", () => {
+  const pctx = (id: string) => ({ params: Promise.resolve({ id }) });
+  const fctx = (id: string, fileId: string) => ({ params: Promise.resolve({ id, fileId }) });
+
+  async function project(name: string): Promise<Project> {
+    const res = await createProject(req("POST", "/api/projects", { name }));
+    expect(res.status).toBe(201);
+    return ((await res.json()) as { project: Project }).project;
+  }
+  async function projects(): Promise<Project[]> {
+    const res = await listProjects(req("GET", "/api/projects"));
+    return ((await res.json()) as { projects: Project[] }).projects;
+  }
+  async function sessionIn(projectId: string | null): Promise<Session> {
+    const res = await createSession(req("POST", "/api/sessions", projectId ? { projectId } : {}));
+    expect(res.status).toBe(201);
+    return ((await res.json()) as { session: Session }).session;
+  }
+  async function addFiles(id: string, files: [string, string][]): Promise<Response> {
+    const form = new FormData();
+    for (const [name, text] of files) form.append("files", new File([text], name));
+    return addProjectFiles(
+      new Request(`${ORIGIN}/api/projects/${id}/files`, {
+        method: "POST",
+        headers: { host: "localhost:3000", origin: ORIGIN },
+        body: form,
+      }),
+      pctx(id),
+    );
+  }
+
+  it("creates, renames and lists projects with their session counts", async () => {
+    expect(await projects()).toEqual([]);
+    const zine = await project("  Zine   issue 4 ");
+    expect(zine).toMatchObject({
+      name: "Zine issue 4",
+      instructions: "",
+      files: [],
+      sessionCount: 0,
+    });
+    await project("Apartment hunt");
+    await sessionIn(zine.id);
+    await sessionIn(zine.id);
+    await sessionIn(null);
+    expect((await projects()).map((p) => [p.name, p.sessionCount])).toEqual([
+      ["Apartment hunt", 0],
+      ["Zine issue 4", 2],
+    ]);
+    const renamed = await patchProject(
+      req("PATCH", `/api/projects/${zine.id}`, { name: "Zine", instructions: " Be blunt. " }),
+      pctx(zine.id),
+    );
+    expect(((await renamed.json()) as { project: Project }).project).toMatchObject({
+      name: "Zine",
+      instructions: "Be blunt.",
+      sessionCount: 2,
+    });
+
+    expect((await createProject(req("POST", "/api/projects", { name: "  " }))).status).toBe(400);
+    expect((await createProject(req("POST", "/api/projects", {}))).status).toBe(400);
+  });
+
+  it("files sessions under a project and lists them by project", async () => {
+    const work = await project("Work");
+    const inside = await sessionIn(work.id);
+    const outside = await sessionIn(null);
+    expect(inside.projectId).toBe(work.id);
+    expect(outside.projectId).toBeNull();
+    expect((await list(`?project=${work.id}`)).map((s) => s.id)).toEqual([inside.id]);
+    expect((await list("?project=none")).map((s) => s.id)).toEqual([outside.id]);
+    expect((await list()).map((s) => s.id).sort()).toEqual([inside.id, outside.id].sort());
+
+    // a chat can be moved in and taken out again, and keeps its title
+    const moved = await patchSession(
+      req("PATCH", `/api/sessions/${outside.id}`, { projectId: work.id }),
+      ctx(outside.id),
+    );
+    expect(((await moved.json()) as { session: SessionMeta }).session).toMatchObject({
+      projectId: work.id,
+      title: "new session",
+    });
+    await patchSession(
+      req("PATCH", `/api/sessions/${outside.id}`, { projectId: null }),
+      ctx(outside.id),
+    );
+    expect((await list(`?project=${work.id}`)).map((s) => s.id)).toEqual([inside.id]);
+
+    // only real projects will do
+    const ghost = "00000000-0000-4000-8000-000000000000";
+    expect((await createSession(req("POST", "/api/sessions", { projectId: ghost }))).status).toBe(
+      400,
+    );
+    expect((await listSessions(req("GET", "/api/sessions?project=../etc"))).status).toBe(400);
+    const bad = await patchSession(
+      req("PATCH", `/api/sessions/${inside.id}`, { projectId: ghost }),
+      ctx(inside.id),
+    );
+    expect(bad.status).toBe(400);
+  });
+
+  it("sends the project's instructions and files ahead of every chat in it", async () => {
+    await useKey();
+    await putSettings(req("PUT", "/api/settings", { systemPrompt: "Global rule." }));
+    const book = await project("Cookbook");
+    await patchProject(
+      req("PATCH", `/api/projects/${book.id}`, { instructions: "Metric units only." }),
+      pctx(book.id),
+    );
+    const added = await addFiles(book.id, [["pantry.txt", "flour, salt, yeast"]]);
+    expect(added.status).toBe(200);
+    const withFile = ((await added.json()) as { project: Project }).project;
+    expect(withFile.files.map((f) => [f.name, f.kind])).toEqual([["pantry.txt", "text"]]);
+
+    const provider = stubProvider(() => sseResponse(["ok"]));
+    const inside = await sessionIn(book.id);
+    await send(inside.id, { content: "what can I bake?" });
+    const [system, user] = provider.calls[0]!.body.messages;
+    expect(system?.role).toBe("system");
+    expect(system?.content).toContain("Global rule.");
+    expect(system?.content).toContain('part of the project "Cookbook"');
+    expect(system?.content).toContain("Metric units only.");
+    expect(system?.content).toContain("Project file: pantry.txt");
+    expect(system?.content).toContain("flour, salt, yeast");
+    expect(user).toEqual({ role: "user", content: "what can I bake?" });
+
+    // a chat outside the project gets none of it
+    const outside = await sessionIn(null);
+    await send(outside.id, { content: "hello" });
+    expect(provider.calls[1]!.body.messages[0]?.content).toBe("Global rule.");
+
+    // the file is served back as plain text, and can be removed
+    const fileId = withFile.files[0]!.id;
+    const served = await getProjectFile(
+      req("GET", `/api/projects/${book.id}/files/${fileId}`),
+      fctx(book.id, fileId),
+    );
+    expect(served.headers.get("content-type")).toContain("text/plain");
+    expect(await served.text()).toBe("flour, salt, yeast");
+    const removed = await deleteProjectFile(
+      req("DELETE", `/api/projects/${book.id}/files/${fileId}`),
+      fctx(book.id, fileId),
+    );
+    expect(((await removed.json()) as { project: Project }).project.files).toEqual([]);
+    expect(fs.existsSync(path.join(data.dir(), "files", book.id, fileId))).toBe(false);
+    await send(inside.id, { content: "again" });
+    expect(provider.calls[2]!.body.messages[0]?.content).not.toContain("pantry.txt");
+  });
+
+  it("refuses files a project cannot use, and more than it can hold", async () => {
+    const p = await project("Limits");
+    const form = new FormData();
+    form.append("files", new File([new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0, 0, 0, 0])], "a.zip"));
+    const zip = await addProjectFiles(
+      new Request(`${ORIGIN}/api/projects/${p.id}/files`, {
+        method: "POST",
+        headers: { host: "localhost:3000", origin: ORIGIN },
+        body: form,
+      }),
+      pctx(p.id),
+    );
+    expect(zip.status).toBe(415);
+    const many = Array.from({ length: 21 }, (_, i) => [`n${i}.txt`, "x"] as [string, string]);
+    expect((await addFiles(p.id, many)).status).toBe(400);
+    expect((await addFiles(p.id, many.slice(0, 20))).status).toBe(200);
+    expect((await addFiles(p.id, [["one-more.txt", "x"]])).status).toBe(400);
+  });
+
+  it("deleting a project keeps its chats and removes its files", async () => {
+    const p = await project("Temporary");
+    await addFiles(p.id, [["notes.md", "# notes"]]);
+    const chat = await sessionIn(p.id);
+    const res = await deleteProject(req("DELETE", `/api/projects/${p.id}`), pctx(p.id));
+    expect(res.status).toBe(200);
+    expect(await projects()).toEqual([]);
+    expect((await detail(chat.id)).session.projectId).toBeNull();
+    expect(fs.existsSync(path.join(data.dir(), "files", p.id))).toBe(false);
+    expect((await deleteProject(req("DELETE", `/api/projects/${p.id}`), pctx(p.id))).status).toBe(
+      404,
+    );
+  });
+
+  it("is behind the same local-only guard as everything else", async () => {
+    const res = await createProject(
+      req("POST", "/api/projects", { name: "x" }, { origin: "https://evil.example" }),
+    );
+    expect(res.status).toBe(403);
   });
 });
 

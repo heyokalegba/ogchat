@@ -13,3 +13,8 @@ export function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+/** Projects: how many files one can hold, and how long its name and instructions can be. */
+export const MAX_PROJECT_FILES = 20;
+export const MAX_PROJECT_NAME_CHARS = 80;
+export const MAX_PROJECT_INSTRUCTIONS_CHARS = 20_000;

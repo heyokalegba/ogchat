@@ -9,7 +9,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { PEOPLE, SCENES, type SceneId, type SkyState } from "./art";
+import { PEOPLE, SCENES, SKY, type SceneId, type SkyState } from "./art";
 import styles from "./backdrop.module.css";
 import {
   castRoofVisit,
@@ -48,12 +48,18 @@ function MemberView({ member, sheets }: { member: Member; sheets: Sheets }) {
   return (
     <div
       className={styles.member}
-      style={{
-        left: u(member.dx),
-        top: u(member.dy - cell.h + 1),
-        width: u(cell.w),
-        height: u(cell.h),
-      }}
+      // Those with a seat move to it, and sit, when the party sits down.
+      data-seat={member.seat ? "" : undefined}
+      style={
+        {
+          left: u(member.dx),
+          top: u(member.dy - cell.h + 1),
+          width: u(cell.w),
+          height: u(cell.h),
+          "--sx": member.seat?.dx ?? 0,
+          "--sy": member.seat?.dy ?? 0,
+        } as CSSProperties
+      }
     >
       <div
         className={styles.frames}
@@ -113,6 +119,15 @@ const PartyView = memo(function PartyView(props: {
         if (Number.isFinite(step.seconds)) timer = setTimeout(next, step.seconds * 1000);
         return;
       }
+      if (step.kind === "sit") {
+        // Down onto the doorstep, and at the end a moment to get back up before moving on.
+        el.dataset.gait = "sit";
+        timer = setTimeout(() => {
+          el.dataset.gait = "idle";
+          timer = setTimeout(next, 800);
+        }, step.seconds * 1000);
+        return;
+      }
       el.dataset.gait = "walk";
       if (step.kind === "walk") {
         if (step.to !== x) el.dataset.facing = step.to > x ? "right" : "left";
@@ -146,12 +161,77 @@ const PartyView = memo(function PartyView(props: {
   );
 });
 
+/**
+ * What goes up for a barbecue: a string of lights between two poles, and a
+ * grill at one end with its smoke. After dark the bulbs and the coals glow.
+ */
+function RoofDecor({ width, night }: { width: number; night: number }) {
+  const { partyLights, grill, smoke } = SKY;
+  const glow = Math.min(1, night * 1.4);
+  const lights = (lit: boolean): CSSProperties => ({
+    backgroundImage: `url(${partyLights.src})`,
+    backgroundSize: `${u(partyLights.w)} ${u(partyLights.h * 2)}`,
+    backgroundPosition: `0 ${lit ? u(-partyLights.h) : "0"}`,
+  });
+  const grillAt = (lit: boolean): CSSProperties => ({
+    backgroundImage: `url(${grill.src})`,
+    backgroundSize: `100% 200%`,
+    backgroundPosition: lit ? "0 100%" : "0 0",
+  });
+  const span = { left: u(3), width: u(width - 6), top: u(ROOF_BOX - 19), height: u(partyLights.h) };
+  return (
+    <>
+      <div className={styles.partyPole} style={{ left: u(2), top: u(ROOF_BOX - 19) }} />
+      <div className={styles.partyPole} style={{ left: u(width - 3), top: u(ROOF_BOX - 19) }} />
+      <div className={styles.partyLights} style={{ ...span, ...lights(false) }} />
+      {glow > 0.02 && (
+        <div className={styles.partyGlow} style={{ opacity: glow }}>
+          <div className={styles.partyLights} style={{ ...span, ...lights(true) }} />
+        </div>
+      )}
+      <div
+        className={styles.partySmoke}
+        style={{ left: u(4), top: u(ROOF_BOX - grill.h - 10), width: u(10), height: u(12) }}
+      >
+        <div className={styles.smokeStrip} style={{ backgroundImage: `url(${smoke})` }} />
+      </div>
+      <div
+        className={styles.partyGrill}
+        style={{
+          left: u(5),
+          top: u(ROOF_BOX - grill.h),
+          width: u(grill.w),
+          height: u(grill.h),
+          ...grillAt(false),
+        }}
+      />
+      {glow > 0.02 && (
+        <div
+          className={styles.partyGrill}
+          style={{
+            left: u(5),
+            top: u(ROOF_BOX - grill.h),
+            width: u(grill.w),
+            height: u(grill.h),
+            opacity: glow,
+            ...grillAt(true),
+          }}
+        />
+      )}
+    </>
+  );
+}
+
 export function StreetLife(props: {
   scene: SceneId;
   light: SkyState;
   night: number;
   /** Whatever stands at the kerb: drawn over the pavement and under the road. */
   kerb?: ReactNode;
+  /** A barbecue going on now: which of the scene's roofs, and when (scene time) it ends. */
+  party?: { roof: number; endsAt: number } | null;
+  /** The scene's time now, in milliseconds. */
+  now?: number;
 }) {
   const { scene, light } = props;
   const art = SCENES[scene];
@@ -174,7 +254,9 @@ export function StreetLife(props: {
 
   useEffect(() => {
     const rand = Math.random;
-    const heads = () => live.current.reduce((sum, party) => sum + party.heads, 0);
+    // People up at a barbecue are counted apart from the usual comings and goings.
+    const heads = () =>
+      live.current.reduce((sum, party) => sum + (party.guest ? 0 : party.heads), 0);
     const add = (...cast: (Party | null)[]) => {
       const fresh = cast.filter((party): party is Party => party !== null);
       if (fresh.length) commit([...live.current, ...fresh]);
@@ -193,6 +275,10 @@ export function StreetLife(props: {
 
     // Open on a street that is already lived in, not an empty one filling up.
     let wanted = wantedHeads(rand, night.current);
+    // Often somebody is already out on a doorstep.
+    if (life.stoops.length > 0 && rand() < 0.75) {
+      add(castWalkers(rand, PEOPLE, life, { seated: true, room: 3 }));
+    }
     for (let n = 0; n < 6 && heads() < wanted; n++) add(one(wanted - heads(), true));
 
     const seconds = () => performance.now() / 1000;
@@ -255,6 +341,50 @@ export function StreetLife(props: {
     };
   }, [life, commit]);
 
+  // ---- the barbecue: guests come up while it lasts, and are sent home if it is called off
+  const partyRoof = props.party?.roof ?? null;
+  const partyEnds = props.party?.endsAt ?? 0;
+  const sceneNow = useRef(props.now ?? 0);
+  useEffect(() => {
+    sceneNow.current = props.now ?? 0;
+  }, [props.now]);
+  useEffect(() => {
+    if (partyRoof === null) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const rand = Math.random;
+    const guests = () =>
+      live.current.reduce((sum, party) => sum + (party.guest ? party.heads : 0), 0);
+    const invite = (count: number) => {
+      const remaining = (partyEnds - sceneNow.current) / 1000;
+      if (remaining < 150) return; // nearly over: nobody new comes up now
+      const fresh: Party[] = [];
+      let heads = 0;
+      for (let n = 0; n < count * 2 && heads < count; n++) {
+        const guest = castRoofVisit(rand, PEOPLE, life, {
+          roof: partyRoof,
+          room: Math.min(2, count - heads),
+          delay: n * (3 + rand() * 6),
+          // They stay a good while, though never past the end of it.
+          stay: Math.min(remaining - 60, 240 + rand() * 900),
+          visits: 3 + Math.floor(rand() * 5),
+          guest: true,
+        });
+        if (!guest) continue;
+        heads += guest.heads;
+        fresh.push(guest);
+      }
+      if (fresh.length) commit([...live.current, ...fresh]);
+    };
+    invite(4 + Math.floor(rand() * 3));
+    const timer = setInterval(() => {
+      if (!document.hidden && guests() < 4) invite(2 + Math.floor(rand() * 2));
+    }, 25_000);
+    return () => {
+      clearInterval(timer);
+      commit(live.current.filter((party) => !party.guest));
+    };
+  }, [partyRoof, partyEnds, life, commit]);
+
   const sheets: Sheets = {
     people: art.people[light],
     props: art.props[light],
@@ -267,8 +397,9 @@ export function StreetLife(props: {
     <div className={styles.life}>
       {life.roofs.map((roof, index) => {
         const here = parties.filter((party) => party.roof === index);
+        const hosting = partyRoof === index;
         return (
-          here.length > 0 && (
+          (here.length > 0 || hosting) && (
             <div
               key={index}
               className={styles.roof}
@@ -279,6 +410,7 @@ export function StreetLife(props: {
                 height: u(ROOF_BOX),
               }}
             >
+              {hosting && <RoofDecor width={roof.w} night={props.night} />}
               {/* Feet on the last row of the box, which is the row above the roof line. */}
               <div className={styles.roofLine} style={{ top: u(ROOF_BOX - 1) }}>
                 {here.map((party) => (

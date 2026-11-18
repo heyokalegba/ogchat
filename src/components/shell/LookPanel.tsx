@@ -7,7 +7,9 @@ import { SCENES, type SceneId } from "./art";
 import {
   activeTextColor,
   DEFAULT_LOOK,
+  INPUT_SWATCHES,
   SCENE_STRENGTH,
+  SIDEBAR_WIDTH,
   TEXT_SIZE,
   TEXT_SWATCHES,
   type Look,
@@ -65,12 +67,15 @@ export function LookPanel({
   const setTextColor = (value: string) =>
     onChange(look.wallShown ? { textColor: value } : { textColorOpen: value });
   const custom = !TEXT_SWATCHES.some((swatch) => swatch.value === textColor);
+  const customInput = !INPUT_SWATCHES.some((swatch) => swatch.value === look.inputColor);
   const changed =
     look.wallShown !== DEFAULT_LOOK.wallShown ||
     look.wall !== DEFAULT_LOOK.wall ||
     look.textSize !== DEFAULT_LOOK.textSize ||
     look.textColor !== DEFAULT_LOOK.textColor ||
-    look.textColorOpen !== DEFAULT_LOOK.textColorOpen;
+    look.textColorOpen !== DEFAULT_LOOK.textColorOpen ||
+    look.inputColor !== DEFAULT_LOOK.inputColor ||
+    look.sidebarWidth !== DEFAULT_LOOK.sidebarWidth;
 
   return (
     <div ref={panel} className={styles.look} role="dialog" aria-label="Look">
@@ -308,6 +313,89 @@ export function LookPanel({
         </div>
       </section>
 
+      <section className={styles.lookSection}>
+        <div className={styles.lookRow}>
+          <span className={styles.lookLabel} id="ogchat-input-color">
+            message box colour
+          </span>
+        </div>
+        <div className={styles.swatches} role="group" aria-labelledby="ogchat-input-color">
+          {INPUT_SWATCHES.map((swatch) => (
+            <button
+              key={swatch.value}
+              type="button"
+              className={`${styles.swatch} ${swatch.value === look.inputColor ? styles.swatchActive : ""}`}
+              style={{ background: swatch.value }}
+              aria-label={swatch.name}
+              aria-pressed={swatch.value === look.inputColor}
+              title={swatch.name}
+              onClick={() => onChange({ inputColor: swatch.value })}
+            />
+          ))}
+          <label
+            className={`${styles.swatch} ${styles.swatchCustom} ${customInput ? styles.swatchActive : ""}`}
+            style={customInput ? { background: look.inputColor } : undefined}
+            title="Pick any colour"
+          >
+            <input
+              type="color"
+              value={look.inputColor}
+              aria-label="Pick any colour for the message box"
+              onChange={(event) => onChange({ inputColor: event.target.value })}
+            />
+            {!customInput && <span aria-hidden="true">+</span>}
+          </label>
+        </div>
+      </section>
+
+      <section className={styles.lookSection}>
+        <div className={styles.lookRow}>
+          <span className={styles.lookLabel} id="ogchat-chat-shown">
+            chat
+          </span>
+          <div className={styles.sceneSwitch} role="group" aria-labelledby="ogchat-chat-shown">
+            <button
+              type="button"
+              className={`${styles.sceneButton} ${look.chatShown ? styles.sceneActive : ""}`}
+              aria-pressed={look.chatShown}
+              onClick={() => onChange({ chatShown: true })}
+            >
+              shown
+            </button>
+            <button
+              type="button"
+              className={`${styles.sceneButton} ${look.chatShown ? "" : styles.sceneActive}`}
+              aria-pressed={!look.chatShown}
+              title="Put the chat and the sidebar away and just look at the scene. Esc brings them back."
+              onClick={() => onChange({ chatShown: false })}
+            >
+              hidden
+            </button>
+          </div>
+        </div>
+        <div className={styles.lookRow}>
+          <label className={styles.lookLabel} htmlFor="ogchat-sidebar-width">
+            sidebar width
+          </label>
+          <span className={styles.lookAside}>{look.sidebarWidth}px</span>
+        </div>
+        <input
+          id="ogchat-sidebar-width"
+          className={styles.slider}
+          type="range"
+          min={SIDEBAR_WIDTH.min}
+          max={SIDEBAR_WIDTH.max}
+          step={SIDEBAR_WIDTH.step}
+          value={look.sidebarWidth}
+          title="The chat takes whatever room the sidebar leaves. You can also drag the sidebar's edge."
+          onChange={(event) => onChange({ sidebarWidth: Number(event.target.value) })}
+        />
+        <div className={styles.ticks} aria-hidden="true">
+          <span>narrow</span>
+          <span>wide</span>
+        </div>
+      </section>
+
       <div className={styles.lookFoot}>
         <button
           type="button"
@@ -320,10 +408,12 @@ export function LookPanel({
               textSize: DEFAULT_LOOK.textSize,
               textColor: DEFAULT_LOOK.textColor,
               textColorOpen: DEFAULT_LOOK.textColorOpen,
+              inputColor: DEFAULT_LOOK.inputColor,
+              sidebarWidth: DEFAULT_LOOK.sidebarWidth,
             })
           }
         >
-          reset wall and text
+          reset wall, text and layout
         </button>
       </div>
     </div>

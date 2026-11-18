@@ -3,7 +3,15 @@ import type { SessionDetail } from "@/lib/types";
 import { getGeneration, stopGeneration } from "@/lib/server/generations";
 import { guard } from "@/lib/server/guard";
 import { BadRequest, errorJson, json, readBody } from "@/lib/server/http";
-import { deleteSession, getSession, renameSession, toMeta } from "@/lib/server/store";
+import { projectExists } from "@/lib/server/projects";
+import {
+  deleteSession,
+  getSession,
+  isValidId,
+  moveSession,
+  renameSession,
+  toMeta,
+} from "@/lib/server/store";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -25,17 +33,31 @@ export async function GET(request: Request, { params }: Context): Promise<Respon
   return json(detail);
 }
 
-/** PATCH /api/sessions/:id { title }  →  { session } */
+/**
+ * PATCH /api/sessions/:id { title?, projectId? }  →  { session }
+ * `projectId` files the session under a project; null takes it out of one.
+ */
 export async function PATCH(request: Request, { params }: Context): Promise<Response> {
   const blocked = guard(request);
   if (blocked) return blocked;
   const { id } = await params;
   try {
     const body = await readBody(request);
-    const title = cleanTitle(body.title);
-    if (!title) return errorJson(400, "bad_title", "Title must not be empty.");
-    const session = renameSession(id, title);
-    return session ? json({ session: toMeta(session) }) : notFound();
+    let session = getSession(id);
+    if (!session) return notFound();
+    if (body.projectId !== undefined) {
+      const projectId = body.projectId;
+      if (projectId !== null && !(isValidId(projectId) && projectExists(projectId))) {
+        return errorJson(400, "bad_project", "That project does not exist.");
+      }
+      session = moveSession(id, projectId) ?? session;
+    }
+    if (body.title !== undefined || body.projectId === undefined) {
+      const title = cleanTitle(body.title);
+      if (!title) return errorJson(400, "bad_title", "Title must not be empty.");
+      session = renameSession(id, title) ?? session;
+    }
+    return json({ session: toMeta(session) });
   } catch (err) {
     if (err instanceof BadRequest) return errorJson(400, "bad_request", err.message);
     throw err;

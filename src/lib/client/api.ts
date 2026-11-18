@@ -1,4 +1,5 @@
 import type {
+  Project,
   PublicSettings,
   ReasoningEffort,
   SendBody,
@@ -34,8 +35,22 @@ export interface SettingsUpdate {
 }
 
 export interface ChatApi {
-  listSessions(query?: string, signal?: AbortSignal): Promise<SessionMeta[]>;
-  createSession(): Promise<Session>;
+  /** `project`: a project id, "none" for chats outside any project, or nothing for all. */
+  listSessions(
+    query?: string,
+    signal?: AbortSignal,
+    project?: string | null,
+  ): Promise<SessionMeta[]>;
+  createSession(projectId?: string | null): Promise<Session>;
+  /** Files a session under a project; null takes it out of one. */
+  moveSession(id: string, projectId: string | null): Promise<SessionMeta>;
+  listProjects(): Promise<Project[]>;
+  createProject(name: string): Promise<Project>;
+  updateProject(id: string, patch: { name?: string; instructions?: string }): Promise<Project>;
+  deleteProject(id: string): Promise<void>;
+  addProjectFiles(id: string, files: File[]): Promise<Project>;
+  removeProjectFile(id: string, fileId: string): Promise<Project>;
+  projectFileUrl(id: string, fileId: string): string;
   getSession(id: string): Promise<SessionDetail>;
   renameSession(id: string, title: string): Promise<SessionMeta>;
   deleteSession(id: string): Promise<void>;
@@ -106,12 +121,47 @@ export function createApi(base = "/api"): ChatApi {
   });
 
   return {
-    async listSessions(query, signal) {
-      const q = query?.trim() ? `?q=${encodeURIComponent(query.trim())}` : "";
+    async listSessions(query, signal, project) {
+      const params = new URLSearchParams();
+      if (query?.trim()) params.set("q", query.trim());
+      if (project) params.set("project", project);
+      const q = params.size ? `?${params}` : "";
       return (await data<{ sessions: SessionMeta[] }>(`/sessions${q}`, { signal })).sessions;
     },
-    async createSession() {
-      return (await data<{ session: Session }>("/sessions", body("POST", {}))).session;
+    async createSession(projectId) {
+      return (
+        await data<{ session: Session }>("/sessions", body("POST", projectId ? { projectId } : {}))
+      ).session;
+    },
+    async moveSession(id, projectId) {
+      return (await data<{ session: SessionMeta }>(`/sessions/${id}`, body("PATCH", { projectId })))
+        .session;
+    },
+    async listProjects() {
+      return (await data<{ projects: Project[] }>("/projects")).projects;
+    },
+    async createProject(name) {
+      return (await data<{ project: Project }>("/projects", body("POST", { name }))).project;
+    },
+    async updateProject(id, patch) {
+      return (await data<{ project: Project }>(`/projects/${id}`, body("PATCH", patch))).project;
+    },
+    async deleteProject(id) {
+      await call(`/projects/${id}`, body("DELETE"));
+    },
+    async addProjectFiles(id, files) {
+      const form = new FormData();
+      for (const file of files) form.append("files", file, file.name);
+      return (
+        await data<{ project: Project }>(`/projects/${id}/files`, { method: "POST", body: form })
+      ).project;
+    },
+    async removeProjectFile(id, fileId) {
+      return (await data<{ project: Project }>(`/projects/${id}/files/${fileId}`, body("DELETE")))
+        .project;
+    },
+    projectFileUrl(id, fileId) {
+      return `${base}/projects/${id}/files/${fileId}`;
     },
     getSession(id) {
       return data<SessionDetail>(`/sessions/${id}`);

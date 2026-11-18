@@ -60,15 +60,16 @@
 .bootInner,
 .composer {
   width: 100%;
-  max-width: 924px;
-  margin: 0 auto 0 max(0px, calc((100% - 924px) / 2 - 16px));
+  /* As wide as whatever holds the chat: the shell decides how wide that is. */
+  max-width: var(--og-measure, 1240px);
+  margin: 0 auto;
 }
 
 .column {
   display: flex;
   flex-direction: column;
   min-height: 100%;
-  padding: 62px 24px 20px;
+  padding: 46px 24px 20px;
 }
 
 /* ---------------------------------------------------------------- boot line */
@@ -93,7 +94,7 @@
 
 .bootInner {
   display: flex;
-  padding: 16px 24px 0;
+  padding: 10px 24px 0;
 }
 
 .bootLabel {
@@ -320,19 +321,29 @@
 .userPlate {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 5px;
   width: fit-content;
   max-width: 100%;
-  /* Snug top and bottom: the sheet should hug a one-line message. */
-  padding: 5px 14px 6px;
+  /* The sheet hugs the words: a hair of yellow above and below, a little at the sides. */
+  padding: 1px 8px 2px;
   border: var(--og-line) solid var(--og-ink);
   background: var(--og-yellow);
-  box-shadow: var(--og-shadow);
-  line-height: 1.5;
+  box-shadow: var(--og-shadow-s);
+  line-height: 1.36;
 }
 
 .userBody {
   white-space: pre-wrap;
+}
+
+/* A sheet that carries files keeps a little room round them. */
+.userPlate:has(.attachments) {
+  padding: 4px 8px 8px;
+}
+
+/* Tighter lines on the sheet than in a reply, so the yellow stays close to the words. */
+.userPlate .body {
+  line-height: 1.4;
 }
 
 .stoppedNote {
@@ -463,7 +474,7 @@ a.chip:hover {
   /* Fixed height, natural width: the frame hugs the picture. */
   display: block;
   width: auto;
-  height: 140px;
+  height: 84px;
   max-width: 100%;
   object-fit: cover;
 }
@@ -612,11 +623,12 @@ a.chip:hover {
   padding: 6px 24px 14px;
 }
 
-/* Black on pale sky blue. */
+/* Black on pale sky blue, unless the look panel has repainted the box. Its text turns light on a dark one. */
 .inputPanel {
   padding: 9px 9px 9px 14px;
   border: var(--og-line) solid var(--og-ink);
-  background: var(--og-blue-pale);
+  background: var(--og-input-bg, var(--og-blue-pale));
+  color: var(--og-input-ink, var(--og-ink));
   box-shadow: var(--og-shadow);
   transition: box-shadow 160ms var(--og-ease);
 }
@@ -638,7 +650,7 @@ a.chip:hover {
   font-size: calc(16.5px * var(--og-type));
   font-weight: 700;
   line-height: 32px;
-  color: var(--og-accent);
+  color: var(--og-input-accent, var(--og-accent));
   user-select: none;
 }
 
@@ -653,17 +665,20 @@ a.chip:hover {
   background: transparent;
   font-size: calc(17px * var(--og-type));
   line-height: calc(24px * var(--og-type));
-  color: var(--og-ink);
-  caret-color: var(--og-accent);
+  color: var(--og-input-ink, var(--og-ink));
+  caret-color: var(--og-input-accent, var(--og-accent));
 }
 
 .surface .input:focus-visible {
   outline: none;
 }
 
-.input::placeholder,
 .editorInput::placeholder {
   color: #44586a;
+}
+
+.input::placeholder {
+  color: var(--og-input-dim, #44586a);
 }
 
 .surface .attach,
@@ -680,7 +695,7 @@ a.chip:hover {
 }
 
 .surface .attach {
-  color: var(--og-ink);
+  color: var(--og-input-ink, var(--og-ink));
 }
 
 .surface .attach:hover {
@@ -699,12 +714,12 @@ a.chip:hover {
   flex: none;
   height: 32px;
   padding: 0 8px;
-  border: 2px solid var(--og-ink);
+  border: 2px solid var(--og-input-ink, var(--og-ink));
   font-family: var(--og-font-mono);
   font-size: calc(12px * var(--og-type));
   font-weight: 700;
   white-space: nowrap;
-  color: var(--og-ink);
+  color: var(--og-input-ink, var(--og-ink));
   transition:
     background var(--og-fast) var(--og-ease),
     color var(--og-fast) var(--og-ease);

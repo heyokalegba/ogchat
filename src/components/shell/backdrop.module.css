@@ -368,6 +368,12 @@
 /* ---------------------------------------------------------------- beacons, birds */
 
 /* Aircraft warning lights on the tallest things. */
+.beacons {
+  position: absolute;
+  inset: 0;
+  transition: opacity 900ms linear;
+}
+
 .beacon {
   position: absolute;
   width: 0.3125%;
@@ -472,6 +478,113 @@
   animation-duration: 0.16s;
 }
 
+/* A bird's wings, and the gentle rise and fall of a flock on its way across. */
+.flierFrames.wingbeat {
+  animation-duration: 0.36s;
+}
+
+.flockBob {
+  position: absolute;
+  left: 0;
+  top: 0;
+  animation: flock-bob 2.6s ease-in-out infinite alternate;
+}
+
+@keyframes flock-bob {
+  from {
+    transform: translateY(calc(var(--u) * -3));
+  }
+  to {
+    transform: translateY(calc(var(--u) * 3));
+  }
+}
+
+/* ---------------------------------------------------------------- behind the windows */
+
+/* One lit window: whoever is in the room shows only where the glass is. */
+.pane {
+  position: absolute;
+  overflow: hidden;
+}
+
+/* A dark shape standing on the sill. Each kind has its own way of coming and going. */
+.shadow {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  opacity: 0.82;
+  animation: 6s linear 1 both;
+}
+
+.shadowFrames {
+  width: 200%;
+  height: 100%;
+  background-repeat: no-repeat;
+  animation: flier-frames 1.9s steps(2) infinite;
+}
+
+/* Walking through the room: in at one side of the window, out at the other. */
+.shadow-pass {
+  animation-name: shadow-pass;
+}
+
+.shadow-pass.shadowLeft {
+  animation-direction: reverse;
+}
+
+@keyframes shadow-pass {
+  from {
+    transform: translateX(calc(var(--u) * -7));
+  }
+  to {
+    transform: translateX(calc(var(--u) * (var(--span) + 1)));
+  }
+}
+
+/* Coming to the window, standing a while, going away again. */
+.shadow-stand {
+  animation-name: shadow-stand;
+}
+
+@keyframes shadow-stand {
+  0% {
+    transform: translateX(calc(var(--u) * -7));
+  }
+  12%,
+  88% {
+    transform: translateX(calc(var(--u) * (var(--span) - 6) / 2));
+  }
+  100% {
+    transform: translateX(calc(var(--u) * -7));
+  }
+}
+
+/* A cat or a dog: up onto the sill, and in time back down. */
+.shadow-cat,
+.shadow-dog {
+  animation-name: shadow-pop;
+  animation-timing-function: steps(24);
+}
+
+.shadow-cat.shadowLeft,
+.shadow-dog.shadowLeft {
+  left: auto;
+  right: 0;
+}
+
+@keyframes shadow-pop {
+  0% {
+    transform: translateY(100%);
+  }
+  6%,
+  94% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
 @keyframes flier-frames {
   to {
     transform: translateX(-100%);
@@ -517,20 +630,34 @@
   overflow: hidden;
 }
 
-/* Six poses side by side: four of a walk cycle, then two of standing about. */
+/* Those with a seat on the doorstep go to it when the party sits, and come back after. */
+.member {
+  transition: transform 700ms steps(5);
+}
+
+.party[data-gait="sit"] .member[data-seat] {
+  transform: translate(calc(var(--u) * var(--sx, 0)), calc(var(--u) * var(--sy, 0)));
+}
+
+/* Eight poses side by side: four of a walk cycle, two of standing about, two of sitting. */
 .frames {
-  width: 600%;
+  width: 800%;
   height: 100%;
   background-repeat: no-repeat;
-  transform: translateX(-66.667%);
+  transform: translateX(-50%);
 }
 
 .party[data-gait="walk"] .frames {
   animation: life-walk var(--cadence, 1s) steps(4) var(--phase, 0s) infinite;
 }
 
-.party[data-gait="idle"] .frames {
+.party[data-gait="idle"] .frames,
+.party[data-gait="sit"] .member:not([data-seat]) .frames {
   animation: life-idle var(--idle, 2s) steps(2) infinite;
+}
+
+.party[data-gait="sit"] .member[data-seat] .frames {
+  animation: life-sit calc(var(--idle, 2s) * 2.4) steps(2) infinite;
 }
 
 @keyframes life-walk {
@@ -538,17 +665,71 @@
     transform: translateX(0);
   }
   to {
-    transform: translateX(-66.667%);
+    transform: translateX(-50%);
   }
 }
 
 @keyframes life-idle {
   from {
-    transform: translateX(-66.667%);
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(-75%);
+  }
+}
+
+@keyframes life-sit {
+  from {
+    transform: translateX(-75%);
   }
   to {
     transform: translateX(-100%);
   }
+}
+
+/* ---- a barbecue on a roof: lights strung between two poles, a grill and its smoke */
+.partyPole {
+  position: absolute;
+  bottom: 0;
+  width: var(--u);
+  background: #17161a;
+}
+
+.partyLights {
+  position: absolute;
+  background-repeat: repeat-x;
+}
+
+/* After dark the bulbs burn, and breathe a little. */
+.partyGlow {
+  position: absolute;
+  inset: 0;
+  transition: opacity 900ms linear;
+}
+
+.partyGlow .partyLights {
+  animation: party-glow 2.8s ease-in-out infinite alternate;
+}
+
+@keyframes party-glow {
+  from {
+    opacity: 0.72;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.partyGrill {
+  position: absolute;
+  background-repeat: no-repeat;
+  transition: opacity 900ms linear;
+}
+
+.partySmoke {
+  position: absolute;
+  overflow: hidden;
+  opacity: 0.55;
 }
 
 @media (prefers-reduced-motion: reduce) {

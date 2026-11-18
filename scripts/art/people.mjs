@@ -5,6 +5,7 @@
  * Every row of a sheet is one character and every column one pose:
  *   columns 0-3   a walk cycle (contact, passing, contact, passing)
  *   columns 4-5   standing about (each character has its own way of waiting)
+ *   columns 6-7   sitting, as on a doorstep (dogs lie down)
  * Everybody faces right; the backdrop mirrors them to walk left.
  *
  * Nobody is drawn by hand. Each character is dealt from a seeded deck of
@@ -13,8 +14,10 @@
  */
 import { canvas, dice, hex, shade } from "./lib.mjs";
 
-export const FRAMES = 6;
+export const FRAMES = 8;
 export const WALK_FRAMES = 4;
+/** Columns 6 and 7: sitting down (people), lying down (dogs). */
+export const SIT_FRAME = 6;
 
 /** One person's cell. The figure stands on the bottom row with a clear column either side. */
 export const PERSON = { w: 9, h: 15 };
@@ -97,7 +100,64 @@ const BAGS = ["#2b2d33", "#7a3328", "#566b4a", "#b79a4c", "#34485e", "#8d8a80"].
  * Draws one person in one pose with their feet on (ox + 4, oy + PERSON.h - 1).
  * `pose` is 0-3 for the walk cycle and 4-5 for waiting.
  */
+/** The head, with its chin on row `chin`: skin, then hair or a hat. */
+function head(px, look, chin, turned = false) {
+  const { skin, hair } = look;
+  for (let y = chin - 2; y <= chin; y++) for (let x = 3; x <= 5; x++) px(x, y, skin);
+  px(5, chin, shade(skin, 0.86)); // jaw
+  const back = turned ? 5 : 3;
+  const crown = look.hat ?? hair;
+  for (let x = 3; x <= 5; x++) px(x, chin - 3, crown);
+  px(back, chin - 2, look.hat && look.hatStyle === "cap" ? hair : crown);
+  if (look.hatStyle === "cap") px(turned ? 2 : 6, chin - 2, shade(crown, 0.8)); // the peak
+  if (look.hatStyle === "beanie") for (let x = 3; x <= 5; x++) px(x, chin - 2, crown);
+  if (look.hatStyle === "beanie") px(turned ? 3 : 5, chin - 2, skin);
+  if (look.long) {
+    // hair to the shoulders
+    px(back, chin - 1, hair);
+    px(turned ? 6 : 2, chin - 2, hair);
+    px(turned ? 6 : 2, chin - 1, hair);
+    px(turned ? 6 : 2, chin, hair);
+  }
+  if (look.puff) {
+    for (let x = 2; x <= 6; x++) px(x, chin - 3, hair);
+    for (let x = 3; x <= 5; x++) px(x, chin - 4, hair);
+    px(turned ? 6 : 2, chin - 2, hair);
+  }
+}
+
+/**
+ * Someone sitting on a step, knees forward, feet a step lower on the bottom
+ * row. On the second frame a hand comes up: talking, or a drink.
+ */
+function seated(c, ox, oy, look, pose) {
+  const ground = oy + PERSON.h - 1;
+  const { torso, skin, top, pants, shoes } = look;
+  const px = (x, y, color) => c.set(ox + x, y, color);
+  const seat = ground - 2;
+  px(5, ground - 1, shade(pants, 0.72)); // the far shin
+  px(6, ground - 1, pants);
+  px(6, ground, shoes);
+  px(7, ground, shoes);
+  for (let x = 3; x <= 6; x++) px(x, seat, pants); // lap
+  const shoulder = seat - torso;
+  for (let y = shoulder; y < seat; y++) for (let x = 3; x <= 5; x++) px(x, y, top);
+  for (let y = shoulder; y < seat; y++) px(3, y, shade(top, 0.86));
+  if (look.pack) for (let y = shoulder; y <= shoulder + 2; y++) px(2, y, look.pack);
+  head(px, look, shoulder - 1);
+  const sleeve = look.bare ? skin : shade(top, 0.8);
+  if (pose === SIT_FRAME) {
+    px(5, shoulder + 1, sleeve);
+    px(5, shoulder + 2, sleeve);
+    px(6, Math.min(seat - 1, shoulder + 3), skin); // a hand on a knee
+  } else {
+    px(6, shoulder + 1, sleeve);
+    px(7, shoulder, skin);
+  }
+}
+
 function person(c, ox, oy, look, pose) {
+  if (pose >= SIT_FRAME) return seated(c, ox, oy, look, pose);
   const ground = oy + PERSON.h - 1;
   const { legs, torso, skin, hair, top, pants, shoes } = look;
   const far = (color) => shade(color, 0.72);
@@ -148,29 +208,7 @@ function person(c, ox, oy, look, pose) {
   }
 
   // ---- head
-  const chin = shoulder - 1;
-  for (let y = chin - 2; y <= chin; y++) for (let x = 3; x <= 5; x++) px(x, y, skin);
-  px(5, chin, shade(skin, 0.86)); // jaw
-  const turned = !walking && look.wait === "look" && pose === 5; // glancing back
-  const back = turned ? 5 : 3;
-  const crown = look.hat ?? hair;
-  for (let x = 3; x <= 5; x++) px(x, chin - 3, crown);
-  px(back, chin - 2, look.hat && look.hatStyle === "cap" ? hair : crown);
-  if (look.hatStyle === "cap") px(turned ? 2 : 6, chin - 2, shade(crown, 0.8)); // the peak
-  if (look.hatStyle === "beanie") for (let x = 3; x <= 5; x++) px(x, chin - 2, crown);
-  if (look.hatStyle === "beanie") px(turned ? 3 : 5, chin - 2, skin);
-  if (look.long) {
-    // hair to the shoulders
-    px(back, chin - 1, hair);
-    px(turned ? 6 : 2, chin - 2, hair);
-    px(turned ? 6 : 2, chin - 1, hair);
-    px(turned ? 6 : 2, chin, hair);
-  }
-  if (look.puff) {
-    for (let x = 2; x <= 6; x++) px(x, chin - 3, hair);
-    for (let x = 3; x <= 5; x++) px(x, chin - 4, hair);
-    px(turned ? 6 : 2, chin - 2, hair);
-  }
+  head(px, look, shoulder - 1, !walking && look.wait === "look" && pose === 5); // glancing back
 
   // ---- arms
   const sleeve = look.bare ? skin : shade(top, 0.8);
@@ -380,7 +418,8 @@ function cyclist(c, ox, oy, look, pose) {
 function skater(c, ox, oy, look, pose) {
   const g = oy + WHEEL.h - 1;
   // one push, then three frames of rolling
-  const stance = pose < WALK_FRAMES ? [0, 1, 4, 4][pose] : pose;
+  // (the last two columns are for sitting; a skater just stands on the board)
+  const stance = pose < WALK_FRAMES ? [0, 1, 4, 4][pose] : pose >= SIT_FRAME ? pose - 2 : pose;
   person(c, ox + 5, oy + WHEEL.h - PERSON.h - 2, look, stance);
   for (let x = 6; x <= 13; x++) c.set(ox + x, g - 1, look.board);
   c.set(ox + 14, g - 2, look.board); // the kicked-up nose
@@ -391,9 +430,9 @@ function skater(c, ox, oy, look, pose) {
 /** A kid with a basketball: dribbling as they walk, and on the spot when they stop. */
 function baller(c, ox, oy, look, pose) {
   const g = oy + WHEEL.h - 1;
-  person(c, ox + 3, oy + WHEEL.h - PERSON.h, look, pose);
+  person(c, ox + 3, oy + WHEEL.h - PERSON.h, look, pose >= SIT_FRAME ? pose - 2 : pose);
   // the ball leaves the hand, hits the pavement and comes back up
-  const height = pose < WALK_FRAMES ? [5, 2, 0, 3][pose] : [5, 0][pose - WALK_FRAMES];
+  const height = pose < WALK_FRAMES ? [5, 2, 0, 3][pose] : [5, 0][pose % 2];
   const ball = hex("#c2622d");
   const bx = ox + 11;
   c.set(bx, g - height, ball);
@@ -451,7 +490,29 @@ const COATS = [
 ].map((pair) => pair.map(hex));
 
 /** One dog in one pose, nose to the right, paws on the bottom row of its cell. */
+/** A dog lying down beside whoever is sitting: flat out, tail moving. */
+function lying(c, ox, oy, look, pose) {
+  const ground = oy + PROP.h - 1;
+  const { long, coat, shadow } = look;
+  const px = (x, y, color) => c.set(ox + x, y, color);
+  const chest = 2 + long;
+  for (let x = 2; x <= chest; x++) {
+    px(x, ground - 1, coat);
+    px(x, ground, x === 2 ? shadow : coat);
+  }
+  px(chest + 1, ground, coat); // front paws out ahead
+  px(chest + 2, ground, shadow);
+  px(chest + 1, ground - 2, coat);
+  px(chest + 2, ground - 2, coat);
+  px(chest + 1, ground - 1, coat);
+  px(chest + 2, ground - 1, look.muzzle);
+  px(chest + 3, ground - 1, hex("#141110"));
+  px(chest + 1, ground - 3, shadow);
+  px(1, ground - (pose === SIT_FRAME ? 1 : 2), coat);
+}
+
 function dog(c, ox, oy, look, pose) {
+  if (pose >= SIT_FRAME) return lying(c, ox, oy, look, pose);
   const ground = oy + PROP.h - 1;
   const { long, tall, coat, shadow } = look;
   const walking = pose < WALK_FRAMES;

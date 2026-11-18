@@ -9,6 +9,17 @@
  * tower downtown catching the last light. The sun has just gone.
  */
 import { empireState, oneWorldTrade } from "./landmarks.mjs";
+import {
+  flyers,
+  neon,
+  oneWay,
+  plateOnPole,
+  sandwichBoard,
+  storefront,
+  streetSign,
+  text,
+  textCentred,
+} from "./street.mjs";
 import { dealer, lamps, stamp, vehicle } from "./vehicles.mjs";
 import {
   bayer,
@@ -91,6 +102,15 @@ function block() {
   const woods = [D("#5c4434"), D("#66493a")];
   const beacons = [];
   const chimneys = [];
+  /** Recorded as the block is drawn, for the life that is added on top of it. */
+  const houses = []; // { x, w, top, color, shop }
+  const stoops = []; // { x } the middle of each stoop
+  const panes = []; // windows that are lit at some hour: { x, y, w, h, when, id }
+  // A few rooms are lit by coloured LED strips instead of a lamp. Dice of their own.
+  const LED = dice(7001);
+  const LED_TONES = ["#c2456e", "#5a7fd6", "#8a5fd0", "#3fae9a", "#d0503a"].map(hex);
+  // Which of the far towers carry a red warning light.
+  const B = dice(7002);
 
   // ------------------------------------------------------------ far: downtown in the haze
   const far = ["#4b4966", "#52506c", "#45445e", "#58556f"].map(hex);
@@ -100,6 +120,8 @@ function block() {
     const color = pick(far);
     skyline.rect(x, PARK_BASE - h, w, h, color);
     skyline.rect(x + w - 2, PARK_BASE - h, 2, h, shade(color, 0.88));
+    // a red warning light on a few of the taller ones
+    if (h > 66 && B.chance(0.22)) beacons.push([x + Math.floor(w / 2), PARK_BASE - h - 1]);
     if (chance(0.3))
       skyline.rect(x + Math.floor(w / 2), PARK_BASE - h - between(6, 16), 1, 16, color);
     for (let wy = PARK_BASE - h + 4; wy < PARK_BASE - 4; wy += 4) {
@@ -446,13 +468,16 @@ function block() {
     if (!on && chance(0.32)) when = "b"; // one of the windows that switch on and off
     when ??= lateOn();
     if (!when) return;
-    const id = emit.light(rooftops, wx, wy, ww, wh, tone, when);
+    // Now and then the light in a room is a coloured LED strip, not a warm lamp.
+    const glow = LED.chance(0.025) ? LED.pick(LED_TONES) : tone;
+    const id = emit.light(rooftops, wx, wy, ww, wh, glow, when);
     if (dressing === "shade") {
-      emit.detail(rooftops, id, wx, wy, ww, Math.ceil(wh * 0.4), shade(tone, 0.68), when); // pulled down
+      emit.detail(rooftops, id, wx, wy, ww, Math.ceil(wh * 0.4), shade(glow, 0.68), when); // pulled down
     } else if (dressing === "curtain") {
-      emit.detail(rooftops, id, wx, wy, 1, wh, shade(tone, 0.6), when);
+      emit.detail(rooftops, id, wx, wy, 1, wh, shade(glow, 0.6), when);
     }
-    emit.detail(rooftops, id, wx, sash, ww, 1, shade(tone, 0.55), when);
+    emit.detail(rooftops, id, wx, sash, ww, 1, shade(glow, 0.55), when);
+    if (when !== "b") panes.push({ x: wx, y: wy, w: ww, h: wh, when, id });
   };
 
   const brownstone = (x, w, floors, color, shop) => {
@@ -492,8 +517,10 @@ function block() {
       // the corner bodega: sign, striped awning, a lit window, crates out front
       const sy = fy + 3;
       rooftops.rect(x + 1, sy, w - 3, 6, D("#7a2f25"));
-      for (let lx = x + 4; lx < x + w - 5; lx += 2)
-        if (chance(0.72)) rooftops.rect(lx, sy + 2, 1, 2, hex("#d6bd72"));
+      // The sign used to be a row of dashes, one roll of the dice each. The rolls
+      // are still made, so the rest of the block is dealt as before.
+      for (let lx = x + 4; lx < x + w - 5; lx += 2) chance(0.72);
+      textCentred(rooftops, x + 1, w - 3, sy + 1, "BODEGA", hex("#e3cf8c"));
       for (let ax = x; ax < x + w - 1; ax++) {
         rooftops.rect(
           ax,
@@ -510,6 +537,14 @@ function block() {
       for (let lx = x + 4; lx < x + w - 14; lx += 3)
         rooftops.rect(lx, wy + 8 + (lx % 2), 2, 6 - (lx % 2), hex("#7a5a34")); // stock on the shelves
       rooftops.rect(x + 3, wy + 6, w - 16, 1, hex("#a67c44"));
+      // fruit on the shelf, and the word in the window
+      for (let lx = x + 4; lx < x + w - 14; lx += 2) {
+        rooftops.set(
+          lx,
+          wy + 5,
+          ["#7b8c4a", "#b0683c", "#b9a04a", "#a8382c"].map(hex)[(lx >> 1) % 4],
+        );
+      }
       rooftops.rect(x + w - 11, wy - 1, 8, 21, hex("#3a2a22")); // door
       rooftops.rect(x + w - 10, wy, 6, 12, hex("#2b2a2e"));
       emit.light(rooftops, x + w - 10, wy, 6, 12, hex("#d8ae66"), "always");
@@ -522,6 +557,8 @@ function block() {
         rooftops.rect(cx, SIDEWALK - 6, 5, 2, hex(tone));
       }
       emit.spill(rooftops, x + w / 2, SIDEWALK - 2, 20, hex("#d9b061"), 0.5, "evening");
+      // lettering in the window, over the light: dull red by day, neon after dark
+      neon(rooftops, emit, x + 5, wy + 1, "OPEN", hex("#7a2f25"), hex("#f0705a"));
       return top;
     }
 
@@ -561,6 +598,7 @@ function block() {
     }
     // the stoop: treads coming down to the pavement, with railings
     const sx = doorX - 1;
+    stoops.push({ x: sx + 4, house: x });
     for (let step = 0; step < 5; step++) {
       const y = fy + step * 2;
       rooftops.rect(sx - step, y, 9 + step * 2, 1, shade(color, 1.26)); // tread
@@ -596,6 +634,7 @@ function block() {
     if (shop) shopPlaced = true;
     const color = pick(stones);
     const top = brownstone(x, w, floors, color, shop);
+    houses.push({ x, w, top, color, shop });
     // on the roof
     const extra = rand();
     if (extra < 0.5) {
@@ -617,6 +656,70 @@ function block() {
       for (let i = 0; i < between(1, 2); i++)
         rooftops.rect(x + between(4, w - 6), top - 2, 2, 2, hex("#17161a")); // pigeons
     x += w;
+  }
+
+  // ------------------------------------------------------------ more shops, and signs
+  // Two more houses give their ground floors over to shops: a bakery and a
+  // pizza place. Each is the house nearest a chosen spot, so they stay put
+  // however the row is dealt.
+  const nearest = (spot) =>
+    houses
+      .filter((house) => !house.shop && !house.taken && house.x > 0 && house.x + house.w < W)
+      .sort((a, b) => Math.abs(a.x + a.w / 2 - spot) - Math.abs(b.x + b.w / 2 - spot))[0];
+  const shops = [
+    {
+      at: 346,
+      name: "BAKERY",
+      sign: D("#39503f"),
+      ink: hex("#e9e4d2"),
+      awning: [D("#c9c2ae"), D("#39503f")],
+      goods: "bread",
+      word: "BREAD",
+      neonDull: hex("#8a6a2c"),
+      neonTone: hex("#fff0c0"),
+    },
+    {
+      at: 462,
+      name: "PIZZA",
+      sign: D("#8f2a1f"),
+      ink: hex("#f0e2b0"),
+      awning: [D("#d6cfbd"), D("#8f2a1f")],
+      goods: "pies",
+      word: "SLICE",
+      neonDull: hex("#7a2f25"),
+      neonTone: hex("#ff7a5c"),
+    },
+  ];
+  for (const shop of shops) {
+    const house = nearest(shop.at);
+    if (!house) continue;
+    house.taken = true;
+    storefront(rooftops, emit, {
+      ...shop,
+      // a shorter word where the window is narrow
+      word: house.w - 16 >= 22 ? shop.word : "OPEN",
+      x: house.x,
+      w: house.w,
+      base: SIDEWALK,
+      wall: house.color,
+      tone: hex("#e3bd72"),
+      tint: dusk,
+    });
+  }
+  // Their stoops went with the parlour floors.
+  const seats = stoops.filter((stoop) => !houses.find((h) => h.x === stoop.house)?.taken);
+
+  /** Draws something in daylight colours and sets it into the dusk the block is drawn in. */
+  const set = (w, h, x, y, draw) => {
+    const piece = canvas(w, h);
+    draw(piece);
+    stamp(rooftops, piece, x, y + h - 1, { tone: dusk });
+  };
+  // a board on the pavement outside each shop
+  for (const house of houses.filter((h) => h.shop || h.taken)) {
+    const face = house.shop ? hex("#2b2d33") : hex("#d6cfbd");
+    const ink = house.shop ? hex("#e3cf8c") : hex("#7a3328");
+    set(5, 8, house.x + house.w - 18, SIDEWALK - 5, (c) => sandwichBoard(c, 0, 7, face, ink));
   }
 
   // Parked along the kerb: all sorts, nose to the right like the lane beside them.
@@ -687,6 +790,14 @@ function block() {
       emit.custom(rooftops, (c) => c.set(lx + dx, 346 + dy, hex("#8a7748")), "evening"); // in the wet road
   }
 
+  // Signs on the lamp posts and along the kerb: where you are, which way the
+  // street runs, where the bus stops and where not to park.
+  set(40, 7, 97, 307, (c) => streetSign(c, 0, 0, "PARK PL"));
+  set(30, 7, 416, 307, (c) => streetSign(c, 0, 0, "7 AV"));
+  set(13, 5, 619, 309, (c) => oneWay(c, 0, 0));
+  set(5, 24, 222, SIDEWALK - 24, (c) => plateOnPole(c, 2, 24, 24, hex("#34485e"), hex("#e9e4d2")));
+  set(5, 22, 520, SIDEWALK - 22, (c) => plateOnPole(c, 2, 22, 22, hex("#e9e4d2"), hex("#a8382c")));
+
   emit.switching(skyline, "a", lights.a);
   emit.switching(skyline, "c", lights.c);
   emit.switching(rooftops, "b", lights.b);
@@ -708,7 +819,21 @@ function block() {
       parked: emit.render(parked, state, GRADES[state]),
     };
   }
-  return { states, lights, glow, beacons, chimneys };
+  // Windows still in plain sight: not behind a tree, not swallowed by a shop.
+  const windows = panes
+    .filter(
+      (p) =>
+        p.x >= 0 &&
+        p.x + p.w <= W &&
+        rooftops.owns(p.x, p.y, p.id) &&
+        rooftops.owns(p.x + p.w - 1, p.y + p.h - 1, p.id) &&
+        rooftops.owns(p.x + 2, p.y + Math.floor(p.h / 2) + 1, p.id),
+    )
+    .map(({ x, y, w, h, when }) => ({ x, y, w, h, when }));
+  const roofs = houses
+    .filter((house) => house.x >= 0 && house.x + house.w <= W)
+    .map(({ x, w, top }) => ({ x, w, top }));
+  return { states, lights, glow, beacons, chimneys, windows, roofs, stoops: seats };
 }
 
 /** Where parked cars' wheels rest, and where each lane's do. */
@@ -839,8 +964,13 @@ export function brooklynScene(puff, cast) {
         road: PARKED_BASE + 3,
         sniff: [...TREES.map((x) => x + 1), HYDRANT],
         linger: [164, 176, 300, 452],
-        roofs: [],
+        // the roofs of the houses, for the odd barbecue
+        roofs: scene.roofs,
+        // where people sit: the middle of each stoop, and the row its bottom step is on
+        stoops: scene.stoops.map((stoop) => ({ x: stoop.x, y: SIDEWALK - 1 })),
       },
+      // Lit windows in plain view, for the people and pets seen moving behind them.
+      windows: scene.windows,
     },
   };
 }

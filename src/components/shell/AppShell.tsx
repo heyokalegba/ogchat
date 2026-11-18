@@ -6,16 +6,18 @@ import { MenuIcon } from "@/components/chat/icons";
 import "@/components/chat/theme.css";
 import { createApi } from "@/lib/client/api";
 import { brooklynClock, offsetForClockTime, readSky } from "@/lib/daylight";
-import type { PublicSettings, ReasoningEffort, SessionMeta } from "@/lib/types";
+import type { Project, PublicSettings, ReasoningEffort, SessionMeta } from "@/lib/types";
 import { SCENES, type SceneId } from "./art";
 import { Backdrop } from "./Backdrop";
 import { DEFAULT_LOOK, loadLook, lookVariables, saveLook, type Look } from "./look";
 import { LookPanel } from "./LookPanel";
+import { ProjectPanel } from "./ProjectPanel";
 import { SettingsPanel } from "./SettingsPanel";
 import styles from "./shell.module.css";
 import { Sidebar } from "./Sidebar";
 
 const SEARCH_DEBOUNCE_MS = 140;
+const PROJECT_KEY = "ogchat:project";
 /** How often the scene looks at the clock. The sun moves a quarter of a degree a minute. */
 const CLOCK_TICK_MS = 15_000;
 const SCENE_IDS = Object.keys(SCENES) as SceneId[];
@@ -57,6 +59,13 @@ export function AppShell() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  /** Projects, which one's chats are listed (null: all), and which one is open for editing. */
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [editingProject, setEditingProject] = useState<string | null>(null);
+  /** The open session's details, kept even when a filter leaves it out of the list. */
+  const [activeMeta, setActiveMeta] = useState<SessionMeta | null>(null);
+  const projectRef = useRef<string | null>(null);
   const queryRef = useRef("");
   const activeIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -66,8 +75,9 @@ export function AppShell() {
   const refreshSessions = useCallback(
     async (q: string, signal?: AbortSignal) => {
       try {
-        const next = await api.listSessions(q, signal);
-        if (signal?.aborted || queryRef.current !== q) return;
+        const project = projectRef.current;
+        const next = await api.listSessions(q, signal, project);
+        if (signal?.aborted || queryRef.current !== q || projectRef.current !== project) return;
         setSessions(next);
         setLoaded(true);
       } catch {
@@ -81,8 +91,26 @@ export function AppShell() {
   useEffect(() => {
     setActiveId(sessionFromUrl());
     setLook(loadLook());
+    try {
+      projectRef.current = window.localStorage.getItem(PROJECT_KEY) || null;
+      setProjectId(projectRef.current);
+    } catch {
+      // storage unavailable: start on all chats
+    }
     setReady(true);
     void refreshSessions("");
+    api.listProjects().then(
+      (list) => {
+        setProjects(list);
+        // The remembered project may have been deleted since.
+        if (projectRef.current && !list.some((p) => p.id === projectRef.current)) {
+          projectRef.current = null;
+          setProjectId(null);
+          void refreshSessions(queryRef.current);
+        }
+      },
+      () => {},
+    );
     api.getSettings().then(setSettings, () => {});
     const onPop = () => {
       setActiveId(sessionFromUrl());
@@ -141,6 +169,42 @@ export function AppShell() {
     document.title = activeId && activeTitle ? `${activeTitle} · ogchat` : "ogchat";
   }, [activeId, activeTitle]);
 
+  const refreshProjects = useCallback(() => {
+    api.listProjects().then(setProjects, () => {});
+  }, [api]);
+
+  const onProjectChange = useCallback(
+    (id: string | null) => {
+      projectRef.current = id;
+      setProjectId(id);
+      try {
+        if (id) window.localStorage.setItem(PROJECT_KEY, id);
+        else window.localStorage.removeItem(PROJECT_KEY);
+      } catch {
+        // not remembered, still applied
+      }
+      void refreshSessions(queryRef.current);
+    },
+    [refreshSessions],
+  );
+
+  const onNewProject = useCallback(
+    async (name: string) => {
+      try {
+        const project = await api.createProject(name);
+        setProjects((current) =>
+          [...current, project].sort((a, b) => a.name.localeCompare(b.name)),
+        );
+        onProjectChange(project.id);
+        // Straight into its panel: a project is not much use without instructions or files.
+        setEditingProject(project.id);
+      } catch {
+        refreshProjects();
+      }
+    },
+    [api, onProjectChange, refreshProjects],
+  );
+
   const open = useCallback((id: string | null) => {
     setActiveId(id);
     setOpenToken((n) => n + 1);
@@ -151,6 +215,11 @@ export function AppShell() {
   const upsert = useCallback((session: SessionMeta) => {
     setSessions((current) => {
       const known = current.some((s) => s.id === session.id);
+      // A session that is not in the project being shown does not belong in the list.
+      const project = projectRef.current;
+      if (project && session.projectId !== project) {
+        return known ? current.filter((s) => s.id !== session.id) : current;
+      }
       // While a search is active, do not add sessions that the search did not return.
       if (!known && queryRef.current) return current;
       const next = known
@@ -159,6 +228,7 @@ export function AppShell() {
       return next.sort(newestFirst);
     });
     setActiveTitle((current) => (session.id === activeIdRef.current ? session.title : current));
+    if (session.id === activeIdRef.current) setActiveMeta(session);
   }, []);
 
   const onSessionCreated = useCallback(
@@ -168,8 +238,9 @@ export function AppShell() {
       setActiveTitle(session.title);
       writeUrl(session.id, "replace");
       upsert(session);
+      if (session.projectId) refreshProjects();
     },
-    [upsert],
+    [upsert, refreshProjects],
   );
 
   const onSessionMissing = useCallback((id: string) => {
@@ -199,8 +270,9 @@ export function AppShell() {
       }
       setSessions((current) => current.filter((s) => s.id !== id));
       if (activeIdRef.current === id) open(null);
+      refreshProjects();
     },
-    [api, open, refreshSessions],
+    [api, open, refreshSessions, refreshProjects],
   );
 
   const openSettings = useCallback(() => {
@@ -226,6 +298,16 @@ export function AppShell() {
       return next;
     });
   }, []);
+
+  // With the chat put away, Escape brings it back.
+  useEffect(() => {
+    if (look.chatShown) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !lookOpen && !settingsOpen) changeLook({ chatShown: true });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [look.chatShown, lookOpen, settingsOpen, changeLook]);
 
   // The scene's clock: real time, looked at again every few seconds and
   // whenever the tab comes back. It is never stopped; setting a time only
@@ -257,6 +339,16 @@ export function AppShell() {
     changeLook({ clockOffsetMs: 0 });
   }, [changeLook]);
 
+  // The session on screen, as the list knows it, and the project named in the title:
+  // the open session's own, or for a new chat the one it will be filed under.
+  const activeSession =
+    (activeMeta?.id === activeId ? activeMeta : null) ??
+    sessions.find((session) => session.id === activeId) ??
+    null;
+  const titleProject =
+    projects.find((p) => p.id === (activeId ? activeSession?.projectId : projectId)) ?? null;
+  const panelProject = projects.find((p) => p.id === editingProject) ?? null;
+
   const provider = useMemo(
     () => (settings ? { ready: settings.apiKey.set, model: settings.model } : null),
     [settings],
@@ -264,10 +356,14 @@ export function AppShell() {
 
   return (
     <div
-      className={`ogchat ${styles.shell} ${look.wallShown ? "" : styles.noWall}`}
+      className={`ogchat ${styles.shell} ${look.wallShown ? "" : styles.noWall} ${
+        look.chatShown ? "" : styles.sceneOnly
+      }`}
       style={lookVariables(look) as CSSProperties}
     >
-      {ready && view && <Backdrop scene={look.scene} view={view} people={look.people} />}
+      {ready && view && (
+        <Backdrop scene={look.scene} view={view} now={sceneNow ?? 0} people={look.people} />
+      )}
       <Sidebar
         sessions={sessions}
         activeId={activeId}
@@ -282,6 +378,15 @@ export function AppShell() {
         onRename={onRename}
         onDelete={onDelete}
         onOpenSettings={openSettings}
+        projects={projects}
+        projectId={projectId}
+        onProjectChange={onProjectChange}
+        onNewProject={onNewProject}
+        onEditProject={(id) => {
+          setSidebarOpen(false);
+          setEditingProject(id);
+        }}
+        onResize={(width) => changeLook({ sidebarWidth: Math.round(width / 10) * 10 })}
       />
       {sidebarOpen && <div className={styles.scrim} onClick={() => setSidebarOpen(false)} />}
 
@@ -296,7 +401,7 @@ export function AppShell() {
             <MenuIcon />
           </button>
           <div className={styles.topTitle}>
-            <span className={styles.topPath}>~/</span>
+            <span className={styles.topPath}>~/{titleProject ? `${titleProject.name}/` : ""}</span>
             {activeId ? (activeTitle ?? "session") : "new session"}
           </div>
           <div className={styles.topTools}>
@@ -314,6 +419,19 @@ export function AppShell() {
                 </button>
               ))}
             </div>
+            <button
+              type="button"
+              className={`${styles.lookButton} ${look.chatShown ? "" : styles.lookButtonOpen}`}
+              aria-pressed={!look.chatShown}
+              title={
+                look.chatShown
+                  ? "Put the chat away and just look at the scene"
+                  : "Bring the chat back (Esc)"
+              }
+              onClick={() => changeLook({ chatShown: !look.chatShown })}
+            >
+              {look.chatShown ? "hide chat" : "show chat"}
+            </button>
             <button
               type="button"
               className={`${styles.lookButton} ${lookOpen ? styles.lookButtonOpen : ""}`}
@@ -334,6 +452,7 @@ export function AppShell() {
               sessionId={activeId}
               openToken={openToken}
               provider={provider}
+              projectId={projectId}
               reasoning={settings?.reasoning}
               onReasoningChange={settings ? onReasoningChange : undefined}
               onSessionCreated={onSessionCreated}
@@ -353,6 +472,35 @@ export function AppShell() {
           onSetTime={setSceneTime}
           onSnapToNow={snapToNow}
           onClose={() => setLookOpen(false)}
+        />
+      )}
+
+      {panelProject && (
+        <ProjectPanel
+          key={panelProject.id}
+          api={api}
+          project={panelProject}
+          session={activeSession}
+          onClose={() => setEditingProject(null)}
+          onChanged={(next) =>
+            setProjects((current) =>
+              current
+                .map((p) => (p.id === next.id ? next : p))
+                .sort((a, b) => a.name.localeCompare(b.name)),
+            )
+          }
+          onSessionMoved={(session) => {
+            upsert(session);
+            setActiveMeta(session);
+            refreshProjects();
+            void refreshSessions(queryRef.current);
+          }}
+          onDeleted={(id) => {
+            setEditingProject(null);
+            setProjects((current) => current.filter((p) => p.id !== id));
+            if (projectRef.current === id) onProjectChange(null);
+            else void refreshSessions(queryRef.current);
+          }}
         />
       )}
 

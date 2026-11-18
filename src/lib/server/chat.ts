@@ -5,6 +5,7 @@ import { buildProviderMessages } from "./context";
 import { FileRejected, ingestFile, saveFile, type IngestedFile } from "./files";
 import { beginGeneration, endGeneration, type Generation } from "./generations";
 import { BadRequest, readBody } from "./http";
+import { getProject } from "./projects";
 import { resolveSettings } from "./settings";
 import { appendMessage, getSession, pruneSessionFiles, toMeta, truncateFrom } from "./store";
 
@@ -247,7 +248,8 @@ export async function runTurn(
   try {
     emit({ type: "start", session: toMeta(turn.session), userMessage: turn.userMessage });
     const settings = resolveSettings();
-    const messages = buildProviderMessages(turn.session, settings.systemPrompt);
+    const project = turn.session.projectId ? getProject(turn.session.projectId) : null;
+    const messages = buildProviderMessages(turn.session, settings.systemPrompt, project);
     sentImages = messages.some(
       (m) => Array.isArray(m.content) && m.content.some((part) => part.type === "image_url"),
     );

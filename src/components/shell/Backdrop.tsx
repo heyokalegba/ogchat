@@ -1,9 +1,15 @@
 import type { CSSProperties } from "react";
-import type { SkyView } from "@/lib/daylight";
+import { brooklynClock, type SkyView } from "@/lib/daylight";
 import { SCENES, SKY, type SceneId } from "./art";
 import styles from "./backdrop.module.css";
+import { roofPartyAt } from "./life";
 import { SkyTraffic } from "./SkyTraffic";
 import { StreetLife } from "./StreetLife";
+import { WindowLife } from "./WindowLife";
+
+/** Each scene keeps its own diary of rooftop barbecues. */
+const PARTY_SALT: Record<SceneId, number> = { skyline: 11, brooklyn: 23 };
+const minuteOfDay = (ms: number) => brooklynClock(ms).minutes;
 
 /**
  * The living scene behind the interface.
@@ -40,8 +46,14 @@ function Blend(props: {
   );
 }
 
-export function Backdrop(props: { scene: SceneId; view: SkyView; people?: boolean }) {
-  const { scene, view, people = true } = props;
+export function Backdrop(props: {
+  scene: SceneId;
+  view: SkyView;
+  /** The scene's time now, in milliseconds: what the timed events go by. */
+  now: number;
+  people?: boolean;
+}) {
+  const { scene, view, now, people = true } = props;
   const art = SCENES[scene];
   const config = art.config;
   const { blend, sun, moon } = view;
@@ -106,6 +118,14 @@ export function Backdrop(props: { scene: SceneId; view: SkyView; people?: boolea
         <div className={`${styles.layer} ${styles[`glow${phase}B`]}`} style={image(sources[1])} />
       </div>
     );
+
+  // Is anybody having a barbecue on a roof just now? Only roofs with room for one are asked.
+  const hosts = config.life.roofs
+    .map((roof, index) => ({ roof, index }))
+    .filter(({ roof }) => roof.w >= 34);
+  const event = roofPartyAt(now, PARTY_SALT[scene], hosts.length, minuteOfDay);
+  const party = event ? { roof: hosts[event.roof]!.index, endsAt: event.endsAt } : null;
+  const beaconGlow = Math.min(1, night * 1.8);
 
   const parked = art.parked && <Blend className={styles.layer} sources={art.parked} view={view} />;
 
@@ -178,7 +198,7 @@ export function Backdrop(props: { scene: SceneId; view: SkyView; people?: boolea
           </div>
         )}
 
-        <SkyTraffic light={light} />
+        <SkyTraffic light={light} night={night} />
 
         <Blend className={styles.layer} sources={art.city} view={view} />
         <div
@@ -192,13 +212,23 @@ export function Backdrop(props: { scene: SceneId; view: SkyView; people?: boolea
         {glow(art.glow.back, "Back")}
         {smoke(false)}
         {lanes(false)}
-        {config.beacons.map((beacon) => (
-          <span
-            key={`${beacon.left}-${beacon.top}`}
-            className={styles.beacon}
-            style={{ left: beacon.left, top: beacon.top, animationDelay: beacon.delay }}
-          />
-        ))}
+        {/* Warning lights on the tall buildings: lit as the light goes, blinking out of step. */}
+        {beaconGlow > 0.04 && (
+          <div className={styles.beacons} style={{ opacity: beaconGlow }}>
+            {config.beacons.map((beacon, index) => (
+              <span
+                key={`${beacon.left}-${beacon.top}`}
+                className={styles.beacon}
+                style={{
+                  left: beacon.left,
+                  top: beacon.top,
+                  animationDelay: beacon.delay,
+                  animationDuration: `${2.1 + (index % 4) * 0.45}s`,
+                }}
+              />
+            ))}
+          </div>
+        )}
 
         <Blend className={styles.layer} sources={art.rooftops} view={view} />
         <div
@@ -207,7 +237,19 @@ export function Backdrop(props: { scene: SceneId; view: SkyView; people?: boolea
         />
         {glow(art.glow.front, "Front")}
         {/* Cars at the kerb stand between the pavement and us; cyclists pass outside them. */}
-        {people ? <StreetLife scene={scene} light={light} night={night} kerb={parked} /> : parked}
+        <WindowLife scene={scene} light={light} />
+        {people ? (
+          <StreetLife
+            scene={scene}
+            light={light}
+            night={night}
+            kerb={parked}
+            party={party}
+            now={now}
+          />
+        ) : (
+          parked
+        )}
         {smoke(true)}
         {lanes(true)}
       </div>

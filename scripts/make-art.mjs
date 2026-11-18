@@ -31,7 +31,8 @@ import { birds, CHAT_ART, ROOT, SHELL_ART, smoke, STATES, writePng, written } fr
 import { bricks } from "./art/bricks.mjs";
 import { brooklynScene } from "./art/brooklyn.mjs";
 import { PEOPLE_META, peopleSheet, propsSheet, wheelsSheet } from "./art/people.mjs";
-import { cloudStrip, FLIER, fliers, moon, sky, stars, sun } from "./art/sky.mjs";
+import { GRILL, grill, PARTY_LIGHTS, partyLights, SHADOW, shadows } from "./art/extras.mjs";
+import { BIRD, bird, cloudStrip, FLIER, fliers, moon, sky, stars, sun } from "./art/sky.mjs";
 import { skylineScene } from "./art/skyline.mjs";
 
 // Start from an empty folder, so a renamed picture never leaves its old self behind.
@@ -59,6 +60,10 @@ add("moon.png", lunar.canvas);
 const puff = smoke();
 add("smoke.png", puff.canvas);
 add("birds.png", birds());
+add("bird.png", bird());
+add("shadows.png", shadows());
+add("party-lights.png", partyLights());
+add("grill.png", grill());
 
 const cast = { people: peopleSheet(), props: propsSheet(), wheels: wheelsSheet() };
 const scenes = { skyline: skylineScene(puff, cast), brooklyn: brooklynScene(puff, cast) };
@@ -116,6 +121,13 @@ export const SKY = {
   /** An airliner and a helicopter: two frames across, one row each. */
   fliers: ${perState((s) => `fliers-${s}.png`)},
   flier: ${JSON.stringify(FLIER)},
+  /** One bird, wings up and wings down. */
+  bird: { src: ${src("bird.png")}, ...${JSON.stringify(BIRD)} },
+  /** Figures seen against lit windows: a row each, two frames across. */
+  shadows: { src: ${src("shadows.png")}, ...${JSON.stringify(SHADOW)} },
+  /** For a barbecue on a roof. Each picture is its unlit look above its lit one. */
+  partyLights: { src: ${src("party-lights.png")}, ...${JSON.stringify(PARTY_LIGHTS)} },
+  grill: { src: ${src("grill.png")}, ...${JSON.stringify(GRILL)} },
 } as const;
 
 /**

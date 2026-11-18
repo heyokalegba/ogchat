@@ -15,6 +15,11 @@ export function sessionsDir(): string {
   return path.join(dataDir(), "sessions");
 }
 
+/** One JSON file per project: <data>/projects/<id>.json. Their files live with the attachments. */
+export function projectsDir(): string {
+  return path.join(dataDir(), "projects");
+}
+
 export function settingsFile(): string {
   return path.join(dataDir(), "settings.json");
 }

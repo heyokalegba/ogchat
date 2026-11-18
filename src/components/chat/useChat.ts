@@ -43,6 +43,8 @@ export interface UseChatOptions {
   /** Bump to re-open the same session (replays the boot line and refocuses). */
   openToken?: number;
   api: ChatApi;
+  /** The project a new conversation is filed under when its first message is sent. */
+  projectId?: string | null;
   onSessionCreated?: (session: SessionMeta) => void;
   onSessionUpdated?: (session: SessionMeta) => void;
   onSessionMissing?: (sessionId: string) => void;
@@ -53,8 +55,8 @@ const WEB_KEY = "ogchat:web";
 const STOP_GRACE_MS = 2500;
 
 function metaOf(session: Session): SessionMeta {
-  const { id, title, createdAt, updatedAt, messageCount } = session;
-  return { id, title, createdAt, updatedAt, messageCount };
+  const { id, title, createdAt, updatedAt, messageCount, projectId } = session;
+  return { id, title, createdAt, updatedAt, messageCount, projectId };
 }
 
 /** Requests the server refused because of what was sent; sending the same thing again cannot work. */
@@ -326,7 +328,7 @@ export function useChat(options: UseChatOptions) {
 
       try {
         if (!id) {
-          const created = await api.createSession();
+          const created = await api.createSession(callbacks.current.projectId ?? null);
           if (epochRef.current !== epoch) {
             // The user moved on before the session existed; do not leave an empty one behind.
             void api.deleteSession(created.id).catch(() => {});

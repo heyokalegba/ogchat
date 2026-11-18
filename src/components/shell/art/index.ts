@@ -22,6 +22,10 @@ import sunLow from "./sun-low.png";
 import moon from "./moon.png";
 import smoke from "./smoke.png";
 import birds from "./birds.png";
+import bird from "./bird.png";
+import shadows from "./shadows.png";
+import partyLights from "./party-lights.png";
+import grill from "./grill.png";
 import skylineLightsA from "./skyline/lights-a.png";
 import skylineLightsB from "./skyline/lights-b.png";
 import skylineLightsC from "./skyline/lights-c.png";
@@ -106,6 +110,13 @@ export const SKY = {
   /** An airliner and a helicopter: two frames across, one row each. */
   fliers: { day: fliersDay.src, golden: fliersGolden.src, dusk: fliersDusk.src, night: fliersNight.src },
   flier: {"w":26,"h":10,"frames":2,"rows":2,"plane":0,"helicopter":1},
+  /** One bird, wings up and wings down. */
+  bird: { src: bird.src, ...{"w":7,"h":5,"frames":2} },
+  /** Figures seen against lit windows: a row each, two frames across. */
+  shadows: { src: shadows.src, ...{"w":6,"h":9,"frames":2,"rows":4,"person":0,"tall":1,"cat":2,"dog":3} },
+  /** For a barbecue on a roof. Each picture is its unlit look above its lit one. */
+  partyLights: { src: partyLights.src, ...{"w":16,"h":6} },
+  grill: { src: grill.src, ...{"w":10,"h":11} },
 } as const;
 
 /**
@@ -114,7 +125,7 @@ export const SKY = {
  * `cast` gives [first row, count] for each kind of character.
  */
 export const PEOPLE = {
-  "frames": 6,
+  "frames": 8,
   "walkFrames": 4,
   "person": {
     "w": 9,
@@ -251,14 +262,29 @@ export const SCENES = {
           "delay": "0.0s"
         },
         {
+          "left": "38.125%",
+          "top": "52.500%",
+          "delay": "-0.8s"
+        },
+        {
+          "left": "72.500%",
+          "top": "47.222%",
+          "delay": "-1.6s"
+        },
+        {
+          "left": "87.031%",
+          "top": "47.222%",
+          "delay": "-2.4s"
+        },
+        {
           "left": "65.000%",
           "top": "54.167%",
-          "delay": "-0.8s"
+          "delay": "-3.2s"
         },
         {
           "left": "91.563%",
           "top": "54.167%",
-          "delay": "-1.6s"
+          "delay": "-4.0s"
         }
       ],
       "birds": {
@@ -284,11 +310,6 @@ export const SCENES = {
             "x": 69,
             "w": 45,
             "top": 324
-          },
-          {
-            "x": 114,
-            "w": 57,
-            "top": 301
           },
           {
             "x": 171,
@@ -326,11 +347,6 @@ export const SCENES = {
             "top": 306
           },
           {
-            "x": 460,
-            "w": 48,
-            "top": 325
-          },
-          {
             "x": 508,
             "w": 56,
             "top": 323
@@ -345,8 +361,690 @@ export const SCENES = {
             "w": 33,
             "top": 322
           }
-        ]
-      }
+        ],
+        "stoops": []
+      },
+      "windows": [
+        {
+          "x": 4,
+          "y": 308,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 4,
+          "y": 332,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 13,
+          "y": 344,
+          "w": 4,
+          "h": 6,
+          "when": "evening"
+        },
+        {
+          "x": 50,
+          "y": 300,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 59,
+          "y": 300,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 41,
+          "y": 312,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 59,
+          "y": 312,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 32,
+          "y": 324,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 50,
+          "y": 324,
+          "w": 4,
+          "h": 6,
+          "when": "evening"
+        },
+        {
+          "x": 32,
+          "y": 336,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 41,
+          "y": 336,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 32,
+          "y": 348,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 41,
+          "y": 348,
+          "w": 4,
+          "h": 6,
+          "when": "evening"
+        },
+        {
+          "x": 50,
+          "y": 348,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 74,
+          "y": 345,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 83,
+          "y": 345,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 119,
+          "y": 310,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 128,
+          "y": 310,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 137,
+          "y": 310,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 137,
+          "y": 322,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 146,
+          "y": 322,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 128,
+          "y": 334,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 137,
+          "y": 334,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 164,
+          "y": 346,
+          "w": 4,
+          "h": 6,
+          "when": "evening"
+        },
+        {
+          "x": 194,
+          "y": 304,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 203,
+          "y": 304,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 212,
+          "y": 304,
+          "w": 4,
+          "h": 6,
+          "when": "evening"
+        },
+        {
+          "x": 194,
+          "y": 316,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 212,
+          "y": 316,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 176,
+          "y": 328,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 194,
+          "y": 328,
+          "w": 4,
+          "h": 6,
+          "when": "evening"
+        },
+        {
+          "x": 212,
+          "y": 328,
+          "w": 4,
+          "h": 6,
+          "when": "evening"
+        },
+        {
+          "x": 194,
+          "y": 340,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 244,
+          "y": 316,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 253,
+          "y": 316,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 235,
+          "y": 328,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 253,
+          "y": 328,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 226,
+          "y": 340,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 244,
+          "y": 340,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 253,
+          "y": 340,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 301,
+          "y": 308,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 310,
+          "y": 308,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 328,
+          "y": 308,
+          "w": 4,
+          "h": 6,
+          "when": "evening"
+        },
+        {
+          "x": 337,
+          "y": 308,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 301,
+          "y": 320,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 310,
+          "y": 320,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 328,
+          "y": 320,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 337,
+          "y": 320,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 301,
+          "y": 332,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 310,
+          "y": 332,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 319,
+          "y": 332,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 328,
+          "y": 332,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 346,
+          "y": 332,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 319,
+          "y": 344,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 328,
+          "y": 344,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 337,
+          "y": 344,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 346,
+          "y": 344,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 360,
+          "y": 314,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 369,
+          "y": 314,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 360,
+          "y": 326,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 378,
+          "y": 326,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 378,
+          "y": 338,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 360,
+          "y": 350,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 378,
+          "y": 350,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 407,
+          "y": 333,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 416,
+          "y": 333,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 416,
+          "y": 345,
+          "w": 4,
+          "h": 6,
+          "when": "evening"
+        },
+        {
+          "x": 443,
+          "y": 315,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 443,
+          "y": 339,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 452,
+          "y": 339,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 443,
+          "y": 351,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 474,
+          "y": 334,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 483,
+          "y": 334,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 501,
+          "y": 334,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 465,
+          "y": 346,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 474,
+          "y": 346,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 483,
+          "y": 346,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 492,
+          "y": 346,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 531,
+          "y": 332,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 540,
+          "y": 332,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 513,
+          "y": 344,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 549,
+          "y": 344,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 569,
+          "y": 300,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 578,
+          "y": 300,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 587,
+          "y": 300,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 578,
+          "y": 312,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 569,
+          "y": 324,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 596,
+          "y": 324,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 569,
+          "y": 336,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 587,
+          "y": 336,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 596,
+          "y": 336,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 578,
+          "y": 348,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 587,
+          "y": 348,
+          "w": 4,
+          "h": 6,
+          "when": "evening"
+        },
+        {
+          "x": 596,
+          "y": 348,
+          "w": 4,
+          "h": 6,
+          "when": "night"
+        },
+        {
+          "x": 619,
+          "y": 331,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 619,
+          "y": 343,
+          "w": 4,
+          "h": 6,
+          "when": "always"
+        },
+        {
+          "x": 628,
+          "y": 343,
+          "w": 4,
+          "h": 6,
+          "when": "evening"
+        }
+      ]
     },
   },
   brooklyn: {
@@ -429,6 +1127,16 @@ export const SCENES = {
       ],
       "beacons": [
         {
+          "left": "18.750%",
+          "top": "39.722%",
+          "delay": "0s"
+        },
+        {
+          "left": "24.375%",
+          "top": "45.000%",
+          "delay": "0s"
+        },
+        {
           "left": "55.000%",
           "top": "19.167%",
           "delay": "0s"
@@ -466,8 +1174,667 @@ export const SCENES = {
           300,
           452
         ],
-        "roofs": []
-      }
+        "roofs": [
+          {
+            "x": 29,
+            "w": 43,
+            "top": 234
+          },
+          {
+            "x": 72,
+            "w": 44,
+            "top": 254
+          },
+          {
+            "x": 116,
+            "w": 41,
+            "top": 214
+          },
+          {
+            "x": 157,
+            "w": 40,
+            "top": 234
+          },
+          {
+            "x": 197,
+            "w": 34,
+            "top": 254
+          },
+          {
+            "x": 231,
+            "w": 38,
+            "top": 234
+          },
+          {
+            "x": 269,
+            "w": 35,
+            "top": 254
+          },
+          {
+            "x": 304,
+            "w": 35,
+            "top": 254
+          },
+          {
+            "x": 339,
+            "w": 34,
+            "top": 234
+          },
+          {
+            "x": 373,
+            "w": 43,
+            "top": 214
+          },
+          {
+            "x": 416,
+            "w": 36,
+            "top": 234
+          },
+          {
+            "x": 452,
+            "w": 34,
+            "top": 234
+          },
+          {
+            "x": 486,
+            "w": 37,
+            "top": 234
+          },
+          {
+            "x": 523,
+            "w": 34,
+            "top": 254
+          },
+          {
+            "x": 557,
+            "w": 43,
+            "top": 254
+          },
+          {
+            "x": 600,
+            "w": 40,
+            "top": 254
+          }
+        ],
+        "stoops": [
+          {
+            "x": 21,
+            "y": 333
+          },
+          {
+            "x": 37,
+            "y": 333
+          },
+          {
+            "x": 106,
+            "y": 333
+          },
+          {
+            "x": 123,
+            "y": 333
+          },
+          {
+            "x": 223,
+            "y": 333
+          },
+          {
+            "x": 260,
+            "y": 333
+          },
+          {
+            "x": 295,
+            "y": 333
+          },
+          {
+            "x": 330,
+            "y": 333
+          },
+          {
+            "x": 381,
+            "y": 333
+          },
+          {
+            "x": 442,
+            "y": 333
+          },
+          {
+            "x": 493,
+            "y": 333
+          },
+          {
+            "x": 549,
+            "y": 333
+          },
+          {
+            "x": 591,
+            "y": 333
+          },
+          {
+            "x": 607,
+            "y": 333
+          }
+        ]
+      },
+      "windows": [
+        {
+          "x": 8,
+          "y": 246,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 8,
+          "y": 266,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 19,
+          "y": 266,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 8,
+          "y": 286,
+          "w": 5,
+          "h": 10,
+          "when": "night"
+        },
+        {
+          "x": 19,
+          "y": 286,
+          "w": 5,
+          "h": 10,
+          "when": "night"
+        },
+        {
+          "x": 8,
+          "y": 306,
+          "w": 5,
+          "h": 14,
+          "when": "night"
+        },
+        {
+          "x": 35,
+          "y": 246,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 48,
+          "y": 246,
+          "w": 5,
+          "h": 10,
+          "when": "night"
+        },
+        {
+          "x": 61,
+          "y": 246,
+          "w": 5,
+          "h": 10,
+          "when": "always"
+        },
+        {
+          "x": 35,
+          "y": 286,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 104,
+          "y": 266,
+          "w": 5,
+          "h": 10,
+          "when": "always"
+        },
+        {
+          "x": 91,
+          "y": 286,
+          "w": 5,
+          "h": 10,
+          "when": "night"
+        },
+        {
+          "x": 104,
+          "y": 286,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 78,
+          "y": 306,
+          "w": 5,
+          "h": 14,
+          "when": "evening"
+        },
+        {
+          "x": 91,
+          "y": 306,
+          "w": 5,
+          "h": 14,
+          "when": "evening"
+        },
+        {
+          "x": 121,
+          "y": 226,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 121,
+          "y": 246,
+          "w": 5,
+          "h": 10,
+          "when": "always"
+        },
+        {
+          "x": 133,
+          "y": 246,
+          "w": 5,
+          "h": 10,
+          "when": "always"
+        },
+        {
+          "x": 145,
+          "y": 246,
+          "w": 5,
+          "h": 10,
+          "when": "night"
+        },
+        {
+          "x": 162,
+          "y": 246,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 186,
+          "y": 246,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 174,
+          "y": 266,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 162,
+          "y": 286,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 186,
+          "y": 286,
+          "w": 5,
+          "h": 10,
+          "when": "night"
+        },
+        {
+          "x": 211,
+          "y": 266,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 211,
+          "y": 286,
+          "w": 5,
+          "h": 10,
+          "when": "night"
+        },
+        {
+          "x": 236,
+          "y": 246,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 247,
+          "y": 246,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 258,
+          "y": 246,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 258,
+          "y": 266,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 247,
+          "y": 306,
+          "w": 5,
+          "h": 14,
+          "when": "always"
+        },
+        {
+          "x": 293,
+          "y": 266,
+          "w": 5,
+          "h": 10,
+          "when": "always"
+        },
+        {
+          "x": 273,
+          "y": 286,
+          "w": 5,
+          "h": 10,
+          "when": "always"
+        },
+        {
+          "x": 293,
+          "y": 286,
+          "w": 5,
+          "h": 10,
+          "when": "always"
+        },
+        {
+          "x": 273,
+          "y": 306,
+          "w": 5,
+          "h": 14,
+          "when": "night"
+        },
+        {
+          "x": 283,
+          "y": 306,
+          "w": 5,
+          "h": 14,
+          "when": "evening"
+        },
+        {
+          "x": 308,
+          "y": 266,
+          "w": 5,
+          "h": 10,
+          "when": "night"
+        },
+        {
+          "x": 343,
+          "y": 246,
+          "w": 5,
+          "h": 10,
+          "when": "always"
+        },
+        {
+          "x": 353,
+          "y": 246,
+          "w": 5,
+          "h": 10,
+          "when": "night"
+        },
+        {
+          "x": 363,
+          "y": 246,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 343,
+          "y": 266,
+          "w": 5,
+          "h": 10,
+          "when": "always"
+        },
+        {
+          "x": 363,
+          "y": 266,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 343,
+          "y": 286,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 379,
+          "y": 226,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 392,
+          "y": 226,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 405,
+          "y": 226,
+          "w": 5,
+          "h": 10,
+          "when": "always"
+        },
+        {
+          "x": 379,
+          "y": 246,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 405,
+          "y": 246,
+          "w": 5,
+          "h": 10,
+          "when": "night"
+        },
+        {
+          "x": 392,
+          "y": 306,
+          "w": 5,
+          "h": 14,
+          "when": "evening"
+        },
+        {
+          "x": 405,
+          "y": 306,
+          "w": 5,
+          "h": 14,
+          "when": "always"
+        },
+        {
+          "x": 420,
+          "y": 246,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 420,
+          "y": 266,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 430,
+          "y": 266,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 440,
+          "y": 266,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 420,
+          "y": 286,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 430,
+          "y": 286,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 430,
+          "y": 306,
+          "w": 5,
+          "h": 14,
+          "when": "evening"
+        },
+        {
+          "x": 456,
+          "y": 246,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 456,
+          "y": 266,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 466,
+          "y": 266,
+          "w": 5,
+          "h": 10,
+          "when": "night"
+        },
+        {
+          "x": 502,
+          "y": 266,
+          "w": 5,
+          "h": 10,
+          "when": "always"
+        },
+        {
+          "x": 502,
+          "y": 306,
+          "w": 5,
+          "h": 14,
+          "when": "evening"
+        },
+        {
+          "x": 547,
+          "y": 266,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 527,
+          "y": 286,
+          "w": 5,
+          "h": 10,
+          "when": "night"
+        },
+        {
+          "x": 527,
+          "y": 306,
+          "w": 5,
+          "h": 14,
+          "when": "always"
+        },
+        {
+          "x": 537,
+          "y": 306,
+          "w": 5,
+          "h": 14,
+          "when": "evening"
+        },
+        {
+          "x": 576,
+          "y": 266,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 563,
+          "y": 306,
+          "w": 5,
+          "h": 14,
+          "when": "evening"
+        },
+        {
+          "x": 576,
+          "y": 306,
+          "w": 5,
+          "h": 14,
+          "when": "evening"
+        },
+        {
+          "x": 629,
+          "y": 266,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 617,
+          "y": 286,
+          "w": 5,
+          "h": 10,
+          "when": "evening"
+        },
+        {
+          "x": 629,
+          "y": 286,
+          "w": 5,
+          "h": 10,
+          "when": "night"
+        },
+        {
+          "x": 617,
+          "y": 306,
+          "w": 5,
+          "h": 14,
+          "when": "evening"
+        },
+        {
+          "x": 629,
+          "y": 306,
+          "w": 5,
+          "h": 14,
+          "when": "evening"
+        }
+      ]
     },
   },
 } as const;

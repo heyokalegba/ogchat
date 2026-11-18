@@ -24,6 +24,8 @@ interface SessionFile {
   title: string;
   /** True once the user has renamed the session; auto-titling then stays out of the way. */
   titleLocked: boolean;
+  /** The project this session is filed under, if any. */
+  projectId?: string;
   createdAt: string;
   updatedAt: string;
   messages: ChatMessage[];
@@ -66,6 +68,7 @@ function parseFile(value: unknown, id: string): SessionFile | null {
     id,
     title: f.title,
     titleLocked: f.titleLocked === true,
+    ...(isValidId(f.projectId) ? { projectId: f.projectId } : {}),
     createdAt: f.createdAt,
     updatedAt: f.updatedAt,
     messages: f.messages,
@@ -93,6 +96,7 @@ function toSession(file: SessionFile): Session {
     createdAt: file.createdAt,
     updatedAt: file.updatedAt,
     messageCount: file.messages.length,
+    projectId: file.projectId ?? null,
     messages: file.messages,
   };
 }
@@ -104,6 +108,7 @@ export function toMeta(session: SessionMeta): SessionMeta {
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
     messageCount: session.messageCount,
+    projectId: session.projectId ?? null,
   };
 }
 
@@ -111,8 +116,12 @@ function newestFirst(a: SessionMeta, b: SessionMeta): number {
   return b.updatedAt.localeCompare(a.updatedAt) || b.createdAt.localeCompare(a.createdAt);
 }
 
-/** All sessions, most recently active first. `query` filters on title and message text. */
-export function listSessions(query?: string): SessionMeta[] {
+/**
+ * All sessions, most recently active first. `query` filters on title and
+ * message text; `project` keeps one project's sessions, or with "none" the
+ * ones that belong to no project.
+ */
+export function listSessions(query?: string, project?: string | null): SessionMeta[] {
   let names: string[];
   try {
     names = fs.readdirSync(sessionsDir());
@@ -126,6 +135,7 @@ export function listSessions(query?: string): SessionMeta[] {
     if (!name.endsWith(".json")) continue;
     const file = load(name.slice(0, -".json".length));
     if (!file) continue;
+    if (project === "none" ? file.projectId : project && file.projectId !== project) continue;
     if (
       needle &&
       !file.title.toLowerCase().includes(needle) &&
@@ -142,13 +152,14 @@ export function listSessions(query?: string): SessionMeta[] {
   return out.sort(newestFirst);
 }
 
-export function createSession(title?: string | null): Session {
+export function createSession(title?: string | null, projectId?: string | null): Session {
   const now = stamp();
   const file: SessionFile = {
     version: 1,
     id: randomUUID(),
     title: title ?? DEFAULT_TITLE,
     titleLocked: Boolean(title),
+    ...(projectId ? { projectId } : {}),
     createdAt: now,
     updatedAt: now,
     messages: [],
@@ -168,6 +179,16 @@ export function renameSession(id: string, title: string): Session | null {
   if (!file) return null;
   file.title = title;
   file.titleLocked = true;
+  save(file);
+  return toSession(file);
+}
+
+/** Files a session under a project, or with null takes it out of its project. */
+export function moveSession(id: string, projectId: string | null): Session | null {
+  const file = load(id);
+  if (!file) return null;
+  if (projectId) file.projectId = projectId;
+  else delete file.projectId;
   save(file);
   return toSession(file);
 }

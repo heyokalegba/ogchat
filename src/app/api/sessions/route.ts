@@ -1,19 +1,28 @@
 import { cleanTitle } from "@/lib/title";
 import { guard } from "@/lib/server/guard";
 import { BadRequest, errorJson, json, readBody } from "@/lib/server/http";
-import { createSession, listSessions } from "@/lib/server/store";
+import { projectExists } from "@/lib/server/projects";
+import { createSession, isValidId, listSessions } from "@/lib/server/store";
 
 export const dynamic = "force-dynamic";
 
-/** GET /api/sessions?q=  →  { sessions } most recently active first. */
+/**
+ * GET /api/sessions?q=&project=  →  { sessions } most recently active first.
+ * `project` is a project id, or "none" for the chats that belong to no project.
+ */
 export async function GET(request: Request): Promise<Response> {
   const blocked = guard(request);
   if (blocked) return blocked;
-  const query = new URL(request.url).searchParams.get("q") ?? undefined;
-  return json({ sessions: listSessions(query) });
+  const search = new URL(request.url).searchParams;
+  const query = search.get("q") ?? undefined;
+  const project = search.get("project");
+  if (project && project !== "none" && !isValidId(project)) {
+    return errorJson(400, "bad_project", "That is not a project id.");
+  }
+  return json({ sessions: listSessions(query, project) });
 }
 
-/** POST /api/sessions { title? }  →  201 { session } */
+/** POST /api/sessions { title?, projectId? }  →  201 { session } */
 export async function POST(request: Request): Promise<Response> {
   const blocked = guard(request);
   if (blocked) return blocked;
@@ -23,7 +32,11 @@ export async function POST(request: Request): Promise<Response> {
     if (body.title !== undefined && !title) {
       return errorJson(400, "bad_title", "Title must not be empty.");
     }
-    return json({ session: createSession(title) }, 201);
+    const projectId = body.projectId ?? null;
+    if (projectId !== null && !(isValidId(projectId) && projectExists(projectId))) {
+      return errorJson(400, "bad_project", "That project does not exist.");
+    }
+    return json({ session: createSession(title, projectId) }, 201);
   } catch (err) {
     if (err instanceof BadRequest) return errorJson(400, "bad_request", err.message);
     throw err;

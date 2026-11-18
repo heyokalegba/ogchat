@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent, type Ref } from "react";
 import { shortAge } from "@/lib/format";
-import type { PublicSettings, SessionMeta } from "@/lib/types";
+import type { Project, PublicSettings, SessionMeta } from "@/lib/types";
 import { GearIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from "../chat/icons";
 import styles from "./shell.module.css";
 
@@ -21,12 +21,55 @@ export interface SidebarProps {
   onRename: (id: string, title: string) => void;
   onDelete: (id: string) => void;
   onOpenSettings: () => void;
+  projects: Project[];
+  /** The project whose sessions are listed, or null for every chat. */
+  projectId: string | null;
+  onProjectChange: (id: string | null) => void;
+  /** Asks for a new project with this name. */
+  onNewProject: (name: string) => void;
+  onEditProject: (id: string) => void;
+  /** Called with the pointer's x while the sidebar's edge is dragged: the width asked for. */
+  onResize?: (width: number) => void;
 }
 
 const CONFIRM_MS = 3000;
 
+/** The sidebar's right edge: drag it, or use the arrow keys, to change the sidebar's width. */
+function SidebarGrip({ onResize }: { onResize: (width: number) => void }) {
+  const [dragging, setDragging] = useState(false);
+  return (
+    <div
+      className={styles.sidebarGrip}
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Sidebar width"
+      tabIndex={0}
+      data-dragging={dragging}
+      title="Drag to resize the sidebar"
+      onPointerDown={(event) => {
+        event.preventDefault();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        setDragging(true);
+      }}
+      onPointerMove={(event) => {
+        if (dragging) onResize(event.clientX);
+      }}
+      onPointerUp={() => setDragging(false)}
+      onPointerCancel={() => setDragging(false)}
+      onKeyDown={(event) => {
+        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+        event.preventDefault();
+        const edge = event.currentTarget.getBoundingClientRect().left + 6;
+        onResize(edge + (event.key === "ArrowLeft" ? -20 : 20));
+      }}
+    />
+  );
+}
+
 function SessionItem(props: {
   session: SessionMeta;
+  /** The name of the session's project, shown when the list mixes projects. */
+  tag?: string;
   active: boolean;
   onSelect: () => void;
   onRename: (title: string) => void;
@@ -103,6 +146,7 @@ function SessionItem(props: {
         }}
       >
         <span className={styles.itemTitle}>{session.title}</span>
+        {props.tag && <span className={styles.itemTag}>{props.tag}</span>}
         <span className={styles.itemAge}>{shortAge(session.updatedAt)}</span>
       </button>
       <div className={styles.itemTools} data-pinned={confirming}>
@@ -143,7 +187,12 @@ function SessionItem(props: {
 }
 
 export function Sidebar(props: SidebarProps) {
-  const { sessions, activeId, query, loaded, settings } = props;
+  const { sessions, activeId, query, loaded, settings, projects, projectId } = props;
+  const [naming, setNaming] = useState(false);
+  const [newName, setNewName] = useState("");
+  const project = projects.find((candidate) => candidate.id === projectId) ?? null;
+  const projectName = (id: string | null) =>
+    projects.find((candidate) => candidate.id === id)?.name;
   const [modKey, setModKey] = useState("⌘");
   useEffect(() => {
     if (!/Mac|iPhone|iPad/.test(navigator.platform)) setModKey("ctrl ");
@@ -170,6 +219,7 @@ export function Sidebar(props: SidebarProps) {
       className={`${styles.sidebar} ${props.open ? styles.sidebarOpen : ""}`}
       aria-label="Sessions"
     >
+      {props.onResize && <SidebarGrip onResize={props.onResize} />}
       <div className={styles.brandRow}>
         <span className={styles.brand}>
           ogchat
@@ -205,12 +255,84 @@ export function Sidebar(props: SidebarProps) {
         {!query && <span className={styles.kbd}>{modKey}K</span>}
       </div>
 
-      <div className={styles.listLabel}>{query.trim() ? "matches" : "sessions"}</div>
+      <div className={styles.projectRow}>
+        {naming ? (
+          <form
+            className={styles.projectForm}
+            onSubmit={(event) => {
+              event.preventDefault();
+              const name = newName.trim();
+              setNaming(false);
+              setNewName("");
+              if (name) props.onNewProject(name);
+            }}
+          >
+            <input
+              className={styles.projectInput}
+              value={newName}
+              placeholder="project name"
+              aria-label="New project name"
+              maxLength={80}
+              autoFocus
+              onChange={(event) => setNewName(event.target.value)}
+              onBlur={() => setNaming(false)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.stopPropagation();
+                  setNaming(false);
+                }
+              }}
+            />
+          </form>
+        ) : (
+          <>
+            <select
+              className={styles.projectSelect}
+              value={projectId ?? ""}
+              aria-label="Project"
+              title="Show one project's chats, or all of them"
+              onChange={(event) => props.onProjectChange(event.target.value || null)}
+            >
+              <option value="">all chats</option>
+              {projects.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.name} ({candidate.sessionCount})
+                </option>
+              ))}
+            </select>
+            {project && (
+              <button
+                type="button"
+                className={styles.projectTool}
+                onClick={() => props.onEditProject(project.id)}
+                aria-label={`Edit project ${project.name}`}
+                title="Instructions and files for this project"
+              >
+                <GearIcon />
+              </button>
+            )}
+            <button
+              type="button"
+              className={styles.projectTool}
+              onClick={() => setNaming(true)}
+              aria-label="New project"
+              title="New project"
+            >
+              <PlusIcon />
+            </button>
+          </>
+        )}
+      </div>
+
+      <div className={styles.listLabel}>
+        {query.trim() ? "matches" : project ? `sessions in ${project.name}` : "sessions"}
+      </div>
       <ul className={styles.list}>
         {sessions.map((session) => (
           <SessionItem
             key={session.id}
             session={session}
+            tag={project ? undefined : projectName(session.projectId)}
             active={session.id === activeId}
             onSelect={() => props.onSelect(session.id)}
             onRename={(title) => props.onRename(session.id, title)}
@@ -221,7 +343,9 @@ export function Sidebar(props: SidebarProps) {
           <li className={styles.listEmpty}>
             {query.trim()
               ? "no sessions match."
-              : "no sessions yet. your first message starts one."}
+              : project
+                ? "nothing in this project yet. your first message here starts a chat in it."
+                : "no sessions yet. your first message starts one."}
           </li>
         )}
       </ul>

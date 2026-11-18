@@ -48,6 +48,8 @@ export interface LifeConfig {
   sniff: readonly number[];
   linger: readonly number[];
   roofs: readonly { x: number; w: number; top: number }[];
+  /** Doorsteps to sit on: the middle of each, and the row its bottom step is on. */
+  stoops: readonly { x: number; y: number }[];
 }
 
 export interface Member {
@@ -62,11 +64,18 @@ export interface Member {
   phase: number;
   /** Seconds for one cycle of standing about. */
   idle: number;
+  /**
+   * Where this member goes when the party sits down, as a move from where
+   * they stand. Members without one stay on their feet.
+   */
+  seat?: { dx: number; dy: number };
 }
 
 export type Step =
   | { kind: "walk"; to: number; seconds: number }
   | { kind: "wait"; seconds: number }
+  /** Sitting on a doorstep: each member moves to their seat, and back when it ends. */
+  | { kind: "sit"; seconds: number }
   /** Roofs only: up through the hatch (0) or back down out of sight (`depth`). */
   | { kind: "climb"; to: number; seconds: number };
 
@@ -78,6 +87,8 @@ export interface Party {
   roof: number | null;
   /** Out in the road, past the parked cars, rather than on the pavement. */
   road: boolean;
+  /** Here for a barbecue: sent home if the barbecue is called off. */
+  guest?: boolean;
   /** Where the party's middle starts; feet row; how far below the roof line it starts. */
   x: number;
   y: number;
@@ -289,6 +300,57 @@ export interface CastOptions {
   group?: number;
   /** No more people than this. */
   room?: number;
+  /** Already sitting on a doorstep when first seen. */
+  seated?: boolean;
+}
+
+/** Places on a doorstep, from its middle: how far across, and how many steps up. */
+const SEATS: readonly { dx: number; up: number }[] = [
+  { dx: 0, up: 1 },
+  { dx: -5, up: 0 },
+  { dx: 5, up: 0 },
+  { dx: -3, up: 2 },
+  { dx: 3, up: 2 },
+  { dx: 0, up: 3 },
+];
+
+/** How likely each kind of party is to sit down on a doorstep it passes. */
+const SITS: Partial<Record<Kind, number>> = {
+  solo: 0.14,
+  couple: 0.22,
+  child: 0.15,
+  dog: 0.12,
+  friends: 0.5,
+};
+
+/**
+ * Gives each person in a party a seat on the doorstep at `stoop`, measured
+ * from where the party stands (its middle at the doorstep's, its feet on row
+ * `y`). The farthest sit highest, so nobody sits in front of somebody else's
+ * face. More people than seats: the rest stay standing. Dogs lie down where
+ * they are.
+ */
+function seatMembers(
+  members: Member[],
+  meta: LifeMeta,
+  stoop: { x: number; y: number },
+  y: number,
+): void {
+  const sitters = members.filter((m) => m.sheet === "people");
+  const seats = SEATS.slice(0, sitters.length).sort((a, b) => b.up - a.up);
+  [...sitters]
+    .sort((a, b) => a.dy - b.dy)
+    .forEach((member, index) => {
+      const seat = seats[index];
+      if (!seat) return;
+      // The figure stands a little right of its cell's middle.
+      const left = seat.dx - Math.floor(meta.person.w / 2) - 1;
+      member.seat = { dx: left - member.dx, dy: stoop.y - seat.up * 2 - (y + member.dy) };
+    });
+  for (const member of members) {
+    const isDog = member.sheet === "props" && member.row < meta.cast.dogs[0] + meta.cast.dogs[1];
+    if (isDog) member.seat = { dx: 0, dy: 0 };
+  }
 }
 
 let serial = 0;
@@ -305,6 +367,10 @@ export function castWalkers(
   const room = options.room ?? MAX_HEADS;
   let kind: Kind = options.group ? "friends" : pickKind(rand, STREET_MIX, room);
   if (kind === "cyclist" && !life.road) kind = "solo";
+  // The ones found sitting on a doorstep are neighbours, alone or in company.
+  if (options.seated) {
+    kind = pick(rand, room >= 3 ? ["solo", "couple", "solo", "friends"] : ["solo"]);
+  }
   const shape = form(rand, meta, kind, Math.min(options.group ?? 0, room));
   const rightward = rand() < 0.5;
   const start = (rightward ? life.from : life.to) + (rightward ? -1 : 1) * shape.reach;
@@ -334,12 +400,31 @@ export function castWalkers(
     stops.sort((a, b) => (rightward ? a - b : b - a));
   }
 
+  // The party's line: its nearest member's feet. Cyclists keep to the road instead.
+  const y =
+    kind === "cyclist" ? life.road + whole(rand, -1, 1) : whole(rand, life.far + 3, life.near);
+
   const steps: Step[] = [];
   let at = x;
   const walkTo = (to: number) => {
     steps.push({ kind: "walk", to, seconds: Math.abs(to - at) / shape.speed });
     at = to;
   };
+  // A doorstep on the way, for those inclined to sit down on one.
+  const ahead = life.stoops.filter((stoop) =>
+    rightward ? stoop.x > x + 16 && stoop.x < end - 30 : stoop.x < x - 16 && stoop.x > end + 30,
+  );
+  const sitting = options.seated ? life.stoops : rand() < (SITS[kind] ?? 0) ? ahead : [];
+  if (sitting.length > 0) {
+    const stoop = pick(rand, sitting);
+    seatMembers(shape.members, meta, stoop, y);
+    const long = kind === "friends" ? between(rand, 45, 160) : between(rand, 25, 90);
+    if (options.seated) at = stoop.x;
+    else walkTo(stoop.x);
+    steps.push({ kind: "sit", seconds: long });
+    stops.length = 0; // one stop is enough for one walk
+  }
+  const startX = options.seated && sitting.length > 0 ? at : x;
   for (const stop of stops) {
     // A dog walker stops with the dog's nose, not their own feet, at the tree.
     walkTo(shape.dog ? stop + (rightward ? -1 : 1) * (shape.reach - 2) : stop);
@@ -352,10 +437,8 @@ export function castWalkers(
     heads: shape.heads,
     roof: null,
     road: kind === "cyclist",
-    x,
-    // Keep everyone's feet on the pavement: the party's line is its nearest member.
-    // Cyclists keep to the road, a pixel or two either side of their line.
-    y: kind === "cyclist" ? life.road + whole(rand, -1, 1) : whole(rand, life.far + 3, life.near),
+    x: startX,
+    y,
     lift: 0,
     members: shape.members,
     steps,
@@ -383,7 +466,15 @@ export function castRoofVisit(
   rand: Rand,
   meta: LifeMeta,
   life: LifeConfig,
-  options: { roof?: number; room?: number; delay?: number; stay?: number } = {},
+  options: {
+    roof?: number;
+    room?: number;
+    delay?: number;
+    stay?: number;
+    /** How many spots they wander between. More, for a long stay. */
+    visits?: number;
+    guest?: boolean;
+  } = {},
 ): Party | null {
   if (life.roofs.length === 0) return null;
   const index = options.roof ?? Math.floor(rand() * life.roofs.length);
@@ -410,7 +501,7 @@ export function castRoofVisit(
     steps.push({ kind: "walk", to, seconds: Math.abs(to - at) / speed });
     at = to;
   };
-  const visits = whole(rand, 1, 3);
+  const visits = options.visits ?? whole(rand, 1, 3);
   for (let n = 0; n < visits; n++) {
     walkTo(clamp(between(rand, lo, hi)));
     steps.push({ kind: "wait", seconds: (options.stay ?? between(rand, 8, 30)) / visits });
@@ -423,6 +514,7 @@ export function castRoofVisit(
     heads: shape.heads,
     roof: index,
     road: false,
+    ...(options.guest ? { guest: true } : {}),
     x: hatch,
     y: 0,
     lift: HATCH_DEPTH,
@@ -446,4 +538,55 @@ export function castStanding(rand: Rand, meta: LifeMeta, life: LifeConfig): Part
   }
   party.steps = [{ kind: "wait", seconds: Infinity }];
   return party;
+}
+
+// ---------------------------------------------------------------- a barbecue on a roof
+
+export interface RoofParty {
+  /** Index into the roofs that can hold one. */
+  roof: number;
+  startsAt: number;
+  endsAt: number;
+}
+
+const SLOT_MS = 3 * 3_600_000;
+
+/** A repeatable number in [0, 1) for a pair of integers. */
+function chanceOf(a: number, b: number): number {
+  let t = (Math.imul(a | 0, 0x9e3779b1) ^ Math.imul((b | 0) + 0x7f4a7c15, 0x85ebca6b)) >>> 0;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
+/**
+ * Whether somebody is having a barbecue on a roof at `ms`, and on which.
+ *
+ * It is decided by the clock, not by chance at the moment of asking: time is
+ * cut into three-hour stretches, each of which has a little under an even
+ * chance of holding one barbecue of fifty to seventy-five minutes, starting
+ * between late morning and mid-evening. So a barbecue that is on stays on
+ * across a reload, ends when it should, and can be found again by setting
+ * the clock back. `salt` makes each scene keep its own diary.
+ */
+export function roofPartyAt(
+  ms: number,
+  salt: number,
+  roofs: number,
+  minuteOfDay: (ms: number) => number,
+): RoofParty | null {
+  if (roofs <= 0) return null;
+  const slot = Math.floor(ms / SLOT_MS);
+  // A barbecue that started late in the last stretch may still be going.
+  for (const s of [slot, slot - 1]) {
+    if (chanceOf(s, salt) >= 0.45) continue;
+    const startsAt = s * SLOT_MS + Math.floor(chanceOf(s, salt + 1) * 2 * 3_600_000);
+    const endsAt = startsAt + (50 + Math.floor(chanceOf(s, salt + 2) * 26)) * 60_000;
+    const minute = minuteOfDay(startsAt);
+    if (minute < 11 * 60 || minute > 21.5 * 60) continue;
+    if (ms >= startsAt && ms < endsAt) {
+      return { roof: Math.floor(chanceOf(s, salt + 3) * roofs), startsAt, endsAt };
+    }
+  }
+  return null;
 }
