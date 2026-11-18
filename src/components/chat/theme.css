@@ -5,7 +5,8 @@
  * around it is see-through, over a pixelated New York skyline: white on black
  * glass for the sidebar, black on pale sky blue for panels. The palette is
  * brick-and-borough: a dark mud-brick red as the one accent, with muted green,
- * blue and yellow, and hard black outlines everywhere.
+ * blue and yellow, and hard black outlines everywhere. The tone is worn and a
+ * little dark on purpose: old brick, dusty paper, city haze.
  *
  * Everything is scoped to .ogchat so the chat surface can be embedded in
  * another app without leaking styles; override the variables to re-theme it.
@@ -14,34 +15,34 @@
 .ogchat {
   /* strong black, warm white */
   --og-ink: #0d0c0b;
-  --og-white: #f6f1e6;
+  --og-white: #ebe4d4;
 
   /* the wall */
-  --og-brick: #c9ad8a;
-  --og-brick-deep: #b59a78;
+  --og-brick: #af9778;
+  --og-brick-deep: #9d8567;
 
   /* dark red mud brick: carets, the active session, primary actions */
-  --og-accent: #7e2e20;
-  --og-accent-bright: #a8452f;
+  --og-accent: #74291c;
+  --og-accent-bright: #9a3f2a;
   /* the same accent, lifted so it reads on black */
   --og-accent-on-dark: #d9694a;
 
-  --og-green: #33503d;
+  --og-green: #2c4636;
   --og-green-soft: #8fc79a;
-  --og-blue: #456583;
-  --og-blue-pale: #bcd6ea;
-  --og-yellow: #e6d391;
+  --og-blue: #3c5a76;
+  --og-blue-pale: #a9c2d5;
+  --og-yellow: #d6c283;
   --og-yellow-deep: #a8862e;
 
   /* text on the wall and on pale panels */
   --og-text: var(--og-ink);
-  --og-text-2: #46382b;
-  --og-text-3: #65523f;
+  --og-text-2: #3f3226;
+  --og-text-3: #594735;
 
   /* text on black glass */
   --og-on-dark: var(--og-white);
-  --og-on-dark-2: rgba(246, 241, 230, 0.76);
-  --og-on-dark-3: rgba(246, 241, 230, 0.54);
+  --og-on-dark-2: rgba(235, 228, 212, 0.8);
+  --og-on-dark-3: rgba(235, 228, 212, 0.58);
 
   --og-font-sans:
     -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Segoe UI", Inter, Roboto,

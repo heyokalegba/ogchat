@@ -6,6 +6,7 @@ import { MenuIcon } from "@/components/chat/icons";
 import "@/components/chat/theme.css";
 import { createApi } from "@/lib/client/api";
 import type { PublicSettings, SessionMeta } from "@/lib/types";
+import { Backdrop } from "./Backdrop";
 import { SettingsPanel } from "./SettingsPanel";
 import styles from "./shell.module.css";
 import { Sidebar } from "./Sidebar";
@@ -204,6 +205,7 @@ export function AppShell() {
 
   return (
     <div className={`ogchat ${styles.shell}`}>
+      <Backdrop />
       <Sidebar
         sessions={sessions}
         activeId={activeId}

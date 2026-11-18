@@ -4,8 +4,11 @@ A personal AI chat interface that runs entirely on your machine. Multi-session
 chat with streaming replies, file attachments, local history, and one
 configurable OpenAI-compatible provider. No accounts, no cloud, no telemetry.
 
-The chat is written in strong black on a wall of pixelated tan bricks. The rest
-of the interface is see-through, over a pixel-art New York skyline.
+The chat is written in strong black on a worn wall of pixelated tan bricks:
+cracked, chipped and stained. The rest of the interface is see-through, over a
+gritty pixel-art New York skyline that is quietly alive: clouds drift, smoke
+rises from the stacks, windows switch on and off, lights cross the bridge, and
+a flock of birds passes now and then.
 
 ![ogchat conversation](docs/screens/03-conversation.png)
 
@@ -153,7 +156,7 @@ src/
     client/api.ts                  browser client for the routes above
 tests/                             vitest: persistence, adapter, route contract, attachments
 scripts/mock-provider.mjs          stand-in provider for local trials
-scripts/make-art.mjs               generates the skyline and the brick wall
+scripts/make-art.mjs               generates the city layers and the brick wall
 ```
 
 ### Changing provider
@@ -187,9 +190,21 @@ outlines) are CSS variables in `src/components/chat/theme.css`.
 
 - **Colors:** edit the variables at the top of `src/components/chat/theme.css`
   (ink, brick, the mud-brick red accent, muted green / blue / yellow).
-- **The art:** the skyline and the brick tile are drawn by
-  `scripts/make-art.mjs` (no dependencies). Change its palettes or shapes, then
-  run `npm run art` to regenerate the two PNGs under `src/components/*/art/`.
+- **The art:** the city and the brick tile are drawn by `scripts/make-art.mjs`
+  (no dependencies). Change its palettes or shapes, then run `npm run art` to
+  regenerate the PNGs under `src/components/*/art/`. To make the whole scene
+  lighter or darker, change the factor in its `grit` function.
+- **The motion:** `src/components/shell/Backdrop.tsx` and `backdrop.module.css`
+  stack the city's layers and move them. Speeds are the animation durations in
+  that stylesheet.
+
+### What the moving backdrop costs
+
+Very little, by design. The whole scene is twelve small PNGs, about 110 KB in
+total, drawn at 640x360 and scaled up. The motion is plain CSS: layers slide
+or switch on and off. There is no video, no canvas and no script running, so it
+adds no measurable script time while idle. People who set "reduce motion" in
+their system settings get the same scene, standing still.
 
 ## API
 

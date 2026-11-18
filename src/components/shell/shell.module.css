@@ -5,21 +5,13 @@
  */
 
 .shell {
+  position: relative;
   display: grid;
   grid-template-columns: 272px minmax(0, 1fr);
   height: 100dvh;
   color: var(--og-on-dark);
-  background-color: #5c91c3;
-  /* 480x270 pixel art, scaled up with hard pixels. Regenerate with `npm run art`. */
-  background-image: url("./art/skyline.png");
-  background-position: center bottom;
-  background-size: cover;
-  background-repeat: no-repeat;
-  image-rendering: pixelated;
-}
-
-.shell * {
-  image-rendering: auto;
+  /* The city itself is the Backdrop component, behind everything here. */
+  background: #3d6a98;
 }
 
 :where(.shell) :where(:focus-visible) {
@@ -29,11 +21,13 @@
 /* ---------------------------------------------------------------- sidebar */
 
 .sidebar {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   min-height: 0;
   border-right: 3px solid var(--og-ink);
-  background: rgba(9, 9, 10, 0.66);
+  background: rgba(8, 8, 9, 0.7);
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.55);
   scrollbar-width: thin;
   scrollbar-color: rgba(246, 241, 230, 0.35) transparent;
@@ -375,6 +369,8 @@
 /* ---------------------------------------------------------------- main */
 
 .main {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;

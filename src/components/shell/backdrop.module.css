@@ -1,0 +1,285 @@
+/*
+ * The city behind the interface: layered pixel art with a little life in it.
+ * Everything here animates with transforms or simple on/off switches, so it
+ * costs next to nothing. See Backdrop.tsx.
+ */
+
+.backdrop {
+  position: fixed;
+  z-index: 0;
+  inset: 0;
+  overflow: hidden;
+  background: #3d6a98;
+  pointer-events: none;
+}
+
+/*
+ * The 16:9 scene, sized to cover the window and anchored to its bottom edge,
+ * so the skyline always sits on the ground. Every layer is placed inside it
+ * in percentages and therefore stays lined up at any window size.
+ */
+.scene {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: max(100vw, 177.778vh);
+  aspect-ratio: 16 / 9;
+  transform: translateX(-50%);
+}
+
+.scene * {
+  image-rendering: pixelated;
+}
+
+.layer {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+
+.sky {
+  background-image: url("./art/sky.png");
+}
+
+.skyline {
+  background-image: url("./art/skyline.png");
+}
+
+.rooftops {
+  background-image: url("./art/rooftops.png");
+}
+
+/* ---------------------------------------------------------------- clouds */
+
+/* A strip twice the scene's width holding two copies; sliding it by half loops seamlessly. */
+.clouds {
+  position: absolute;
+  left: 0;
+  width: 200%;
+  background-repeat: repeat-x;
+  background-size: 50% 100%;
+  /* One scene pixel per step, so the clouds move the way pixel art moves. */
+  animation: drift 420s steps(640) infinite;
+}
+
+.cloudsFar {
+  top: 0;
+  height: 41.667%;
+  background-image: url("./art/clouds-far.png");
+  opacity: 0.9;
+}
+
+.cloudsNear {
+  top: 1.5%;
+  height: 47.222%;
+  background-image: url("./art/clouds-near.png");
+  animation-duration: 250s;
+  animation-delay: -90s;
+}
+
+@keyframes drift {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* ---------------------------------------------------------------- windows, water */
+
+/* Lit windows and glints on the river, switched on and off. */
+.lightsA {
+  background-image: url("./art/lights-a.png");
+  animation: lights-a 13s steps(1) infinite;
+}
+
+.lightsB {
+  background-image: url("./art/lights-b.png");
+  animation: lights-b 19s steps(1) infinite;
+}
+
+.lightsC {
+  background-image: url("./art/lights-c.png");
+  animation: lights-c 7s steps(1) infinite;
+}
+
+@keyframes lights-a {
+  0%,
+  100% {
+    visibility: visible;
+  }
+  41% {
+    visibility: hidden;
+  }
+  58% {
+    visibility: visible;
+  }
+  86% {
+    visibility: hidden;
+  }
+}
+
+@keyframes lights-b {
+  0%,
+  100% {
+    visibility: hidden;
+  }
+  22% {
+    visibility: visible;
+  }
+  67% {
+    visibility: hidden;
+  }
+  74% {
+    visibility: visible;
+  }
+}
+
+@keyframes lights-c {
+  0%,
+  100% {
+    visibility: visible;
+  }
+  50% {
+    visibility: hidden;
+  }
+}
+
+/* ---------------------------------------------------------------- smoke */
+
+.smoke {
+  position: absolute;
+  width: 11.25%;
+  height: 17.778%;
+  overflow: hidden;
+}
+
+/* Six frames side by side; step through them. */
+.smokeStrip {
+  width: 600%;
+  height: 100%;
+  background: url("./art/smoke.png") 0 0 / 100% 100% no-repeat;
+  animation: puff 2.8s steps(6) infinite;
+}
+
+@keyframes puff {
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+/* ---------------------------------------------------------------- bridge traffic */
+
+.traffic {
+  position: absolute;
+  left: 45.625%;
+  top: 81.389%;
+  width: 54.375%;
+  height: 1.111%;
+}
+
+.lane {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 25%;
+  overflow: hidden;
+}
+
+.laneStrip {
+  width: 200%;
+  height: 100%;
+  background-image: url("./art/traffic.png");
+  background-repeat: repeat-x;
+  background-size: 50% 400%;
+}
+
+/* Headlights coming this way, tail lights going. */
+.laneIn {
+  top: 0;
+}
+
+.laneIn .laneStrip {
+  background-position: 0 0;
+  animation: lane-in 46s steps(348) infinite;
+}
+
+.laneOut {
+  top: 50%;
+}
+
+.laneOut .laneStrip {
+  background-position: 0 66.667%;
+  animation: lane-out 64s steps(348) infinite;
+}
+
+@keyframes lane-in {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes lane-out {
+  from {
+    transform: translateX(-50%);
+  }
+}
+
+/* ---------------------------------------------------------------- beacons, birds */
+
+/* Aircraft warning lights on the mast and the bridge towers. */
+.beacon {
+  position: absolute;
+  width: 0.3125%;
+  height: 0.5556%;
+  background: #e0563c;
+  animation: og-blink 2.4s steps(1) infinite;
+}
+
+/* A flock crosses the sky, then stays away for a while. */
+.flight {
+  position: absolute;
+  inset: 0;
+  animation: fly 70s linear infinite;
+  animation-delay: -8s;
+}
+
+.birds {
+  position: absolute;
+  left: 0;
+  top: 19%;
+  width: 4.6875%;
+  aspect-ratio: 30 / 14;
+  overflow: hidden;
+}
+
+.birdsStrip {
+  width: 200%;
+  height: 100%;
+  background: url("./art/birds.png") 0 0 / 100% 100% no-repeat;
+  animation: flap 0.56s steps(2) infinite;
+}
+
+@keyframes fly {
+  0% {
+    transform: translate(-8%, 3%);
+  }
+  62%,
+  100% {
+    transform: translate(104%, -9%);
+  }
+}
+
+@keyframes flap {
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop * {
+    animation: none !important;
+  }
+  .flight {
+    display: none;
+  }
+}

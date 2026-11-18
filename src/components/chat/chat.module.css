@@ -9,9 +9,9 @@
   height: 100%;
   color: var(--og-text);
   background-color: var(--og-brick);
-  /* A 128x64 tile of bricks, shown at 3x with hard pixels. */
+  /* A 320x320 tile of worn bricks, shown at 3x with hard pixels. */
   background-image: url("./art/bricks.png");
-  background-size: 384px 192px;
+  background-size: 960px 960px;
   image-rendering: pixelated;
 }
 
@@ -430,7 +430,7 @@ a.chip:hover {
   display: grid;
   place-items: center;
   border: 4px dashed var(--og-ink);
-  background: rgba(188, 214, 234, 0.86);
+  background: rgba(169, 194, 213, 0.88);
   pointer-events: none;
   animation: og-fade 120ms var(--og-ease) both;
 }
@@ -621,7 +621,7 @@ a.chip:hover {
 
 .input::placeholder,
 .editorInput::placeholder {
-  color: #4d6377;
+  color: #44586a;
 }
 
 .surface .attach,
