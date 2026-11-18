@@ -11,6 +11,8 @@ export interface Look {
   clockOffsetMs: number;
   /** Whether people walk about in the scene. */
   people: boolean;
+  /** Frozen: the scene holds still, like a picture. The light still follows the clock. */
+  still: boolean;
   /** How strongly the scene shows, in percent. Lower fades it into the dark, behind the text. */
   sceneStrength: number;
   /** Whether the chat is on screen at all. Hidden, there is only the scene to look at. */
@@ -35,6 +37,7 @@ export const DEFAULT_LOOK: Look = {
   scene: "skyline",
   clockOffsetMs: 0,
   people: true,
+  still: false,
   sceneStrength: 100,
   chatShown: true,
   sidebarWidth: 290,
@@ -92,6 +95,7 @@ function clean(value: unknown): Look {
         : DEFAULT_LOOK.scene,
     clockOffsetMs: clamp(Math.round(number(raw.clockOffsetMs, 0)), -DAY_MS, DAY_MS),
     people: typeof raw.people === "boolean" ? raw.people : DEFAULT_LOOK.people,
+    still: typeof raw.still === "boolean" ? raw.still : DEFAULT_LOOK.still,
     sceneStrength: clamp(
       Math.round(number(raw.sceneStrength, DEFAULT_LOOK.sceneStrength)),
       SCENE_STRENGTH.min,

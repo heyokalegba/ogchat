@@ -31,6 +31,8 @@ export type SendInput =
       uploads: IngestedFile[];
       /** Search the web for this message. */
       web: boolean;
+      /** An earlier message to ask again as a new one, with the files it carried. */
+      replayOf?: string;
     }
   | { kind: "regenerate" };
 
@@ -39,6 +41,7 @@ function messageInput(
   replace: unknown,
   uploads: IngestedFile[],
   web: boolean,
+  replay?: unknown,
 ): SendInput {
   const content = typeof rawContent === "string" ? rawContent.trim() : "";
   if (content.length > MAX_MESSAGE_CHARS) {
@@ -48,17 +51,27 @@ function messageInput(
     throw new ChatRequestError(400, "bad_request", "replaceFromMessageId must be a string.");
   }
   const replaceFromMessageId = typeof replace === "string" && replace ? replace : undefined;
+  if (replay !== undefined && replay !== null && typeof replay !== "string") {
+    throw new ChatRequestError(400, "bad_request", "replayOf must be a string.");
+  }
+  const replayOf = typeof replay === "string" && replay ? replay : undefined;
   // An edit may legitimately be empty when the original message carried files; that is
   // checked once the target message is known.
-  if (!content && uploads.length === 0 && !replaceFromMessageId) {
+  if (!content && uploads.length === 0 && !replaceFromMessageId && !replayOf) {
     throw new ChatRequestError(400, "empty_message", "Message is empty.");
   }
-  return { kind: "message", content, replaceFromMessageId, uploads, web };
+  return { kind: "message", content, replaceFromMessageId, uploads, web, replayOf };
 }
 
 export function parseSendInput(body: Record<string, unknown>): SendInput {
   if (body.regenerate === true) return { kind: "regenerate" };
-  return messageInput(body.content, body.replaceFromMessageId, [], body.web === true);
+  return messageInput(
+    body.content,
+    body.replaceFromMessageId,
+    [],
+    body.web === true,
+    body.replayOf,
+  );
 }
 
 /**
@@ -156,8 +169,23 @@ export function prepareTurn(sessionId: string, input: SendInput): PreparedTurn {
         }
         carried = target.attachments ?? [];
       }
+      // Asking an earlier question again: the same words unless new ones were sent, and
+      // the same files. The files are shared with the original, not copied.
+      let content = input.content;
+      if (input.replayOf) {
+        const source = session.messages.find((m) => m.id === input.replayOf);
+        if (!source || source.role !== "user") {
+          throw new ChatRequestError(
+            400,
+            "bad_message",
+            "That message is no longer there to ask again.",
+          );
+        }
+        carried = source.attachments ?? [];
+        content ||= source.content;
+      }
       const attachments = [...carried, ...input.uploads.map((upload) => upload.attachment)];
-      if (!input.content && attachments.length === 0) {
+      if (!content && attachments.length === 0) {
         throw new ChatRequestError(400, "empty_message", "Message is empty.");
       }
       if (attachments.length > MAX_FILES_PER_MESSAGE) {
@@ -171,7 +199,7 @@ export function prepareTurn(sessionId: string, input: SendInput): PreparedTurn {
       for (const upload of input.uploads) saveFile(sessionId, upload.attachment.id, upload.data);
       const appended = appendMessage(sessionId, {
         role: "user",
-        content: input.content,
+        content,
         attachments,
         web: input.web,
       });

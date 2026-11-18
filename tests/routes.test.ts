@@ -374,6 +374,45 @@ describe("sending messages", () => {
     expect(last(plain, "done").message?.content).toBe("plain");
   });
 
+  it("asks an earlier question again as a new message, web setting and all", async () => {
+    await useKey();
+    const provider = stubProvider(() => sseResponse(["answer"]));
+    const session = await create();
+    const first = await send(session.id, { content: "what is new?", web: true });
+    const started = first[0];
+    const original = started?.type === "start" ? started.userMessage : null;
+    await send(session.id, { content: "and something else" });
+
+    const again = await send(session.id, { content: "", replayOf: original!.id, web: true });
+    const repeated = again[0]?.type === "start" ? again[0].userMessage : null;
+    expect(repeated).toMatchObject({ role: "user", content: "what is new?", web: true });
+    expect(repeated?.id).not.toBe(original!.id);
+    // it went to the end of the conversation, with everything before it as context
+    expect((await detail(session.id)).session.messages.map((m) => m.content)).toEqual([
+      "what is new?",
+      "answer",
+      "and something else",
+      "answer",
+      "what is new?",
+      "answer",
+    ]);
+    expect(provider.calls[2]?.body.messages).toHaveLength(5);
+    expect(provider.calls[2]?.body.web_search_options).toBeDefined();
+
+    // only a message of yours that is still there can be asked again
+    const reply = (await detail(session.id)).session.messages[1]!;
+    const wrong = await sendMessage(
+      req("POST", `/api/sessions/${session.id}/messages`, { content: "", replayOf: reply.id }),
+      ctx(session.id),
+    );
+    expect(wrong.status).toBe(400);
+    const gone = await sendMessage(
+      req("POST", `/api/sessions/${session.id}/messages`, { content: "", replayOf: "nope" }),
+      ctx(session.id),
+    );
+    expect(gone.status).toBe(400);
+  });
+
   it("explains a refused web search", async () => {
     await useKey();
     stubProvider(() =>

@@ -26,9 +26,8 @@ import bird from "./bird.png";
 import shadows from "./shadows.png";
 import partyLights from "./party-lights.png";
 import grill from "./grill.png";
-import skylineLightsA from "./skyline/lights-a.png";
-import skylineLightsB from "./skyline/lights-b.png";
-import skylineLightsC from "./skyline/lights-c.png";
+import skylineGlintsA from "./skyline/glints-a.png";
+import skylineGlintsB from "./skyline/glints-b.png";
 import skylineGlowBackA from "./skyline/glow-back-a.png";
 import skylineGlowBackB from "./skyline/glow-back-b.png";
 import skylineGlowFrontA from "./skyline/glow-front-a.png";
@@ -54,14 +53,12 @@ import skylineRooftopsNight from "./skyline/rooftops-night.png";
 import skylinePeopleNight from "./skyline/people-night.png";
 import skylinePropsNight from "./skyline/props-night.png";
 import skylineWheelsNight from "./skyline/wheels-night.png";
-import brooklynLightsA from "./brooklyn/lights-a.png";
-import brooklynLightsB from "./brooklyn/lights-b.png";
-import brooklynLightsC from "./brooklyn/lights-c.png";
 import brooklynGlowBackA from "./brooklyn/glow-back-a.png";
 import brooklynGlowBackB from "./brooklyn/glow-back-b.png";
 import brooklynGlowFrontA from "./brooklyn/glow-front-a.png";
 import brooklynGlowFrontB from "./brooklyn/glow-front-b.png";
 import brooklynTrafficDay from "./brooklyn/traffic-day.png";
+import brooklynCabDay from "./brooklyn/cab-day.png";
 import brooklynCityDay from "./brooklyn/city-day.png";
 import brooklynRooftopsDay from "./brooklyn/rooftops-day.png";
 import brooklynParkedDay from "./brooklyn/parked-day.png";
@@ -69,6 +66,7 @@ import brooklynPeopleDay from "./brooklyn/people-day.png";
 import brooklynPropsDay from "./brooklyn/props-day.png";
 import brooklynWheelsDay from "./brooklyn/wheels-day.png";
 import brooklynTrafficGolden from "./brooklyn/traffic-golden.png";
+import brooklynCabGolden from "./brooklyn/cab-golden.png";
 import brooklynCityGolden from "./brooklyn/city-golden.png";
 import brooklynRooftopsGolden from "./brooklyn/rooftops-golden.png";
 import brooklynParkedGolden from "./brooklyn/parked-golden.png";
@@ -76,6 +74,7 @@ import brooklynPeopleGolden from "./brooklyn/people-golden.png";
 import brooklynPropsGolden from "./brooklyn/props-golden.png";
 import brooklynWheelsGolden from "./brooklyn/wheels-golden.png";
 import brooklynTrafficDusk from "./brooklyn/traffic-dusk.png";
+import brooklynCabDusk from "./brooklyn/cab-dusk.png";
 import brooklynCityDusk from "./brooklyn/city-dusk.png";
 import brooklynRooftopsDusk from "./brooklyn/rooftops-dusk.png";
 import brooklynParkedDusk from "./brooklyn/parked-dusk.png";
@@ -83,6 +82,7 @@ import brooklynPeopleDusk from "./brooklyn/people-dusk.png";
 import brooklynPropsDusk from "./brooklyn/props-dusk.png";
 import brooklynWheelsDusk from "./brooklyn/wheels-dusk.png";
 import brooklynTrafficNight from "./brooklyn/traffic-night.png";
+import brooklynCabNight from "./brooklyn/cab-night.png";
 import brooklynCityNight from "./brooklyn/city-night.png";
 import brooklynRooftopsNight from "./brooklyn/rooftops-night.png";
 import brooklynParkedNight from "./brooklyn/parked-night.png";
@@ -125,7 +125,7 @@ export const SKY = {
  * `cast` gives [first row, count] for each kind of character.
  */
 export const PEOPLE = {
-  "frames": 8,
+  "frames": 10,
   "walkFrames": 4,
   "person": {
     "w": 9,
@@ -185,7 +185,10 @@ export const SCENES = {
     people: { day: skylinePeopleDay.src, golden: skylinePeopleGolden.src, dusk: skylinePeopleDusk.src, night: skylinePeopleNight.src },
     props: { day: skylinePropsDay.src, golden: skylinePropsGolden.src, dusk: skylinePropsDusk.src, night: skylinePropsNight.src },
     wheels: { day: skylineWheelsDay.src, golden: skylineWheelsGolden.src, dusk: skylineWheelsDusk.src, night: skylineWheelsNight.src },
-    lights: { a: skylineLightsA.src, b: skylineLightsB.src, c: skylineLightsC.src },
+    /** The cab that answers a hail. Only where there is a street to hail one on. */
+    cab: null,
+    /** Sparkle on the water, as two pictures that take turns. Only where there is water. */
+    glints: [skylineGlintsA.src, skylineGlintsB.src],
     glow: {
       back: [skylineGlowBackA.src, skylineGlowBackB.src],
       front: [skylineGlowFrontA.src, skylineGlowFrontB.src],
@@ -239,6 +242,7 @@ export const SCENES = {
           "seconds": 46,
           "steps": 348,
           "span": 1,
+          "vehicles": [],
           "front": false
         },
         {
@@ -252,6 +256,7 @@ export const SCENES = {
           "seconds": 64,
           "steps": 348,
           "span": 1,
+          "vehicles": [],
           "front": false
         }
       ],
@@ -362,7 +367,9 @@ export const SCENES = {
             "top": 322
           }
         ],
-        "stoops": []
+        "stoops": [],
+        "hail": [],
+        "cab": null
       },
       "windows": [
         {
@@ -1044,7 +1051,314 @@ export const SCENES = {
           "h": 6,
           "when": "evening"
         }
-      ]
+      ],
+      "switches": {
+        "back": [
+          {
+            "x": 34,
+            "y": 250,
+            "w": 3,
+            "h": 3,
+            "color": "#bd9a50"
+          },
+          {
+            "x": 34,
+            "y": 304,
+            "w": 3,
+            "h": 3,
+            "color": "#c9ae5c"
+          },
+          {
+            "x": 55,
+            "y": 214,
+            "w": 2,
+            "h": 4,
+            "color": "#c9ae5c"
+          },
+          {
+            "x": 127,
+            "y": 301,
+            "w": 2,
+            "h": 4,
+            "color": "#ddd096"
+          },
+          {
+            "x": 143,
+            "y": 223,
+            "w": 2,
+            "h": 4,
+            "color": "#ddd096"
+          },
+          {
+            "x": 143,
+            "y": 295,
+            "w": 2,
+            "h": 4,
+            "color": "#ddd096"
+          },
+          {
+            "x": 148,
+            "y": 303,
+            "w": 2,
+            "h": 4,
+            "color": "#d8c478"
+          },
+          {
+            "x": 153,
+            "y": 303,
+            "w": 2,
+            "h": 4,
+            "color": "#bd9a50"
+          },
+          {
+            "x": 143,
+            "y": 311,
+            "w": 2,
+            "h": 4,
+            "color": "#bd9a50"
+          },
+          {
+            "x": 151,
+            "y": 208,
+            "w": 2,
+            "h": 4,
+            "color": "#ddd096"
+          },
+          {
+            "x": 161,
+            "y": 244,
+            "w": 3,
+            "h": 3,
+            "color": "#bd9a50"
+          },
+          {
+            "x": 161,
+            "y": 298,
+            "w": 3,
+            "h": 3,
+            "color": "#c9ae5c"
+          },
+          {
+            "x": 161,
+            "y": 310,
+            "w": 3,
+            "h": 3,
+            "color": "#c9ae5c"
+          },
+          {
+            "x": 193,
+            "y": 275,
+            "w": 3,
+            "h": 3,
+            "color": "#ddd096"
+          },
+          {
+            "x": 198,
+            "y": 311,
+            "w": 3,
+            "h": 3,
+            "color": "#d8c478"
+          },
+          {
+            "x": 277,
+            "y": 253,
+            "w": 2,
+            "h": 4,
+            "color": "#d8c478"
+          },
+          {
+            "x": 488,
+            "y": 173,
+            "w": 2,
+            "h": 4,
+            "color": "#ddd096"
+          },
+          {
+            "x": 493,
+            "y": 181,
+            "w": 2,
+            "h": 4,
+            "color": "#ddd096"
+          },
+          {
+            "x": 496,
+            "y": 151,
+            "w": 2,
+            "h": 4,
+            "color": "#bd9a50"
+          },
+          {
+            "x": 557,
+            "y": 178,
+            "w": 2,
+            "h": 4,
+            "color": "#bd9a50"
+          }
+        ],
+        "front": [
+          {
+            "x": 4,
+            "y": 320,
+            "w": 4,
+            "h": 6,
+            "color": "#d8c478"
+          },
+          {
+            "x": 13,
+            "y": 332,
+            "w": 4,
+            "h": 6,
+            "color": "#d8c478"
+          },
+          {
+            "x": 59,
+            "y": 348,
+            "w": 4,
+            "h": 6,
+            "color": "#c9ae5c"
+          },
+          {
+            "x": 155,
+            "y": 310,
+            "w": 4,
+            "h": 6,
+            "color": "#ddd096"
+          },
+          {
+            "x": 119,
+            "y": 322,
+            "w": 4,
+            "h": 6,
+            "color": "#d8c478"
+          },
+          {
+            "x": 155,
+            "y": 322,
+            "w": 4,
+            "h": 6,
+            "color": "#bd9a50"
+          },
+          {
+            "x": 146,
+            "y": 334,
+            "w": 4,
+            "h": 6,
+            "color": "#c9ae5c"
+          },
+          {
+            "x": 164,
+            "y": 334,
+            "w": 4,
+            "h": 6,
+            "color": "#ddd096"
+          },
+          {
+            "x": 137,
+            "y": 346,
+            "w": 4,
+            "h": 6,
+            "color": "#ddd096"
+          },
+          {
+            "x": 146,
+            "y": 346,
+            "w": 4,
+            "h": 6,
+            "color": "#d0503a"
+          },
+          {
+            "x": 176,
+            "y": 340,
+            "w": 4,
+            "h": 6,
+            "color": "#d8c478"
+          },
+          {
+            "x": 212,
+            "y": 352,
+            "w": 4,
+            "h": 6,
+            "color": "#d8c478"
+          },
+          {
+            "x": 268,
+            "y": 344,
+            "w": 4,
+            "h": 6,
+            "color": "#ddd096"
+          },
+          {
+            "x": 277,
+            "y": 344,
+            "w": 4,
+            "h": 6,
+            "color": "#bd9a50"
+          },
+          {
+            "x": 369,
+            "y": 326,
+            "w": 4,
+            "h": 6,
+            "color": "#bd9a50"
+          },
+          {
+            "x": 360,
+            "y": 338,
+            "w": 4,
+            "h": 6,
+            "color": "#bd9a50"
+          },
+          {
+            "x": 434,
+            "y": 315,
+            "w": 4,
+            "h": 6,
+            "color": "#bd9a50"
+          },
+          {
+            "x": 434,
+            "y": 327,
+            "w": 4,
+            "h": 6,
+            "color": "#ddd096"
+          },
+          {
+            "x": 434,
+            "y": 339,
+            "w": 4,
+            "h": 6,
+            "color": "#d8c478"
+          },
+          {
+            "x": 513,
+            "y": 332,
+            "w": 4,
+            "h": 6,
+            "color": "#c9ae5c"
+          },
+          {
+            "x": 522,
+            "y": 344,
+            "w": 4,
+            "h": 6,
+            "color": "#d8c478"
+          },
+          {
+            "x": 596,
+            "y": 300,
+            "w": 4,
+            "h": 6,
+            "color": "#bd9a50"
+          },
+          {
+            "x": 610,
+            "y": 343,
+            "w": 4,
+            "h": 6,
+            "color": "#ddd096"
+          }
+        ]
+      }
     },
   },
   brooklyn: {
@@ -1055,7 +1369,10 @@ export const SCENES = {
     people: { day: brooklynPeopleDay.src, golden: brooklynPeopleGolden.src, dusk: brooklynPeopleDusk.src, night: brooklynPeopleNight.src },
     props: { day: brooklynPropsDay.src, golden: brooklynPropsGolden.src, dusk: brooklynPropsDusk.src, night: brooklynPropsNight.src },
     wheels: { day: brooklynWheelsDay.src, golden: brooklynWheelsGolden.src, dusk: brooklynWheelsDusk.src, night: brooklynWheelsNight.src },
-    lights: { a: brooklynLightsA.src, b: brooklynLightsB.src, c: brooklynLightsC.src },
+    /** The cab that answers a hail. Only where there is a street to hail one on. */
+    cab: { day: brooklynCabDay.src, golden: brooklynCabGolden.src, dusk: brooklynCabDusk.src, night: brooklynCabNight.src },
+    /** Sparkle on the water, as two pictures that take turns. Only where there is water. */
+    glints: null,
     glow: {
       back: [brooklynGlowBackA.src, brooklynGlowBackB.src],
       front: [brooklynGlowFrontA.src, brooklynGlowFrontB.src],
@@ -1106,9 +1423,31 @@ export const SCENES = {
           "rows": 2,
           "row": 0,
           "reverse": true,
-          "seconds": 44,
+          "seconds": 54,
           "steps": 1920,
           "span": 3,
+          "vehicles": [
+            {
+              "x": 120,
+              "w": 28
+            },
+            {
+              "x": 540,
+              "w": 30
+            },
+            {
+              "x": 900,
+              "w": 28
+            },
+            {
+              "x": 1190,
+              "w": 28
+            },
+            {
+              "x": 1593,
+              "w": 32
+            }
+          ],
           "front": true
         },
         {
@@ -1119,9 +1458,31 @@ export const SCENES = {
           "rows": 2,
           "row": 1,
           "reverse": false,
-          "seconds": 52,
+          "seconds": 64,
           "steps": 1920,
           "span": 3,
+          "vehicles": [
+            {
+              "x": 21,
+              "w": 46
+            },
+            {
+              "x": 438,
+              "w": 34
+            },
+            {
+              "x": 799,
+              "w": 62
+            },
+            {
+              "x": 1245,
+              "w": 34
+            },
+            {
+              "x": 1629,
+              "w": 28
+            }
+          ],
           "front": true
         }
       ],
@@ -1313,7 +1674,18 @@ export const SCENES = {
             "x": 607,
             "y": 333
           }
-        ]
+        ],
+        "hail": [
+          165,
+          291,
+          467
+        ],
+        "cab": {
+          "w": 28,
+          "h": 12,
+          "lane": 353,
+          "kerb": 350
+        }
       },
       "windows": [
         {
@@ -1834,7 +2206,545 @@ export const SCENES = {
           "h": 14,
           "when": "evening"
         }
-      ]
+      ],
+      "switches": {
+        "back": [
+          {
+            "x": 47,
+            "y": 195,
+            "w": 1,
+            "h": 1,
+            "color": "#c9ae70"
+          },
+          {
+            "x": 104,
+            "y": 148,
+            "w": 1,
+            "h": 1,
+            "color": "#c9ae70"
+          },
+          {
+            "x": 101,
+            "y": 176,
+            "w": 1,
+            "h": 1,
+            "color": "#c9ae70"
+          },
+          {
+            "x": 104,
+            "y": 176,
+            "w": 1,
+            "h": 1,
+            "color": "#c9ae70"
+          },
+          {
+            "x": 107,
+            "y": 204,
+            "w": 1,
+            "h": 1,
+            "color": "#c9ae70"
+          },
+          {
+            "x": 118,
+            "y": 148,
+            "w": 1,
+            "h": 1,
+            "color": "#c9ae70"
+          },
+          {
+            "x": 118,
+            "y": 168,
+            "w": 1,
+            "h": 1,
+            "color": "#c9ae70"
+          },
+          {
+            "x": 127,
+            "y": 208,
+            "w": 1,
+            "h": 1,
+            "color": "#c9ae70"
+          },
+          {
+            "x": 152,
+            "y": 187,
+            "w": 1,
+            "h": 1,
+            "color": "#c9ae70"
+          },
+          {
+            "x": 181,
+            "y": 159,
+            "w": 1,
+            "h": 1,
+            "color": "#c9ae70"
+          },
+          {
+            "x": 178,
+            "y": 187,
+            "w": 1,
+            "h": 1,
+            "color": "#c9ae70"
+          },
+          {
+            "x": 187,
+            "y": 171,
+            "w": 1,
+            "h": 1,
+            "color": "#c9ae70"
+          },
+          {
+            "x": 190,
+            "y": 191,
+            "w": 1,
+            "h": 1,
+            "color": "#c9ae70"
+          },
+          {
+            "x": 193,
+            "y": 191,
+            "w": 1,
+            "h": 1,
+            "color": "#c9ae70"
+          },
+          {
+            "x": 187,
+            "y": 219,
+            "w": 1,
+            "h": 1,
+            "color": "#c9ae70"
+          },
+          {
+            "x": 187,
+            "y": 223,
+            "w": 1,
+            "h": 1,
+            "color": "#c9ae70"
+          },
+          {
+            "x": 208,
+            "y": 169,
+            "w": 1,
+            "h": 1,
+            "color": "#c9ae70"
+          },
+          {
+            "x": 59,
+            "y": 236,
+            "w": 3,
+            "h": 5,
+            "color": "#d29a50"
+          },
+          {
+            "x": 10,
+            "y": 246,
+            "w": 3,
+            "h": 5,
+            "color": "#dfa85a"
+          },
+          {
+            "x": 17,
+            "y": 246,
+            "w": 3,
+            "h": 5,
+            "color": "#ecd08a"
+          },
+          {
+            "x": 45,
+            "y": 266,
+            "w": 3,
+            "h": 5,
+            "color": "#e0b565"
+          },
+          {
+            "x": 52,
+            "y": 276,
+            "w": 3,
+            "h": 5,
+            "color": "#b98548"
+          },
+          {
+            "x": 31,
+            "y": 306,
+            "w": 3,
+            "h": 5,
+            "color": "#b98548"
+          },
+          {
+            "x": 10,
+            "y": 316,
+            "w": 3,
+            "h": 5,
+            "color": "#dfa85a"
+          },
+          {
+            "x": 103,
+            "y": 264,
+            "w": 3,
+            "h": 5,
+            "color": "#dfa85a"
+          },
+          {
+            "x": 110,
+            "y": 284,
+            "w": 3,
+            "h": 5,
+            "color": "#dfa85a"
+          },
+          {
+            "x": 138,
+            "y": 304,
+            "w": 3,
+            "h": 5,
+            "color": "#e0b565"
+          },
+          {
+            "x": 271,
+            "y": 194,
+            "w": 3,
+            "h": 5,
+            "color": "#ecd08a"
+          },
+          {
+            "x": 243,
+            "y": 224,
+            "w": 3,
+            "h": 5,
+            "color": "#d29a50"
+          },
+          {
+            "x": 264,
+            "y": 234,
+            "w": 3,
+            "h": 5,
+            "color": "#e0b565"
+          },
+          {
+            "x": 271,
+            "y": 234,
+            "w": 3,
+            "h": 5,
+            "color": "#e0b565"
+          },
+          {
+            "x": 229,
+            "y": 254,
+            "w": 3,
+            "h": 5,
+            "color": "#d29a50"
+          },
+          {
+            "x": 243,
+            "y": 284,
+            "w": 3,
+            "h": 5,
+            "color": "#b98548"
+          },
+          {
+            "x": 236,
+            "y": 324,
+            "w": 3,
+            "h": 5,
+            "color": "#b98548"
+          },
+          {
+            "x": 317,
+            "y": 226,
+            "w": 3,
+            "h": 5,
+            "color": "#d29a50"
+          },
+          {
+            "x": 310,
+            "y": 246,
+            "w": 3,
+            "h": 5,
+            "color": "#b98548"
+          },
+          {
+            "x": 317,
+            "y": 256,
+            "w": 3,
+            "h": 5,
+            "color": "#b98548"
+          },
+          {
+            "x": 345,
+            "y": 276,
+            "w": 3,
+            "h": 5,
+            "color": "#e0b565"
+          },
+          {
+            "x": 324,
+            "y": 316,
+            "w": 3,
+            "h": 5,
+            "color": "#ecd08a"
+          },
+          {
+            "x": 388,
+            "y": 210,
+            "w": 3,
+            "h": 5,
+            "color": "#b98548"
+          },
+          {
+            "x": 437,
+            "y": 210,
+            "w": 3,
+            "h": 5,
+            "color": "#ecd08a"
+          },
+          {
+            "x": 395,
+            "y": 220,
+            "w": 3,
+            "h": 5,
+            "color": "#b98548"
+          },
+          {
+            "x": 437,
+            "y": 220,
+            "w": 3,
+            "h": 5,
+            "color": "#dfa85a"
+          },
+          {
+            "x": 388,
+            "y": 260,
+            "w": 3,
+            "h": 5,
+            "color": "#ecd08a"
+          },
+          {
+            "x": 444,
+            "y": 280,
+            "w": 3,
+            "h": 5,
+            "color": "#e0b565"
+          },
+          {
+            "x": 402,
+            "y": 290,
+            "w": 3,
+            "h": 5,
+            "color": "#dfa85a"
+          },
+          {
+            "x": 388,
+            "y": 300,
+            "w": 3,
+            "h": 5,
+            "color": "#e0b565"
+          },
+          {
+            "x": 388,
+            "y": 310,
+            "w": 3,
+            "h": 5,
+            "color": "#e0b565"
+          },
+          {
+            "x": 409,
+            "y": 320,
+            "w": 3,
+            "h": 5,
+            "color": "#d29a50"
+          },
+          {
+            "x": 444,
+            "y": 320,
+            "w": 3,
+            "h": 5,
+            "color": "#ecd08a"
+          },
+          {
+            "x": 481,
+            "y": 278,
+            "w": 3,
+            "h": 5,
+            "color": "#e0b565"
+          },
+          {
+            "x": 495,
+            "y": 278,
+            "w": 3,
+            "h": 5,
+            "color": "#ecd08a"
+          },
+          {
+            "x": 481,
+            "y": 288,
+            "w": 3,
+            "h": 5,
+            "color": "#e0b565"
+          },
+          {
+            "x": 495,
+            "y": 298,
+            "w": 3,
+            "h": 5,
+            "color": "#e0b565"
+          },
+          {
+            "x": 495,
+            "y": 318,
+            "w": 3,
+            "h": 5,
+            "color": "#ecd08a"
+          }
+        ],
+        "front": [
+          {
+            "x": 35,
+            "y": 266,
+            "w": 5,
+            "h": 10,
+            "color": "#d29a50"
+          },
+          {
+            "x": 78,
+            "y": 266,
+            "w": 5,
+            "h": 10,
+            "color": "#ecd08a"
+          },
+          {
+            "x": 91,
+            "y": 266,
+            "w": 5,
+            "h": 10,
+            "color": "#d29a50"
+          },
+          {
+            "x": 78,
+            "y": 286,
+            "w": 5,
+            "h": 10,
+            "color": "#b98548"
+          },
+          {
+            "x": 133,
+            "y": 226,
+            "w": 5,
+            "h": 10,
+            "color": "#d29a50"
+          },
+          {
+            "x": 145,
+            "y": 226,
+            "w": 5,
+            "h": 10,
+            "color": "#dfa85a"
+          },
+          {
+            "x": 174,
+            "y": 246,
+            "w": 5,
+            "h": 10,
+            "color": "#b98548"
+          },
+          {
+            "x": 162,
+            "y": 266,
+            "w": 5,
+            "h": 10,
+            "color": "#ecd08a"
+          },
+          {
+            "x": 174,
+            "y": 286,
+            "w": 5,
+            "h": 10,
+            "color": "#e0b565"
+          },
+          {
+            "x": 201,
+            "y": 286,
+            "w": 5,
+            "h": 10,
+            "color": "#dfa85a"
+          },
+          {
+            "x": 201,
+            "y": 306,
+            "w": 5,
+            "h": 14,
+            "color": "#dfa85a"
+          },
+          {
+            "x": 273,
+            "y": 266,
+            "w": 5,
+            "h": 10,
+            "color": "#ecd08a"
+          },
+          {
+            "x": 283,
+            "y": 286,
+            "w": 5,
+            "h": 10,
+            "color": "#d29a50"
+          },
+          {
+            "x": 328,
+            "y": 266,
+            "w": 5,
+            "h": 10,
+            "color": "#d29a50"
+          },
+          {
+            "x": 308,
+            "y": 306,
+            "w": 5,
+            "h": 14,
+            "color": "#dfa85a"
+          },
+          {
+            "x": 353,
+            "y": 266,
+            "w": 5,
+            "h": 10,
+            "color": "#b98548"
+          },
+          {
+            "x": 476,
+            "y": 266,
+            "w": 5,
+            "h": 10,
+            "color": "#b98548"
+          },
+          {
+            "x": 456,
+            "y": 306,
+            "w": 5,
+            "h": 14,
+            "color": "#ecd08a"
+          },
+          {
+            "x": 491,
+            "y": 266,
+            "w": 5,
+            "h": 10,
+            "color": "#ecd08a"
+          },
+          {
+            "x": 502,
+            "y": 286,
+            "w": 5,
+            "h": 10,
+            "color": "#b98548"
+          },
+          {
+            "x": 527,
+            "y": 266,
+            "w": 5,
+            "h": 10,
+            "color": "#e0b565"
+          }
+        ]
+      }
     },
   },
 } as const;

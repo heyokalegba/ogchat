@@ -11,10 +11,11 @@ import {
   type KeyboardEvent,
 } from "react";
 import { createApi } from "@/lib/client/api";
-import type { ReasoningEffort, SessionMeta } from "@/lib/types";
+import type { ChatMessage, ReasoningEffort, SessionMeta } from "@/lib/types";
 import { BootLine } from "./BootLine";
 import styles from "./chat.module.css";
 import { Composer } from "./Composer";
+import { copyText } from "./Markdown";
 import { MessageView, StreamingMessage } from "./Message";
 import "./theme.css";
 import { useChat } from "./useChat";
@@ -132,7 +133,29 @@ export function ChatSurface(props: ChatSurfaceProps) {
     if (el) stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < STICK_PX;
   }, []);
 
-  const { send, editAndResend, deleteMessage, regenerate, retry, stop } = chat;
+  const { send, editAndResend, deleteMessage, regenerate, replay, retry, stop } = chat;
+  const onReplay = useCallback(
+    (message: ChatMessage) => {
+      stick.current = true;
+      replay(message);
+    },
+    [replay],
+  );
+  /** The whole conversation as plain markdown, for pasting somewhere else. */
+  const [chatCopied, setChatCopied] = useState(false);
+  const copyChat = useCallback(async () => {
+    const transcript = messages
+      .map((m) => {
+        const files = m.attachments?.length
+          ? `\n\n(attached: ${m.attachments.map((a) => a.name).join(", ")})`
+          : "";
+        return `## ${m.role === "user" ? "You" : "Assistant"}\n\n${m.content}${files}`;
+      })
+      .join("\n\n");
+    if (!(await copyText(transcript))) return;
+    setChatCopied(true);
+    setTimeout(() => setChatCopied(false), 1500);
+  }, [messages]);
   const onSubmit = useCallback(
     (text: string) => {
       stick.current = true;
@@ -245,6 +268,8 @@ export function ChatSurface(props: ChatSurfaceProps) {
                   onEdit={onEdit}
                   onDelete={onDelete}
                   onRegenerate={regenerate}
+                  canReplay={idle && message.role === "user" && !message.id.startsWith("pending-")}
+                  onReplay={onReplay}
                   fileUrl={chat.fileUrl}
                 />
               ))}
@@ -324,6 +349,16 @@ export function ChatSurface(props: ChatSurfaceProps) {
             <span className={styles.hintKeys}>
               {busy ? "esc to stop" : "enter to send · shift+enter for a newline"}
             </span>
+            {messages.length > 0 && (
+              <button
+                type="button"
+                className={`${styles.status} ${styles.statusButton} ${styles.copyChat}`}
+                onClick={copyChat}
+                title="Copy the whole conversation"
+              >
+                {chatCopied ? "copied" : "copy chat"}
+              </button>
+            )}
             {provider &&
               (provider.ready ? (
                 <span className={styles.status}>

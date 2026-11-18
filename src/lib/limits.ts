@@ -18,3 +18,9 @@ export function formatBytes(bytes: number): string {
 export const MAX_PROJECT_FILES = 20;
 export const MAX_PROJECT_NAME_CHARS = 80;
 export const MAX_PROJECT_INSTRUCTIONS_CHARS = 20_000;
+
+/**
+ * A paste longer than this goes onto the message as a text attachment
+ * instead of into the box, the way a pasted file would.
+ */
+export const PASTE_AS_FILE_CHARS = 2_000;

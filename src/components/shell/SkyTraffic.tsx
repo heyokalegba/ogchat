@@ -58,7 +58,8 @@ function schedule(id: number): Flight {
   };
 }
 
-export function SkyTraffic({ light, night }: { light: SkyState; night: number }) {
+export function SkyTraffic(props: { light: SkyState; night: number; still?: boolean }) {
+  const { light, night, still = false } = props;
   const [flights, setFlights] = useState<Flight[]>([]);
   const [flocks, setFlocks] = useState<Flock[]>([]);
   const dark = useRef(night);
@@ -66,9 +67,16 @@ export function SkyTraffic({ light, night }: { light: SkyState; night: number })
     dark.current = night;
   }, [night]);
 
+  // Frozen: whatever was in the air is gone, and nothing new sets off.
+  useEffect(() => {
+    if (!still) return;
+    setFlights([]);
+    setFlocks([]);
+  }, [still]);
+
   // Birds: a few every so often while there is light to fly by.
   useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (still || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const seconds = () => performance.now() / 1000;
     let next = seconds() + 3 + Math.random() * 8;
     let id = 0;
@@ -79,10 +87,10 @@ export function SkyTraffic({ light, night }: { light: SkyState; night: number })
       setFlocks((current) => (current.length >= 3 ? current : [...current, gather(++id)]));
     }, 2000);
     return () => clearInterval(timer);
-  }, []);
+  }, [still]);
 
   useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (still || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const seconds = () => performance.now() / 1000;
     let next = seconds() + 12 + Math.random() * 40;
     let id = 0;
@@ -92,7 +100,7 @@ export function SkyTraffic({ light, night }: { light: SkyState; night: number })
       setFlights((current) => (current.length >= 2 ? current : [...current, schedule(++id)]));
     }, 3000);
     return () => clearInterval(timer);
-  }, []);
+  }, [still]);
 
   const { flier, bird } = SKY;
   return (

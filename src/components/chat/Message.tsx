@@ -16,6 +16,9 @@ export interface MessageViewProps {
   onEdit?: (messageId: string, content: string) => void;
   onDelete?: (messageId: string) => void;
   onRegenerate?: () => void;
+  /** Offer "ask again" on a message you sent (while nothing is generating). */
+  canReplay?: boolean;
+  onReplay?: (message: ChatMessage) => void;
   /** Where to load an attachment from (thumbnails, "open file" links). */
   fileUrl: (attachment: Attachment) => string;
 }
@@ -116,6 +119,7 @@ function Editor(props: {
 /** One persisted message. User text is shown as written; replies render as markdown. */
 export const MessageView = memo(function MessageView(props: MessageViewProps) {
   const { message, canEdit, canRegenerate, onEdit, onDelete, onRegenerate, fileUrl } = props;
+  const { canReplay, onReplay } = props;
   const attachments = message.attachments ?? [];
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -153,6 +157,17 @@ export const MessageView = memo(function MessageView(props: MessageViewProps) {
         note={message.web ? "web" : undefined}
       >
         <div className={`${styles.actions} ${confirming ? styles.actionsPinned : ""}`}>
+          {isUser && message.content && <CopyButton text={message.content} label="prompt" />}
+          {isUser && canReplay && (
+            <button
+              type="button"
+              className={styles.action}
+              title="Send this again as a new message"
+              onClick={() => onReplay?.(message)}
+            >
+              ask again
+            </button>
+          )}
           {isUser && canEdit && (
             <>
               <button type="button" className={styles.action} onClick={() => setEditing(true)}>

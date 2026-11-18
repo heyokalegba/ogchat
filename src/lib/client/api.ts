@@ -206,8 +206,13 @@ export function createApi(base = "/api"): ChatApi {
         for (const file of payload.files) form.append("files", file, file.name);
         init = { method: "POST", body: form };
       } else if ("content" in payload) {
-        const { content, replaceFromMessageId, web } = payload;
-        init = body("POST", { content, replaceFromMessageId, ...(web ? { web: true } : {}) });
+        const { content, replaceFromMessageId, web, replayOf } = payload;
+        init = body("POST", {
+          content,
+          replaceFromMessageId,
+          ...(web ? { web: true } : {}),
+          ...(replayOf ? { replayOf } : {}),
+        });
       } else {
         init = body("POST", payload);
       }

@@ -265,8 +265,9 @@ export function useChat(options: UseChatOptions) {
           ? current.findIndex((m) => m.id === body.replaceFromMessageId)
           : -1;
         const kept = cut === -1 ? current : current.slice(0, cut);
-        // An edited message keeps the files it already had.
-        const attachments = [...(cut === -1 ? [] : (current[cut]?.attachments ?? [])), ...previews];
+        // An edited message keeps the files it already had; so does a question asked again.
+        const source = body.replayOf ? current.find((m) => m.id === body.replayOf) : current[cut];
+        const attachments = [...(source?.attachments ?? []), ...previews];
         return [
           ...kept,
           {
@@ -360,7 +361,7 @@ export function useChat(options: UseChatOptions) {
         // Nothing was accepted: put the transcript back and keep the text and files within reach.
         setMessages((current) => current.filter((m) => m.id !== tempId));
         releasePreviews(previews);
-        if (!isRegenerate) {
+        if (!isRegenerate && !body.replayOf) {
           setDraft((current) => (current.trim() ? current : body.content));
           if (sending.length && filesRef.current.length === 0) setFiles(sending);
         }
@@ -448,6 +449,20 @@ export function useChat(options: UseChatOptions) {
 
   const regenerate = useCallback(() => void submit({ regenerate: true }), [submit]);
 
+  /** Asks an earlier question again, as a new message at the end, with the files it had. */
+  const replay = useCallback(
+    (message: ChatMessage) => {
+      if (phaseRef.current !== "idle" || message.role !== "user") return false;
+      void submit({
+        content: message.content,
+        replayOf: message.id,
+        ...(message.web ? { web: true } : {}),
+      });
+      return true;
+    },
+    [submit],
+  );
+
   const retry = useCallback(() => {
     const action = error?.retry ?? { kind: "regenerate" as const };
     const id = activeIdRef.current;
@@ -528,6 +543,7 @@ export function useChat(options: UseChatOptions) {
     openCount,
     send,
     editAndResend,
+    replay,
     regenerate,
     retry,
     stop,

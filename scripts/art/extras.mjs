@@ -113,3 +113,41 @@ export function grill() {
   }
   return c;
 }
+
+/**
+ * The app's icon, for when ogchat is installed as an app of its own: a few
+ * courses of brick with a prompt and a caret, drawn at 32 pixels and scaled
+ * up with hard edges to `size`.
+ */
+export function appIcon(size) {
+  const small = canvas(32, 32);
+  const ink = hex("#0d0c0b");
+  const brick = hex("#c9ad8a");
+  const mortar = hex("#b59a78");
+  small.rect(0, 0, 32, 32, ink);
+  small.rect(2, 2, 28, 28, brick);
+  for (const y of [10, 20]) small.rect(2, y, 28, 2, mortar); // courses
+  for (const [x, y, h] of [
+    [15, 2, 8],
+    [8, 12, 8],
+    [22, 12, 8],
+    [15, 22, 8],
+  ]) {
+    small.rect(x, y, 2, h, mortar);
+  }
+  // the prompt: a chevron, three pixels thick
+  for (let i = 0; i < 6; i++) {
+    small.rect(8 + i, 10 + i, 3, 1, ink);
+    small.rect(8 + i, 22 - i, 3, 1, ink);
+  }
+  small.rect(17, 20, 8, 3, hex("#7e2e20")); // the caret
+  const scale = Math.floor(size / 32);
+  const out = canvas(size, size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const p = small.get(Math.min(31, Math.floor(x / scale)), Math.min(31, Math.floor(y / scale)));
+      if (p) out.set(x, y, p);
+    }
+  }
+  return out;
+}

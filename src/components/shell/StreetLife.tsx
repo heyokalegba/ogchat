@@ -12,11 +12,13 @@ import {
 import { PEOPLE, SCENES, SKY, type SceneId, type SkyState } from "./art";
 import styles from "./backdrop.module.css";
 import {
+  castCabRide,
   castRoofVisit,
   castStanding,
   castWalkers,
   MAX_HEADS,
   wantedHeads,
+  type CabRide,
   type LifeConfig,
   type Member,
   type Party,
@@ -128,14 +130,29 @@ const PartyView = memo(function PartyView(props: {
         }, step.seconds * 1000);
         return;
       }
+      if (step.kind === "hail") {
+        // Facing the traffic that will bring the cab, which comes from the left.
+        el.dataset.gait = "hail";
+        el.dataset.facing = "left";
+        timer = setTimeout(next, step.seconds * 1000);
+        return;
+      }
       el.dataset.gait = "walk";
       if (step.kind === "walk") {
         if (step.to !== x) el.dataset.facing = step.to > x ? "right" : "left";
         x = step.to;
+      } else if (step.kind === "board") {
+        // Down off the kerb and round to the door: gone from view as they reach the cab.
+        lift = step.drop;
+        el.dataset.facing = "right";
       } else {
         lift = step.to;
       }
       place(step.seconds);
+      if (step.kind === "board") {
+        el.style.transition += `, opacity ${step.seconds}s steps(1, end)`;
+        el.style.opacity = "0";
+      }
       timer = setTimeout(next, step.seconds * 1000);
     };
     place(0);
@@ -160,6 +177,57 @@ const PartyView = memo(function PartyView(props: {
     </div>
   );
 });
+
+/**
+ * The cab that answers a hail. It waits out of sight until it is due, runs in
+ * from the left along its lane and eases in to the kerb, and once its fare is
+ * aboard pulls away to the right. Three timers and two CSS transitions.
+ */
+function Cab(props: {
+  ride: CabRide;
+  cab: NonNullable<LifeConfig["cab"]>;
+  sprite: string;
+  /** Scene pixels the picture is wide: where "off the right-hand edge" is. */
+  far: number;
+  onGone: (id: number) => void;
+}) {
+  const { ride, cab, sprite, far, onGone } = props;
+  const element = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = element.current;
+    if (!el) return;
+    const at = (x: number, base: number) => `translate(${u(x)}, ${u(base - cab.h + 1)})`;
+    el.style.transform = at(-cab.w - 12, cab.lane);
+    const timers = [
+      setTimeout(
+        () => {
+          el.style.visibility = "visible";
+          el.style.transition = `transform ${ride.arriveFor}s cubic-bezier(0.16, 0.6, 0.3, 1)`;
+          el.style.transform = at(ride.stopX, cab.kerb);
+        },
+        Math.max(0, ride.arriveAt) * 1000,
+      ),
+      setTimeout(() => {
+        el.style.transition = "transform 5.5s cubic-bezier(0.5, 0, 0.85, 0.55)";
+        el.style.transform = at(far + 20, cab.lane);
+      }, ride.leaveAt * 1000),
+      setTimeout(() => onGone(ride.id), (ride.leaveAt + 5.8) * 1000),
+    ];
+    return () => timers.forEach(clearTimeout);
+  }, [ride, cab, far, onGone]);
+  return (
+    <div
+      ref={element}
+      className={styles.cab}
+      style={{
+        width: u(cab.w),
+        height: u(cab.h),
+        backgroundImage: `url(${sprite})`,
+        visibility: "hidden",
+      }}
+    />
+  );
+}
 
 /**
  * What goes up for a barbecue: a string of lights between two poles, and a
@@ -232,12 +300,21 @@ export function StreetLife(props: {
   party?: { roof: number; endsAt: number } | null;
   /** The scene's time now, in milliseconds. */
   now?: number;
+  /** Frozen: a few people standing where they are, and nothing else. */
+  still?: boolean;
 }) {
   const { scene, light } = props;
   const art = SCENES[scene];
   const life: LifeConfig = art.config.life;
+  const still = props.still ?? false;
   const [parties, setParties] = useState<Party[]>([]);
   const live = useRef<Party[]>([]);
+  /** Cabs on their way to, or away from, somebody who hailed one. */
+  const [cabs, setCabs] = useState<CabRide[]>([]);
+  const onCabGone = useCallback(
+    (id: number) => setCabs((current) => current.filter((ride) => ride.id !== id)),
+    [],
+  );
   const night = useRef(props.night);
   useEffect(() => {
     night.current = props.night;
@@ -267,8 +344,9 @@ export function StreetLife(props: {
         ? castRoofVisit(rand, PEOPLE, life, { room, delay: midway ? rand() * 6 : 0 })
         : castWalkers(rand, PEOPLE, life, { room, midway });
 
-    // Less motion asked for: a few people standing about, and nothing else.
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    // Frozen, or less motion asked for: a few people standing about, and nothing else.
+    if (still || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setCabs([]);
       add(...Array.from({ length: 3 }, () => castStanding(rand, PEOPLE, life)));
       return () => commit([]);
     }
@@ -284,6 +362,8 @@ export function StreetLife(props: {
     const seconds = () => performance.now() / 1000;
     let nextArrival = seconds() + 2 + rand() * 6;
     let nextGroup = seconds() + 45 + rand() * 90;
+    // Now and then somebody flags down a cab. Only where there is a kerb to do it from.
+    let nextCab = seconds() + 35 + rand() * 80;
 
     let away = false;
     const tick = () => {
@@ -301,6 +381,14 @@ export function StreetLife(props: {
         add(one(Math.min(wanted + 1, MAX_HEADS) - heads()));
         nextArrival = now + 2 + rand() * 7;
         wanted = wantedHeads(rand, night.current);
+      }
+      if (now >= nextCab) {
+        nextCab = now + 150 + rand() * 270;
+        const ride = castCabRide(rand, PEOPLE, life);
+        if (ride) {
+          add(ride.party);
+          setCabs((current) => [...current, ride.cab]);
+        }
       }
       if (now >= nextGroup) {
         nextGroup = now + 150 + rand() * 250;
@@ -338,8 +426,9 @@ export function StreetLife(props: {
     return () => {
       clearInterval(timer);
       commit([]);
+      setCabs([]);
     };
-  }, [life, commit]);
+  }, [life, commit, still]);
 
   // ---- the barbecue: guests come up while it lasts, and are sent home if it is called off
   const partyRoof = props.party?.roof ?? null;
@@ -349,7 +438,7 @@ export function StreetLife(props: {
     sceneNow.current = props.now ?? 0;
   }, [props.now]);
   useEffect(() => {
-    if (partyRoof === null) return;
+    if (partyRoof === null || still) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const rand = Math.random;
     const guests = () =>
@@ -383,7 +472,7 @@ export function StreetLife(props: {
       clearInterval(timer);
       commit(live.current.filter((party) => !party.guest));
     };
-  }, [partyRoof, partyEnds, life, commit]);
+  }, [partyRoof, partyEnds, life, commit, still]);
 
   const sheets: Sheets = {
     people: art.people[light],
@@ -428,6 +517,18 @@ export function StreetLife(props: {
           <PartyView key={party.id} party={party} sheets={sheets} onDone={onDone} />
         ))}
       {props.kerb}
+      {life.cab &&
+        art.cab &&
+        cabs.map((ride) => (
+          <Cab
+            key={ride.id}
+            ride={ride}
+            cab={life.cab!}
+            sprite={art.cab![light]}
+            far={life.to}
+            onGone={onCabGone}
+          />
+        ))}
       {road.map((party) => (
         <PartyView key={party.id} party={party} sheets={sheets} onDone={onDone} />
       ))}

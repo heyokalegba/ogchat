@@ -6,6 +6,7 @@ import { roofPartyAt } from "./life";
 import { SkyTraffic } from "./SkyTraffic";
 import { StreetLife } from "./StreetLife";
 import { WindowLife } from "./WindowLife";
+import { WindowSwitches } from "./WindowSwitches";
 
 /** Each scene keeps its own diary of rooftop barbecues. */
 const PARTY_SALT: Record<SceneId, number> = { skyline: 11, brooklyn: 23 };
@@ -52,8 +53,10 @@ export function Backdrop(props: {
   /** The scene's time now, in milliseconds: what the timed events go by. */
   now: number;
   people?: boolean;
+  /** Frozen: nothing moves, nobody arrives. The light still follows the clock. */
+  still?: boolean;
 }) {
-  const { scene, view, now, people = true } = props;
+  const { scene, view, now, people = true, still = false } = props;
   const art = SCENES[scene];
   const config = art.config;
   const { blend, sun, moon } = view;
@@ -85,30 +88,65 @@ export function Backdrop(props: {
         </div>
       ));
 
+  /** Scene pixels as a CSS length. */
+  const u = (n: number) => `calc(var(--u) * ${n})`;
   const lanes = (front: boolean) =>
     config.lanes
       .filter((lane) => lane.front === front)
-      .map((lane) => (
-        <div
-          key={`${lane.top}-${lane.row}`}
-          className={styles.lane}
-          style={{ left: lane.left, top: lane.top, width: lane.width, height: lane.height }}
-        >
+      .map((lane) => {
+        const row = `${lane.rows > 1 ? (lane.row / (lane.rows - 1)) * 100 : 0}%`;
+        return (
           <div
-            className={`${styles.laneStrip} ${lane.reverse ? styles.laneReverse : ""}`}
-            style={{
-              ...image(art.traffic[light]),
-              // The strip holds its picture twice, and the picture is \`span\` lanes long.
-              width: `${lane.span * 200}%`,
-              // The strip image holds every lane as a row; show this one.
-              backgroundSize: `50% ${lane.rows * 100}%`,
-              backgroundPosition: `0 ${lane.rows > 1 ? (lane.row / (lane.rows - 1)) * 100 : 0}%`,
-              animationDuration: `${lane.seconds}s`,
-              animationTimingFunction: `steps(${lane.steps})`,
-            }}
-          />
-        </div>
-      ));
+            key={`${lane.top}-${lane.row}`}
+            className={styles.lane}
+            style={{ left: lane.left, top: lane.top, width: lane.width, height: lane.height }}
+          >
+            {lane.vehicles.length === 0 ? (
+              // A lane that is only lights (the bridge): one short strip sliding past.
+              <div
+                className={`${styles.laneStrip} ${lane.reverse ? styles.laneReverse : ""}`}
+                style={{
+                  ...image(art.traffic[light]),
+                  backgroundSize: `50% ${lane.rows * 100}%`,
+                  backgroundPosition: `0 ${row}`,
+                  animationDuration: `${lane.seconds}s`,
+                  animationTimingFunction: `steps(${lane.steps})`,
+                }}
+              />
+            ) : (
+              // Each vehicle is a small piece of its own, cut from the lane's sheet and
+              // driven along the lane. Small pieces are cheap to keep and quick to redraw,
+              // where one strip several screens long was neither.
+              lane.vehicles.map((vehicle) => {
+                const length = lane.steps;
+                // Where in its lap this vehicle is at the start, so they keep their spacing.
+                const lap = lane.reverse
+                  ? (vehicle.x + vehicle.w) / length
+                  : (length - vehicle.w - vehicle.x) / length;
+                return (
+                  <div
+                    key={vehicle.x}
+                    className={styles.vehicle}
+                    style={
+                      {
+                        ...image(art.traffic[light]),
+                        width: u(vehicle.w),
+                        backgroundSize: `${u(length)} ${lane.rows * 100}%`,
+                        backgroundPosition: `${u(-vehicle.x)} ${row}`,
+                        animationDuration: `${lane.seconds}s`,
+                        animationDelay: `${(-lap * lane.seconds).toFixed(2)}s`,
+                        animationTimingFunction: `steps(${length})`,
+                        "--from": lane.reverse ? -vehicle.w : length - vehicle.w,
+                        "--to": lane.reverse ? length - vehicle.w : -vehicle.w,
+                      } as CSSProperties
+                    }
+                  />
+                );
+              })
+            )}
+          </div>
+        );
+      });
 
   /** Halos round the lights: two layers per depth, each breathing on its own rhythm. */
   const glow = (sources: readonly [string, string], phase: "Back" | "Front") =>
@@ -130,7 +168,7 @@ export function Backdrop(props: {
   const parked = art.parked && <Blend className={styles.layer} sources={art.parked} view={view} />;
 
   return (
-    <div className={styles.backdrop} aria-hidden="true">
+    <div className={`${styles.backdrop} ${still ? styles.still : ""}`} aria-hidden="true">
       {/* Keyed by scene, so switching starts the new one's motion from the top. */}
       <div key={scene} className={styles.scene}>
         {/* The glow on the horizon is drawn on the sunset side; flip it for the morning. */}
@@ -198,17 +236,16 @@ export function Backdrop(props: {
           </div>
         )}
 
-        <SkyTraffic light={light} night={night} />
+        <SkyTraffic light={light} night={night} still={still} />
 
         <Blend className={styles.layer} sources={art.city} view={view} />
-        <div
-          className={`${styles.layer} ${styles.lightsA}`}
-          style={{ ...image(art.lights.a), opacity: switching }}
-        />
-        <div
-          className={`${styles.layer} ${styles.lightsC}`}
-          style={{ ...image(art.lights.c), opacity: switching }}
-        />
+        {art.glints && (
+          <div className={styles.switches} style={{ opacity: switching }}>
+            <div className={`${styles.layer} ${styles.glintsA}`} style={image(art.glints[0])} />
+            <div className={`${styles.layer} ${styles.glintsB}`} style={image(art.glints[1])} />
+          </div>
+        )}
+        <WindowSwitches windows={config.switches.back} strength={switching} still={still} />
         {glow(art.glow.back, "Back")}
         {smoke(false)}
         {lanes(false)}
@@ -231,13 +268,10 @@ export function Backdrop(props: {
         )}
 
         <Blend className={styles.layer} sources={art.rooftops} view={view} />
-        <div
-          className={`${styles.layer} ${styles.lightsB}`}
-          style={{ ...image(art.lights.b), opacity: switching }}
-        />
+        <WindowSwitches windows={config.switches.front} strength={switching} still={still} />
         {glow(art.glow.front, "Front")}
         {/* Cars at the kerb stand between the pavement and us; cyclists pass outside them. */}
-        <WindowLife scene={scene} light={light} />
+        <WindowLife scene={scene} light={light} still={still} />
         {people ? (
           <StreetLife
             scene={scene}
@@ -246,6 +280,7 @@ export function Backdrop(props: {
             kerb={parked}
             party={party}
             now={now}
+            still={still}
           />
         ) : (
           parked

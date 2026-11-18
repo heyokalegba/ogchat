@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   castRoofVisit,
   castStanding,
+  castCabRide,
   castWalkers,
   HATCH_DEPTH,
   MAX_HEADS,
@@ -39,6 +40,8 @@ const street: LifeConfig = {
   from: -14,
   to: 654,
   road: 351,
+  hail: [165, 325, 500],
+  cab: { w: 28, h: 12, lane: 353, kerb: 350 },
   stoops: [
     { x: 60, y: 333 },
     { x: 210, y: 333 },
@@ -57,6 +60,8 @@ const roofs: LifeConfig = {
   from: 0,
   to: 0,
   road: 0,
+  hail: [],
+  cab: null,
   stoops: [],
   sniff: [],
   linger: [],
@@ -293,6 +298,49 @@ describe("sitting on a doorstep", () => {
     for (const party of many(300, (rand) => castWalkers(rand, meta, bare))) {
       expect(party.steps.some((s) => s.kind === "sit")).toBe(false);
     }
+  });
+});
+
+describe("hailing a cab", () => {
+  const rides = many(300, (rand) => castCabRide(rand, meta, street)!);
+
+  it("is one person walking to an empty stretch of kerb, an arm up, then into the cab", () => {
+    for (const { party, cab } of rides) {
+      expect(party.heads).toBe(1);
+      expect(party.members).toHaveLength(1);
+      expect(party.road).toBe(false);
+      expect(party.y).toBe(street.near); // at the kerb's edge
+      expect(party.steps.map((s) => s.kind)).toEqual(["walk", "hail", "board"]);
+      const [walk, hail, board] = party.steps;
+      const spot = walk?.kind === "walk" ? walk.to : NaN;
+      expect(street.hail).toContain(spot);
+      // they start out of sight
+      expect(party.x <= street.from || party.x >= street.to).toBe(true);
+      expect(hail!.seconds).toBeGreaterThanOrEqual(5);
+      expect(hail!.seconds).toBeLessThanOrEqual(9);
+      // the cab stops in front of them, and they step down to its door
+      expect(Math.abs(cab.stopX + street.cab!.w / 2 - spot)).toBeLessThanOrEqual(1);
+      expect(board?.kind === "board" && board.drop).toBeGreaterThan(0);
+      expect(cab.id).toBe(party.id);
+    }
+  });
+
+  it("times the cab to pull in as the wait ends and leave once its fare is aboard", () => {
+    for (const { party, cab } of rides) {
+      const [walk, hail, board] = party.steps;
+      const hailFrom = walk!.seconds;
+      const hailTo = hailFrom + hail!.seconds;
+      // it sets off after the arm goes up and is at the kerb when the wait ends
+      expect(cab.arriveAt).toBeGreaterThan(hailFrom);
+      expect(cab.arriveAt + cab.arriveFor).toBeCloseTo(hailTo, 5);
+      expect(cab.leaveAt).toBeGreaterThan(hailTo + board!.seconds);
+      expect(cab.leaveAt).toBeLessThan(hailTo + board!.seconds + 2);
+    }
+  });
+
+  it("does not happen where there is no kerb or no cab", () => {
+    expect(castCabRide(seeded(1), meta, roofs)).toBeNull();
+    expect(castCabRide(seeded(1), meta, { ...street, hail: [] })).toBeNull();
   });
 });
 

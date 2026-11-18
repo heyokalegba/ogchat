@@ -131,6 +131,30 @@ export function LookPanel({
           </div>
         </div>
         <div className={styles.lookRow}>
+          <span className={styles.lookLabel} id="ogchat-motion">
+            motion
+          </span>
+          <div className={styles.sceneSwitch} role="group" aria-labelledby="ogchat-motion">
+            <button
+              type="button"
+              className={`${styles.sceneButton} ${look.still ? "" : styles.sceneActive}`}
+              aria-pressed={!look.still}
+              onClick={() => onChange({ still: false })}
+            >
+              live
+            </button>
+            <button
+              type="button"
+              className={`${styles.sceneButton} ${look.still ? styles.sceneActive : ""}`}
+              aria-pressed={look.still}
+              title="Hold the scene still, like a picture, while you work. The light still follows the clock."
+              onClick={() => onChange({ still: true })}
+            >
+              frozen
+            </button>
+          </div>
+        </div>
+        <div className={styles.lookRow}>
           <label className={styles.lookLabel} htmlFor="ogchat-scene-strength">
             strength
           </label>

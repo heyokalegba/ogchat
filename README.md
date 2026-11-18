@@ -19,7 +19,9 @@ interface is see-through, over a pixel-art New York that keeps real time.
   higher in summer than in winter; the sky moves through day, golden hour, dusk
   and night; stars come out and the moon shows its real phase.
 - **Night lights.** Windows and street lamps come on as it gets dark, and their
-  halos swell and settle on uneven rhythms, so the city shimmers.
+  halos swell and settle on uneven rhythms, so the city shimmers. Here and
+  there a light is switched on or off: one window at a time, about every half
+  minute, never several together.
 - **Landmarks you know.** One World Trade Center, the Empire State Building
   (floodlit at night) and the Chrysler Building stand in the skyline scene. In
   Brooklyn, One World Trade and the Empire State rise over the rooftops beside
@@ -56,6 +58,8 @@ interface is see-through, over a pixel-art New York that keeps real time.
   comes to look out; a cat settles on a sill; a dog gets its paws up. One room
   in fifty or so is lit red, blue, violet or green by an LED strip instead of a
   lamp.
+- **Cabs.** Every few minutes somebody walks to an empty stretch of kerb, puts
+  an arm up, and a yellow cab pulls in, takes them and drives off.
 - **Warning lights.** After dark about one building in eight carries a red
   light at its top, a single pixel, blinking out of step with the others.
 - **More birds.** Besides the flock that crosses, ones, twos and small groups
@@ -69,6 +73,7 @@ is remembered in your browser.
 | Control                 | What it does                                                                                                                                                                                                                                                   |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | People                  | `out` or `none`. `none` empties the streets and roofs.                                                                                                                                                                                                         |
+| Motion                  | `live` or `frozen`. Frozen holds the scene still, like a picture, while you work: nothing moves and nobody arrives. The light still follows the clock.                                                                                                         |
 | Strength                | How strongly the scene shows, from full down to faint. Lower it when the picture competes with the text, above all with the wall hidden.                                                                                                                       |
 | Message box colour      | The colour of the box you type in: six to choose from, or pick any. What you type turns light on a dark box.                                                                                                                                                   |
 | Chat                    | `shown` or `hidden`. Hidden puts the chat, the sidebar and the title away so there is only the scene; the corner keeps the scene switch, the clock and a `show chat` button, and Esc brings everything back. The top bar has the same switch.                  |
@@ -113,6 +118,28 @@ npm start
 ```
 
 Both commands bind to 127.0.0.1 only.
+
+### As an app of its own
+
+ogchat is a local web app: a small server on your machine and a page that
+talks to it. It can still live outside your browser, in a window of its own
+with its own Dock icon. Two ways:
+
+- **Double-click `scripts/ogchat.command`** in Finder (or `npm run app`). It
+  starts the server if it is not running, builds first if the app has been
+  updated, and opens ogchat in a window with no tabs or address bar (using
+  Chrome, Brave, Edge or Arc if one is installed; otherwise your default
+  browser). A Terminal window stays open while it runs; closing it stops
+  ogchat. The first time, macOS may ask you to confirm opening it: right-click
+  the file and choose Open.
+- **Install it from the browser** while the server is running. In Chrome: the
+  install icon at the right of the address bar, or the menu, then Cast, save
+  and share, then Install page as app. In Safari: File, then Add to Dock. The
+  installed app opens ogchat in its own window, but something still has to
+  start the server (the launcher above, or `npm run dev`).
+
+Either way your chats and settings are the same ones: they live in `data/` and
+in the browser's storage for `127.0.0.1:3000`.
 
 ### Try it without a real key
 
@@ -223,10 +250,17 @@ The provider must speak the OpenAI chat-completions shape:
   or out. Deleting a project keeps its chats.
 - A session is saved on its first message, so "new session" never leaves empty
   entries behind.
-- Hover the last message you sent to edit or delete it; hover the last reply to
-  copy or retry it. Editing replaces the message and its reply, then asks again.
+- Hover any message you sent to copy it or to **ask again**, which sends the
+  same question (and the files it had) as a new message at the end. Hover the
+  last message you sent to edit or delete it; editing replaces the message and
+  its reply, then asks again. Hover a reply to copy it, and the last reply to
+  retry it. **copy chat**, under the message box, copies the whole conversation.
 - Attach files with the paperclip, by dropping them on the chat, or by pasting
-  (see below).
+  (see below). Pasting more than 2,000 characters of text attaches it as a
+  text file instead of filling the message box.
+- Code in a reply sits in a panel as wide as its longest line, at the left, and
+  scrolls sideways once it reaches the full width.
+- While a reasoning model is working out its answer, `thinking` pulses slowly.
 - Stopping keeps the text received so far, marked `— stopped`.
 - A reply keeps generating on the server if you switch sessions or close the
   tab, and is there when you come back. Only Stop ends it early.

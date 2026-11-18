@@ -641,9 +641,12 @@ function city() {
   }
 
   // The switching layers: river glints were drawn straight in; add the windows.
-  emit.switching(skyline, "a", lights.a);
-  emit.switching(skyline, "c", lights.c);
-  emit.switching(rooftops, "b", lights.b);
+  // The windows that come on and go off: listed one by one, so the backdrop can
+  // switch them singly rather than a whole layer at a time.
+  const switches = {
+    back: emit.switches(skyline, ["a", "c"]),
+    front: emit.switches(rooftops, ["b"]),
+  };
 
   // Halos for everything lit at night, dealt between two layers per depth so
   // neighbouring lights can pulse out of step.
@@ -673,7 +676,8 @@ function city() {
         rooftops.owns(p.x + p.w - 1, p.y + p.h - 1, p.id),
     )
     .map(({ x, y, w, h, when }) => ({ x, y, w, h, when }));
-  return { states, lights, glow, beacons, roofs, windows: inView };
+  // What is left on the two light canvases is the glint on the river.
+  return { states, glow, beacons, roofs, windows: inView, switches, glints: [lights.a, lights.c] };
 }
 
 /** Two lanes of lights on the bridge, as seamless strips: headlights, then tail lights. */
@@ -696,9 +700,8 @@ export function skylineScene(puff, cast) {
   const scene = city();
   const lane = W - BRIDGE_LEFT + 8;
   const images = {
-    "lights-a.png": scene.lights.a,
-    "lights-b.png": scene.lights.b,
-    "lights-c.png": scene.lights.c,
+    "glints-a.png": scene.glints[0],
+    "glints-b.png": scene.glints[1],
     "glow-back-a.png": scene.glow.backA,
     "glow-back-b.png": scene.glow.backB,
     "glow-front-a.png": scene.glow.frontA,
@@ -742,6 +745,7 @@ export function skylineScene(puff, cast) {
           seconds: 46,
           steps: lane,
           span: 1,
+          vehicles: [],
           front: false,
         },
         {
@@ -755,6 +759,7 @@ export function skylineScene(puff, cast) {
           seconds: 64,
           steps: lane,
           span: 1,
+          vehicles: [],
           front: false,
         },
       ],
@@ -783,9 +788,13 @@ export function skylineScene(puff, cast) {
           )
           .map(({ x, w, top }) => ({ x, w, top })),
         stoops: [],
+        hail: [],
+        cab: null,
       },
       // Lit windows in plain view, for the people and pets seen moving behind them.
       windows: scene.windows,
+      // Windows that switch on and off, behind the near roofs and on them.
+      switches: scene.switches,
     },
   };
 }

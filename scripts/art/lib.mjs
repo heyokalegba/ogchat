@@ -197,6 +197,26 @@ export function emitter() {
       return out;
     },
 
+    /**
+     * The windows tagged with any of `which` that are still in plain view, as
+     * a list: where each is, how big, and the colour it lights up in. For
+     * switching them one at a time instead of a layer at a time.
+     */
+    switches(source, which) {
+      const toHex = (c) => `#${c.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+      const seen = new Set();
+      const out = [];
+      for (const op of ops) {
+        if (op.c !== source || !which.includes(op.when) || op.kind !== "rect") continue;
+        if (seen.has(op.id)) continue; // a blind or a sash bar on a window already listed
+        seen.add(op.id);
+        if (!source.owns(op.x, op.y, op.id)) continue;
+        if (!source.owns(op.x + op.w - 1, op.y + op.h - 1, op.id)) continue;
+        out.push({ x: op.x, y: op.y, w: op.w, h: op.h, color: toHex(op.color) });
+      }
+      return out;
+    },
+
     /** One of the switching layers: just the windows tagged with `which`. */
     switching(source, which, into) {
       for (const op of ops) {

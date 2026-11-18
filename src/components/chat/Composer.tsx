@@ -10,6 +10,7 @@ import {
   type ReactNode,
   type Ref,
 } from "react";
+import { PASTE_AS_FILE_CHARS } from "@/lib/limits";
 import type { ReasoningEffort } from "@/lib/types";
 import { PendingFiles } from "./Attachments";
 import styles from "./chat.module.css";
@@ -51,6 +52,7 @@ export interface ComposerProps {
 /**
  * Enter sends, Shift+Enter inserts a newline, Escape stops a reply in progress.
  * Files are attached with the paperclip, by pasting, or by dropping them on the chat.
+ * Pasting a lot of text attaches it as a text file rather than filling the box.
  * The globe lets the next message search the web; "think" sets how hard the
  * model reasons before it answers.
  */
@@ -86,9 +88,19 @@ export function Composer(props: ComposerProps) {
 
   const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
     const pasted = Array.from(event.clipboardData.files);
-    if (pasted.length === 0) return;
+    if (pasted.length > 0) {
+      event.preventDefault();
+      onAddFiles(pasted);
+      return;
+    }
+    // A long paste rides along as a text attachment and leaves the box clear to type in.
+    const text = event.clipboardData.getData("text/plain");
+    if (text.length <= PASTE_AS_FILE_CHARS) return;
     event.preventDefault();
-    onAddFiles(pasted);
+    const now = new Date();
+    const two = (n: number) => String(n).padStart(2, "0");
+    const stamp = `${two(now.getHours())}.${two(now.getMinutes())}.${two(now.getSeconds())}`;
+    onAddFiles([new File([text], `pasted text ${stamp}.txt`, { type: "text/plain" })]);
   };
 
   return (

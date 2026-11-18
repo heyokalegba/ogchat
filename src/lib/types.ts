@@ -127,6 +127,8 @@ export type SendBody =
       files?: File[];
       /** Let the provider search the web for this message. */
       web?: boolean;
+      /** Ask an earlier question again: the id of the message to repeat, files and all. */
+      replayOf?: string;
     }
   | { regenerate: true };
 

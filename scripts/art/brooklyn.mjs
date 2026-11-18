@@ -87,7 +87,6 @@ function block() {
   // The cars at the kerb get a picture of their own, so that people on the
   // pavement can pass behind them.
   const parked = canvas(W, H);
-  const lights = { a: canvas(W, H), b: canvas(W, H), c: canvas(W, H) };
   const d = dice(1127);
   const { rand, pick, between, chance } = d;
   // Lights are recorded, not painted, and decided by their own dice, so the
@@ -739,10 +738,12 @@ function block() {
   // make and paint of each car come from dice of their own.
   const paints = ["#3a4654", "#5a3d36", "#4a4a48", "#2c3a33", "#6b6558", "#2b2d33"].map(D);
   const park = dealer(dice(808), PARKED);
+  const parkedSpans = []; // where the kerb is taken
   for (const x of [22, 96, 204, 262, 356, 438, 548, 598]) {
     if (chance(0.2)) continue;
     pick(paints);
     const car = park();
+    parkedSpans.push({ x, w: car.w });
     stamp(parked, vehicle(car.kind, car.paint), x, PARKED_BASE, { tone: dusk });
     lamps(parked, car, x, PARKED_BASE);
   }
@@ -809,9 +810,12 @@ function block() {
   set(5, 24, 222, SIDEWALK - 24, (c) => plateOnPole(c, 2, 24, 24, hex("#34485e"), hex("#e9e4d2")));
   set(5, 22, 556, SIDEWALK - 22, (c) => plateOnPole(c, 2, 22, 22, hex("#e9e4d2"), hex("#a8382c")));
 
-  emit.switching(skyline, "a", lights.a);
-  emit.switching(skyline, "c", lights.c);
-  emit.switching(rooftops, "b", lights.b);
+  // The windows that come on and go off: listed one by one, so the backdrop can
+  // switch them singly rather than a whole layer at a time.
+  const switches = {
+    back: emit.switches(skyline, ["a", "c"]),
+    front: emit.switches(rooftops, ["b"]),
+  };
 
   const glow = {
     backA: canvas(W, H),
@@ -844,14 +848,23 @@ function block() {
   const roofs = houses
     .filter((house) => house.x >= 0 && house.x + house.w <= W)
     .map(({ x, w, top }) => ({ x, w, top }));
-  return { states, lights, glow, beacons, chimneys, windows, roofs, stoops: seats };
+  // Stretches of empty kerb long enough for a cab to pull in: their middles.
+  const kerb = [{ x: -40, w: 40 }, ...parkedSpans, { x: W, w: 40 }];
+  const gaps = [];
+  for (let i = 1; i < kerb.length; i++) {
+    const from = kerb[i - 1].x + kerb[i - 1].w;
+    const to = kerb[i].x;
+    if (to - from >= 46) gaps.push(Math.round((from + to) / 2));
+  }
+  const hail = gaps.filter((x) => x > 60 && x < W - 60);
+  return { states, glow, beacons, chimneys, windows, roofs, stoops: seats, switches, hail };
 }
 
 /** Where parked cars' wheels rest, and where each lane's do. */
 const PARKED_BASE = 348;
 const LANES = [
-  { base: 353, seconds: 44, reverse: true }, // by the kerb, heading right
-  { base: 359, seconds: 52, reverse: false }, // nearer us, heading left
+  { base: 353, seconds: 54, reverse: true }, // by the kerb, heading right
+  { base: 359, seconds: 64, reverse: false }, // nearer us, heading left
 ];
 const LANE_ROW = 18; // tall enough for a bus
 const LANE_SPAN = 3; // the strip is this many pictures long, so the traffic takes a while to repeat
@@ -877,28 +890,52 @@ const MOVING = [
 ];
 
 /**
- * What passes on the street: one long seamless strip per lane, in one light.
- * The same dice deal the same traffic in every light; after dark the lamps
- * are on.
+ * What is on the road, dealt once: for each lane, each vehicle's kind, paint
+ * and place along a stretch three pictures long. The backdrop moves every
+ * vehicle on its own, so it needs to know where each one is.
  */
-function traffic(state) {
-  const c = canvas(W * LANE_SPAN, LANE_ROW * LANES.length);
+function trafficLayout() {
   const d = dice(606);
   const next = dealer(d, MOVING);
+  const length = W * LANE_SPAN;
+  return LANES.map(() => {
+    const vehicles = [];
+    let x = d.between(20, 120);
+    for (;;) {
+      const v = next();
+      if (x + v.w > length - 60) break;
+      vehicles.push({ ...v, x });
+      x += v.w + d.between(200, 480);
+    }
+    return vehicles;
+  });
+}
+
+/**
+ * The traffic in one light, as a sheet the backdrop cuts the vehicles out of:
+ * one row per lane, every vehicle at its place. After dark the lamps are on.
+ */
+function traffic(state, layout) {
+  const c = canvas(W * LANE_SPAN, LANE_ROW * LANES.length);
   const tone = (p) => GRADES[state](dusk(p));
   const on = state === "dusk" || state === "night";
   LANES.forEach((lane, row) => {
     const base = (row + 1) * LANE_ROW - 1;
-    const flip = !lane.reverse; // the strip that slides left carries cars facing left
-    let x = d.between(20, 120);
-    for (;;) {
-      const v = next();
-      if (x + v.w > c.w - 60) break;
-      stamp(c, vehicle(v.kind, v.paint), x, base, { flip, tone });
-      lamps(c, v, x, base, { flip, on });
-      x += v.w + d.between(200, 480);
+    const flip = !lane.reverse; // the lane that runs left carries vehicles facing left
+    for (const v of layout[row]) {
+      stamp(c, vehicle(v.kind, v.paint), v.x, base, { flip, tone });
+      lamps(c, v, v.x, base, { flip, on });
     }
   });
+  return c;
+}
+
+/** The cab that answers a hail: a yellow taxi, nose right, in one light. */
+const CAB = { w: 28, h: 12 };
+function cab(state) {
+  const c = canvas(CAB.w, CAB.h);
+  stamp(c, vehicle("taxi", null), 0, CAB.h - 1, { tone: (p) => GRADES[state](dusk(p)) });
+  lamps(c, CAB, 0, CAB.h - 1, { on: state === "dusk" || state === "night" });
   return c;
 }
 
@@ -910,16 +947,15 @@ export function brooklynScene(puff, cast) {
   const scene = block();
   const smokers = scene.chimneys.filter(([x]) => x < 215 || x > 515).slice(0, 2);
   const images = {
-    "lights-a.png": scene.lights.a,
-    "lights-b.png": scene.lights.b,
-    "lights-c.png": scene.lights.c,
     "glow-back-a.png": scene.glow.backA,
     "glow-back-b.png": scene.glow.backB,
     "glow-front-a.png": scene.glow.frontA,
     "glow-front-b.png": scene.glow.frontB,
   };
+  const layout = trafficLayout();
   for (const state of STATES) {
-    images[`traffic-${state}.png`] = traffic(state);
+    images[`traffic-${state}.png`] = traffic(state, layout);
+    images[`cab-${state}.png`] = cab(state);
     images[`city-${state}.png`] = scene.states[state].city;
     images[`rooftops-${state}.png`] = scene.states[state].rooftops;
     images[`parked-${state}.png`] = scene.states[state].parked;
@@ -958,6 +994,8 @@ export function brooklynScene(puff, cast) {
         seconds: lane.seconds,
         steps: W * LANE_SPAN,
         span: LANE_SPAN,
+        // Each vehicle's place and width on the lane's stretch, for moving them one by one.
+        vehicles: layout[row].map(({ x, w }) => ({ x, w })),
         front: true,
       })),
       beacons: scene.beacons.map(([x, y]) => ({ left: pctX(x), top: pctY(y), delay: "0s" })),
@@ -979,9 +1017,14 @@ export function brooklynScene(puff, cast) {
         roofs: scene.roofs,
         // where people sit: the middle of each stoop, and the row its bottom step is on
         stoops: scene.stoops.map((stoop) => ({ x: stoop.x, y: SIDEWALK - 1 })),
+        // Where a cab can be hailed: empty kerb. And the rows a cab drives and stops on.
+        hail: scene.hail,
+        cab: { ...CAB, lane: LANES[0].base, kerb: PARKED_BASE + 2 },
       },
       // Lit windows in plain view, for the people and pets seen moving behind them.
       windows: scene.windows,
+      // Windows that switch on and off, behind the houses and on them.
+      switches: scene.switches,
     },
   };
 }

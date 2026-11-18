@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "mock-provider": "node scripts/mock-provider.mjs",
     "format": "prettier --write .",
-    "art": "node scripts/make-art.mjs"
+    "art": "node scripts/make-art.mjs",
+    "app": "bash scripts/ogchat.command"
   },
   "engines": {
     "node": ">=20.9"

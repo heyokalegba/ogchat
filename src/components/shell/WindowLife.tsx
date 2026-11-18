@@ -34,7 +34,8 @@ const LIT: Record<SkyState, readonly string[]> = {
 
 const MAX_AT_ONCE = 4;
 
-export function WindowLife({ scene, light }: { scene: SceneId; light: SkyState }) {
+export function WindowLife(props: { scene: SceneId; light: SkyState; still?: boolean }) {
+  const { scene, light, still = false } = props;
   const windows = SCENES[scene].config.windows;
   const [shadows, setShadows] = useState<Shadow[]>([]);
   const lit = useRef<readonly string[]>(LIT[light]);
@@ -45,6 +46,10 @@ export function WindowLife({ scene, light }: { scene: SceneId; light: SkyState }
   }, [light, windows]);
 
   useEffect(() => {
+    if (still) {
+      setShadows([]);
+      return;
+    }
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const { shadows: sheet } = SKY;
     let id = 0;
@@ -94,7 +99,7 @@ export function WindowLife({ scene, light }: { scene: SceneId; light: SkyState }
       clearTimeout(first);
       clearInterval(timer);
     };
-  }, [windows]);
+  }, [windows, still]);
 
   const { shadows: sheet } = SKY;
   const px = (n: number) => `calc(var(--u) * ${n})`;

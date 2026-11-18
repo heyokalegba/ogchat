@@ -362,7 +362,13 @@ export function AppShell() {
       style={lookVariables(look) as CSSProperties}
     >
       {ready && view && (
-        <Backdrop scene={look.scene} view={view} now={sceneNow ?? 0} people={look.people} />
+        <Backdrop
+          scene={look.scene}
+          view={view}
+          now={sceneNow ?? 0}
+          people={look.people}
+          still={look.still}
+        />
       )}
       <Sidebar
         sessions={sessions}

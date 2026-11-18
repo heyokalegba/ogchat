@@ -1206,3 +1206,25 @@
 .overlay .button:disabled {
   opacity: 0.5;
 }
+
+/*
+ * The shared animations, repeated here because names inside a CSS module are
+ * private to it: an animation defined in theme.css is not the one a module
+ * asks for by the same name.
+ */
+@keyframes og-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes og-fade {
+  from {
+    opacity: 0;
+  }
+}

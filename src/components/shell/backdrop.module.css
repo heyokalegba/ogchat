@@ -9,6 +9,8 @@
   z-index: 0;
   inset: 0;
   overflow: hidden;
+  /* Nothing in here affects, or is affected by, the page around it. */
+  contain: strict;
   background: #151b2e;
   pointer-events: none;
 }
@@ -179,58 +181,36 @@
 
 /* ---------------------------------------------------------------- windows, water */
 
-/* Lit windows, glints on the river, a neon sign: switched on and off. */
-.lightsA {
-  animation: lights-a 13s steps(1) infinite;
+/*
+ * Windows where a light comes on or goes off: one at a time, seldom
+ * (WindowSwitches.tsx). Each simply appears, or goes, over half a second.
+ */
+.switches {
+  position: absolute;
+  inset: 0;
+  transition: opacity 900ms linear;
 }
 
-.lightsB {
-  animation: lights-b 19s steps(1) infinite;
+.switchOn {
+  position: absolute;
+  animation: og-fade 500ms steps(3) both;
 }
 
-.lightsC {
-  animation: lights-c 7s steps(1) infinite;
+/* Sparkle on the river: two pictures of glints that slowly take turns. */
+.glintsA {
+  animation: glints 9s ease-in-out infinite alternate;
 }
 
-@keyframes lights-a {
-  0%,
-  100% {
-    visibility: visible;
-  }
-  41% {
-    visibility: hidden;
-  }
-  58% {
-    visibility: visible;
-  }
-  86% {
-    visibility: hidden;
-  }
+.glintsB {
+  animation: glints 9s ease-in-out infinite alternate-reverse;
 }
 
-@keyframes lights-b {
-  0%,
-  100% {
-    visibility: hidden;
+@keyframes glints {
+  from {
+    opacity: 1;
   }
-  22% {
-    visibility: visible;
-  }
-  67% {
-    visibility: hidden;
-  }
-  74% {
-    visibility: visible;
-  }
-}
-
-@keyframes lights-c {
-  0%,
-  100% {
-    visibility: visible;
-  }
-  50% {
-    visibility: hidden;
+  to {
+    opacity: 0.1;
   }
 }
 
@@ -351,6 +331,29 @@
 
 .laneReverse {
   animation-name: lane-reverse;
+}
+
+/*
+ * One vehicle: a small window onto its place in the lane's sheet, driven from
+ * one end of its lap to the other (Backdrop.tsx gives the ends as --from and
+ * --to, in scene pixels). Most of a lap is spent out of sight.
+ */
+.vehicle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background-repeat: no-repeat;
+  animation: drive 50s linear infinite;
+}
+
+@keyframes drive {
+  from {
+    transform: translateX(calc(var(--u) * var(--from)));
+  }
+  to {
+    transform: translateX(calc(var(--u) * var(--to)));
+  }
 }
 
 @keyframes lane-forward {
@@ -618,7 +621,17 @@
   position: absolute;
   left: 0;
   top: 0;
-  will-change: transform;
+  /* Anyone who turns up in view arrives gently rather than popping in. */
+  animation: og-fade 700ms ease-out both;
+}
+
+/* The cab that answers a hail: in from the left, a stop at the kerb, away to the right. */
+.cab {
+  position: absolute;
+  left: 0;
+  top: 0;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
 }
 
 /* Everybody is drawn facing right. Walking left, the whole formation is mirrored. */
@@ -640,12 +653,15 @@
   transform: translate(calc(var(--u) * var(--sx, 0)), calc(var(--u) * var(--sy, 0)));
 }
 
-/* Eight poses side by side: four of a walk cycle, two of standing about, two of sitting. */
+/*
+ * Ten poses side by side: four of a walk cycle, then two each of standing
+ * about, sitting, and hailing a cab.
+ */
 .frames {
-  width: 800%;
+  width: 1000%;
   height: 100%;
   background-repeat: no-repeat;
-  transform: translateX(-50%);
+  transform: translateX(-40%);
 }
 
 .party[data-gait="walk"] .frames {
@@ -661,27 +677,40 @@
   animation: life-sit calc(var(--idle, 2s) * 2.4) steps(2) infinite;
 }
 
+.party[data-gait="hail"] .frames {
+  animation: life-hail 0.9s steps(2) infinite;
+}
+
 @keyframes life-walk {
   from {
     transform: translateX(0);
   }
   to {
-    transform: translateX(-50%);
+    transform: translateX(-40%);
   }
 }
 
 @keyframes life-idle {
   from {
-    transform: translateX(-50%);
+    transform: translateX(-40%);
   }
   to {
-    transform: translateX(-75%);
+    transform: translateX(-60%);
   }
 }
 
 @keyframes life-sit {
   from {
-    transform: translateX(-75%);
+    transform: translateX(-60%);
+  }
+  to {
+    transform: translateX(-80%);
+  }
+}
+
+@keyframes life-hail {
+  from {
+    transform: translateX(-80%);
   }
   to {
     transform: translateX(-100%);
@@ -740,5 +769,37 @@
   }
   .flight {
     display: none;
+  }
+}
+
+/* Frozen from the look panel: the same stillness, asked for in the app. */
+.still * {
+  animation: none !important;
+  transition: none !important;
+}
+
+.still .flight {
+  display: none;
+}
+
+/*
+ * The shared animations, repeated here because names inside a CSS module are
+ * private to it: an animation defined in theme.css is not the one a module
+ * asks for by the same name.
+ */
+@keyframes og-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes og-fade {
+  from {
+    opacity: 0;
   }
 }

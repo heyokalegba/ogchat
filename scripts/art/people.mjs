@@ -6,6 +6,7 @@
  *   columns 0-3   a walk cycle (contact, passing, contact, passing)
  *   columns 4-5   standing about (each character has its own way of waiting)
  *   columns 6-7   sitting, as on a doorstep (dogs lie down)
+ *   columns 8-9   an arm in the air, hailing a cab
  * Everybody faces right; the backdrop mirrors them to walk left.
  *
  * Nobody is drawn by hand. Each character is dealt from a seeded deck of
@@ -14,10 +15,12 @@
  */
 import { canvas, dice, hex, shade } from "./lib.mjs";
 
-export const FRAMES = 8;
+export const FRAMES = 10;
 export const WALK_FRAMES = 4;
 /** Columns 6 and 7: sitting down (people), lying down (dogs). */
 export const SIT_FRAME = 6;
+/** Columns 8 and 9: an arm up, flagging down a cab. Everything else just stands. */
+export const HAIL_FRAME = 8;
 
 /** One person's cell. The figure stands on the bottom row with a clear column either side. */
 export const PERSON = { w: 9, h: 15 };
@@ -156,7 +159,10 @@ function seated(c, ox, oy, look, pose) {
   }
 }
 
-function person(c, ox, oy, look, pose) {
+function person(c, ox, oy, look, frame) {
+  // Hailing is standing still with one arm up: the first frame straight, the second waving.
+  const hail = frame >= HAIL_FRAME ? frame - HAIL_FRAME + 1 : 0;
+  const pose = hail ? 4 : frame;
   if (pose >= SIT_FRAME) return seated(c, ox, oy, look, pose);
   const ground = oy + PERSON.h - 1;
   const { legs, torso, skin, hair, top, pants, shoes } = look;
@@ -214,7 +220,13 @@ function person(c, ox, oy, look, pose) {
   const sleeve = look.bare ? skin : shade(top, 0.8);
   const hand = skin;
   const arm = (pixels) => pixels.forEach(([x, y, color]) => px(x, shoulder + y, color));
-  if (walking && !passing) {
+  if (hail) {
+    arm([
+      [6, 0, sleeve],
+      [6, -1, sleeve],
+      [hail === 1 ? 6 : 7, -2, hand],
+    ]);
+  } else if (walking && !passing) {
     const swing = look.stride > 1 ? 2 : 1;
     const ahead = [
       [6, 1, far(sleeve)],
@@ -285,6 +297,9 @@ function castPerson(d, kind, heritage) {
 
 /** How many of each kind of person the sheet holds, in row order. */
 export const CAST = { adults: 28, children: 8, runners: 4 };
+
+/** For everyone who never hails a cab: those columns show them standing about. */
+const standing = (pose) => (pose >= HAIL_FRAME ? pose - 4 : pose);
 
 /** Every person, one per row. Rows: adults, then children, then runners. */
 export function peopleSheet() {
@@ -473,7 +488,9 @@ export function wheelsSheet() {
       look.board = d.pick([hex("#2a2420"), hex("#7a3328"), hex("#566b4a")]);
       draw = row < RIDERS.cyclists + RIDERS.skaters ? skater : baller;
     }
-    for (let pose = 0; pose < FRAMES; pose++) draw(c, pose * WHEEL.w, row * WHEEL.h, look, pose);
+    for (let pose = 0; pose < FRAMES; pose++) {
+      draw(c, pose * WHEEL.w, row * WHEEL.h, look, standing(pose));
+    }
   }
   return c;
 }
@@ -616,7 +633,9 @@ export function propsSheet() {
       shadow: shade(coat, 0.7),
       muzzle: d.chance(0.4) ? second : coat,
     };
-    for (let pose = 0; pose < FRAMES; pose++) dog(c, pose * PROP.w, row * PROP.h, look, pose);
+    for (let pose = 0; pose < FRAMES; pose++) {
+      dog(c, pose * PROP.w, row * PROP.h, look, standing(pose));
+    }
   }
   for (let pose = 0; pose < FRAMES; pose++) {
     pram(c, pose * PROP.w, PROPS.pram * PROP.h, pose);

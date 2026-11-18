@@ -31,7 +31,15 @@ import { birds, CHAT_ART, ROOT, SHELL_ART, smoke, STATES, writePng, written } fr
 import { bricks } from "./art/bricks.mjs";
 import { brooklynScene } from "./art/brooklyn.mjs";
 import { PEOPLE_META, peopleSheet, propsSheet, wheelsSheet } from "./art/people.mjs";
-import { GRILL, grill, PARTY_LIGHTS, partyLights, SHADOW, shadows } from "./art/extras.mjs";
+import {
+  appIcon,
+  GRILL,
+  grill,
+  PARTY_LIGHTS,
+  partyLights,
+  SHADOW,
+  shadows,
+} from "./art/extras.mjs";
 import { BIRD, bird, cloudStrip, FLIER, fliers, moon, sky, stars, sun } from "./art/sky.mjs";
 import { skylineScene } from "./art/skyline.mjs";
 
@@ -39,6 +47,10 @@ import { skylineScene } from "./art/skyline.mjs";
 fs.rmSync(SHELL_ART, { recursive: true, force: true });
 
 writePng(path.join(CHAT_ART, "bricks.png"), bricks());
+// The icons for running ogchat as an app of its own.
+for (const size of [192, 512]) {
+  writePng(path.join(ROOT, "public", `icon-${size}.png`), appIcon(size));
+}
 
 /** name -> canvas, for everything under the shell's art folder. */
 const files = new Map();
@@ -88,7 +100,10 @@ const sceneBlock = (id) => `{
     people: ${perState((s) => `${id}/people-${s}.png`)},
     props: ${perState((s) => `${id}/props-${s}.png`)},
     wheels: ${perState((s) => `${id}/wheels-${s}.png`)},
-    lights: { a: ${src(`${id}/lights-a.png`)}, b: ${src(`${id}/lights-b.png`)}, c: ${src(`${id}/lights-c.png`)} },
+    /** The cab that answers a hail. Only where there is a street to hail one on. */
+    cab: ${files.has(`${id}/cab-day.png`) ? perState((s) => `${id}/cab-${s}.png`) : "null"},
+    /** Sparkle on the water, as two pictures that take turns. Only where there is water. */
+    glints: ${files.has(`${id}/glints-a.png`) ? `[${src(`${id}/glints-a.png`)}, ${src(`${id}/glints-b.png`)}]` : "null"},
     glow: {
       back: [${src(`${id}/glow-back-a.png`)}, ${src(`${id}/glow-back-b.png`)}],
       front: [${src(`${id}/glow-front-a.png`)}, ${src(`${id}/glow-front-b.png`)}],

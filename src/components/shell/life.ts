@@ -50,6 +50,10 @@ export interface LifeConfig {
   roofs: readonly { x: number; w: number; top: number }[];
   /** Doorsteps to sit on: the middle of each, and the row its bottom step is on. */
   stoops: readonly { x: number; y: number }[];
+  /** Stretches of empty kerb where a cab can be flagged down, by x. */
+  hail: readonly number[];
+  /** The cab: its size, the row it drives on and the row it stops on. Null where no cab comes. */
+  cab: { w: number; h: number; lane: number; kerb: number } | null;
 }
 
 export interface Member {
@@ -76,6 +80,10 @@ export type Step =
   | { kind: "wait"; seconds: number }
   /** Sitting on a doorstep: each member moves to their seat, and back when it ends. */
   | { kind: "sit"; seconds: number }
+  /** At the kerb with an arm up, flagging down a cab. */
+  | { kind: "hail"; seconds: number }
+  /** Off the kerb and into the cab: down `drop` rows, and out of sight behind it. */
+  | { kind: "board"; drop: number; seconds: number }
   /** Roofs only: up through the hatch (0) or back down out of sight (`depth`). */
   | { kind: "climb"; to: number; seconds: number };
 
@@ -442,6 +450,71 @@ export function castWalkers(
     lift: 0,
     members: shape.members,
     steps,
+  };
+}
+
+// ---------------------------------------------------------------- hailing a cab
+
+/** A cab answering a hail: when it sets off, where it stops, when it pulls away. Seconds from now. */
+export interface CabRide {
+  id: number;
+  /** Left edge of the cab where it stops. */
+  stopX: number;
+  /** When it starts in from the edge of the picture, and how long the run-in takes. */
+  arriveAt: number;
+  arriveFor: number;
+  /** When it pulls away with its fare. */
+  leaveAt: number;
+}
+
+/**
+ * Someone who walks to an empty stretch of kerb, puts an arm up, and takes
+ * the cab that pulls in. Returns the walker and the cab timed to meet them,
+ * or null where there is no kerb to hail from.
+ */
+export function castCabRide(
+  rand: Rand,
+  meta: LifeMeta,
+  life: LifeConfig,
+): { party: Party; cab: CabRide } | null {
+  if (!life.cab || life.hail.length === 0) return null;
+  const spot = pick(rand, life.hail);
+  const shape = form(rand, meta, "solo");
+  // They come in from whichever end of the street is nearer the spot.
+  const rightward = spot - life.from < life.to - spot;
+  const start = (rightward ? life.from : life.to) + (rightward ? -1 : 1) * shape.reach;
+  // At the kerb's edge, where a driver will see them.
+  const y = life.near;
+  const walk = Math.abs(spot - start) / shape.speed;
+  const hail = between(rand, 5, 9);
+  const arriveFor = 4.6;
+  const board = 1.3;
+  const id = nextId();
+  return {
+    party: {
+      id,
+      heads: 1,
+      roof: null,
+      road: false,
+      x: start,
+      y,
+      lift: 0,
+      members: shape.members,
+      steps: [
+        { kind: "walk", to: spot, seconds: walk },
+        { kind: "hail", seconds: hail },
+        // down off the kerb, to the cab's door
+        { kind: "board", drop: life.cab.kerb - 3 - y, seconds: board },
+      ],
+    },
+    cab: {
+      id,
+      stopX: Math.round(spot - life.cab.w / 2),
+      // it pulls up just as the arm has been out long enough
+      arriveAt: walk + hail - arriveFor,
+      arriveFor,
+      leaveAt: walk + hail + board + 0.4,
+    },
   };
 }
 

@@ -362,6 +362,14 @@
   padding: 2px 6px;
   color: var(--og-ink);
   background: rgba(235, 228, 212, 0.8);
+  /* A slow pulse: the model is there and working, not hung. */
+  animation: og-pulse 1800ms ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thinkingNote {
+    animation: none;
+  }
 }
 
 /* The streaming caret: same accent as the active-session marker. */
@@ -776,6 +784,13 @@ a.chip:hover {
   background: rgba(235, 228, 212, 0.78);
 }
 
+/* "copy chat" sits beside the model name, at the right. */
+.surface .copyChat {
+  margin-left: auto;
+  font: inherit;
+  color: inherit;
+}
+
 .hintKeys {
   white-space: nowrap;
   overflow: hidden;
@@ -1019,7 +1034,15 @@ a.chip:hover {
 
 /* code blocks: white on black */
 
+/*
+ * A block of code is as wide as its longest line and no wider, and sits at the
+ * left: a short snippet is a compact panel, not a band across the chat. Long
+ * lines scroll inside it once it reaches the full width.
+ */
 .codeBlock {
+  width: fit-content;
+  min-width: min(100%, 240px);
+  max-width: 100%;
   overflow: hidden;
   border: var(--og-line) solid var(--og-ink);
   background: #131210;
@@ -1126,4 +1149,43 @@ a.chip:hover {
 
 .codeBlock :global(.hljs-strong) {
   font-weight: 700;
+}
+
+/*
+ * The shared animations, repeated here because names inside a CSS module are
+ * private to it: an animation defined in theme.css is not the one a module
+ * asks for by the same name.
+ */
+@keyframes og-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes og-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes og-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes og-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
 }
