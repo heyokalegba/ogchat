@@ -7,8 +7,9 @@ configurable OpenAI-compatible provider. No accounts, no cloud, no telemetry.
 The chat is written in strong black on an old wall of pixelated bricks where no
 two are alike: mostly muted tan, with browns, greys, dull reds and limewashed
 pale ones, each with its own peeling, discolouring and chipped corners. The
-wall is kept light, and the lettering carries a soft pale halo, so the text
-stays easy to read on every brick. The rest of the interface is see-through, over a pixel-art New York
+wall sits midway between dark and pale: gritty enough to read as old city
+brick, light enough to write on. The lettering carries a soft pale halo, so the
+text stays easy to read on every brick. The rest of the interface is see-through, over a pixel-art New York
 that is quietly alive. There are two scenes, switched from the top-right corner
 and remembered in your browser:
 
@@ -200,11 +201,15 @@ outlines) are CSS variables in `src/components/chat/theme.css`.
 
 - **Colors:** edit the variables at the top of `src/components/chat/theme.css`
   (ink, brick, the mud-brick red accent, muted green / blue / yellow).
+- **Text size:** the `font-size` values in `src/components/chat/chat.module.css`
+  (replies and the message box are 17px) and `shell.module.css` (the sidebar).
 - **The art:** everything is drawn by code with no dependencies. Run
   `npm run art` after changing any of it to regenerate the PNGs under
   `src/components/*/art/`.
-  - `scripts/art/bricks.mjs`: the wall. The brick colour families and how common
-    each is are at the top; the kinds of wear are further down.
+  - `scripts/art/bricks.mjs`: the wall. `LIGHTNESS` at the top is one dial for
+    the whole wall, from 0 (dark and gritty) to 1 (pale); it ships at 0.5. The
+    brick colour families and how common each is come next; the kinds of wear
+    are further down.
   - `scripts/art/skyline.mjs`: the harbour scene. Its `grit` function sets how
     dark and how desaturated the whole scene is.
   - `scripts/art/brooklyn.mjs`: the dusk block. Its `dusk` function does the

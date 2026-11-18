@@ -1,14 +1,14 @@
 /**
  * The wall the chat is written on: a 320x320 tile of old running-bond
  * brickwork. No two bricks are alike. Most are muted tan, but there are
- * browns, greys, dull dark reds, limewashed pale ones and sooty ones, and each
+ * browns, greys, dull reds, limewashed pale ones and sooty ones, and each
  * carries its own wear: faces peeling to another layer, discolouration,
  * mottling, scraps of old paint, score marks, chipped corners. Over the whole
  * wall run a few cracks, damp patches and drip marks.
  *
- * Everything is kept light and shallow enough for black text to read on it:
- * the darkest families are only a few shades below the tan, and the wear
- * darkens a brick by a few percent, never by a lot.
+ * How light the whole wall is comes from one dial, LIGHTNESS, below. It sits
+ * in the middle: dark enough to read as old city brick, light enough for
+ * black text to stay readable.
  */
 import { bayer, canvas, dice, hex, mix, shade } from "./lib.mjs";
 
@@ -17,20 +17,89 @@ const BH = 8;
 const COLS = 20;
 const ROWS = 40;
 
-/** Brick colours by family, with how common each family is. */
+/**
+ * How light the wall is, from 0 (dark and gritty) to 1 (pale). Every colour
+ * below is given as a [dark, light] pair and this picks the point between
+ * them. Darker reads more like old city brick; lighter makes black text
+ * easier to read. Change it, then run `npm run art`.
+ */
+const LIGHTNESS = 0.5;
+
+const between2 = ([dark, light]) => mix(hex(dark), hex(light), LIGHTNESS);
+const factor = (dark, light) => dark + (light - dark) * LIGHTNESS;
+
+/** Brick colours by family, with how common each family is. Each tone is [dark, light]. */
 const FAMILIES = [
   {
+    name: "tan",
     weight: 38,
-    tones: ["#cdb695", "#c9b190", "#c4ab89", "#d1bb9b", "#c7ae8d", "#d3bd9c", "#bfa685"],
-  }, // tan
-  { weight: 17, tones: ["#b89c7d", "#b09475", "#bda283", "#ab8f71"] }, // brown
-  { weight: 15, tones: ["#c2bbae", "#b8b1a5", "#c9c2b5", "#b1ab9f"] }, // grey
-  { weight: 15, tones: ["#c39686", "#bb8d7d", "#c89d8e", "#b58778"] }, // dull red
-  { weight: 8, tones: ["#dccfb8", "#e2d6c0", "#d6c8af"] }, // limewashed
-  { weight: 7, tones: ["#a59584", "#9e8e7d", "#aa9a88"] }, // sooty
+    tones: [
+      ["#b39b7b", "#cdb695"],
+      ["#af9676", "#c9b190"],
+      ["#aa9170", "#c4ab89"],
+      ["#b7a080", "#d1bb9b"],
+      ["#ad9474", "#c7ae8d"],
+      ["#b89f7e", "#d3bd9c"],
+      ["#a68d6c", "#bfa685"],
+    ],
+  },
+  {
+    name: "brown",
+    weight: 17,
+    tones: [
+      ["#9d8063", "#b89c7d"],
+      ["#96795c", "#b09475"],
+      ["#a28669", "#bda283"],
+      ["#8f7458", "#ab8f71"],
+    ],
+  },
+  {
+    name: "grey",
+    weight: 15,
+    tones: [
+      ["#a8a093", "#c2bbae"],
+      ["#9e978b", "#b8b1a5"],
+      ["#b0a99c", "#c9c2b5"],
+      ["#979186", "#b1ab9f"],
+    ],
+  },
+  {
+    name: "dull red",
+    weight: 15,
+    tones: [
+      ["#a87a6a", "#c39686"],
+      ["#a07162", "#bb8d7d"],
+      ["#ad8273", "#c89d8e"],
+      ["#996b5d", "#b58778"],
+    ],
+  },
+  {
+    name: "limewashed",
+    weight: 8,
+    tones: [
+      ["#c2b59d", "#dccfb8"],
+      ["#c8bca5", "#e2d6c0"],
+      ["#bcae95", "#d6c8af"],
+    ],
+  },
+  {
+    name: "sooty",
+    weight: 7,
+    tones: [
+      ["#877766", "#a59584"],
+      ["#7f7061", "#9e8e7d"],
+      ["#8b7b6b", "#aa9a88"],
+    ],
+  },
 ];
-const PAINT = ["#bcc6c9", "#ddd4bd", "#b3bea8", "#cbbcae"]; // what is left of old paint
-const MORTAR = "#a8937a";
+/** What is left of old paint. */
+const PAINT = [
+  ["#a9b4b8", "#bcc6c9"],
+  ["#cdc4ad", "#ddd4bd"],
+  ["#9ca891", "#b3bea8"],
+  ["#b9a89a", "#cbbcae"],
+];
+const MORTAR = ["#8f7a60", "#a8937a"];
 
 export function bricks() {
   const W = BW * COLS;
@@ -48,7 +117,7 @@ export function bricks() {
     return FAMILIES[0];
   };
 
-  const mortar = hex(MORTAR);
+  const mortar = between2(MORTAR);
   c.rect(0, 0, W, H, mortar);
   const isMortar = new Uint8Array(W * H).fill(1);
 
@@ -60,8 +129,12 @@ export function bricks() {
     for (let col = 0; col < COLS; col++) {
       const fam = family();
       // Its own colour: a family tone, nudged lighter or darker, warmer or cooler.
-      let base = shade(hex(pick(fam.tones)), 0.95 + rand() * 0.1);
-      base = mix(base, chance(0.5) ? hex("#c9a585") : hex("#aab0ae"), rand() * 0.07);
+      let base = shade(between2(pick(fam.tones)), 0.95 + rand() * 0.1);
+      base = mix(
+        base,
+        chance(0.5) ? between2(["#b08a6a", "#c9a585"]) : between2(["#8f9694", "#aab0ae"]),
+        rand() * 0.07,
+      );
 
       // The face of this one brick, drawn into a small grid and then worn.
       const face = Array.from({ length: bh }, (_, y) =>
@@ -73,7 +146,7 @@ export function bricks() {
           const speck = rand();
           if (speck < 0.07) color = shade(color, 0.93);
           else if (speck < 0.085)
-            color = shade(color, 0.88); // pit
+            color = shade(color, factor(0.84, 0.88)); // pit
           else if (speck > 0.955) color = shade(color, 1.05);
           return color;
         }),
@@ -82,7 +155,7 @@ export function bricks() {
       // Discolouration: one end or one edge has gone darker or paler.
       if (chance(0.24)) {
         const along = chance(0.7);
-        const from = chance(0.5) ? 0.92 : 1.06;
+        const from = chance(0.5) ? factor(0.89, 0.92) : 1.065;
         const flip = chance(0.5);
         for (let y = 0; y < bh; y++) {
           for (let x = 0; x < bw; x++) {
@@ -95,7 +168,7 @@ export function bricks() {
 
       // Mottling: blotches of a neighbouring colour worked into the face.
       if (chance(0.16)) {
-        const other = hex(pick(family().tones));
+        const other = between2(pick(family().tones));
         for (let n = 0; n < between(3, 7); n++) {
           const mx = between(0, bw - 2);
           const my = between(0, bh - 1);
@@ -106,7 +179,7 @@ export function bricks() {
 
       // Scraps of old paint.
       if (chance(0.11)) {
-        const paint = hex(pick(PAINT));
+        const paint = between2(pick(PAINT));
         const px = between(0, bw - 1);
         const py = between(0, bh - 1);
         const r = between(4, 9);
@@ -122,8 +195,8 @@ export function bricks() {
       // Peeling: the fired skin has flaked off part of the face, showing the body under it.
       if (chance(0.26)) {
         const under = chance(0.6)
-          ? mix(shade(base, 1.08), hex("#e0d5bf"), 0.3) // a paler core
-          : mix(shade(base, 0.91), hex("#9a8a76"), 0.3); // or a darker one
+          ? mix(shade(base, 1.09), between2(["#c9bda6", "#e0d5bf"]), 0.29) // a paler core
+          : mix(shade(base, factor(0.86, 0.91)), between2(["#7a6a58", "#9a8a76"]), 0.3); // or a darker one
         const sx = chance(0.5) ? between(-1, 2) : between(bw - 3, bw);
         const sy = chance(0.5) ? between(-1, 1) : between(bh - 2, bh);
         const r = between(3, 7);
@@ -140,7 +213,7 @@ export function bricks() {
             if (peeled(x, y)) {
               face[y][x] = rand() < 0.14 ? shade(under, 0.93) : under;
             } else if (peeled(x + 1, y) || peeled(x, y + 1)) {
-              face[y][x] = shade(face[y][x], 0.86); // the lip of the layer that is left, in shadow
+              face[y][x] = shade(face[y][x], factor(0.82, 0.86)); // the lip of the layer left, in shadow
             }
           }
         }
@@ -151,7 +224,7 @@ export function bricks() {
         const y = between(1, bh - 2);
         const from = between(0, 5);
         for (let x = from; x < Math.min(bw, from + between(5, 11)); x++)
-          face[y][x] = shade(face[y][x], 0.88);
+          face[y][x] = shade(face[y][x], factor(0.84, 0.88));
       }
 
       // A chipped corner or a broken edge: the mortar shows through.
@@ -179,8 +252,8 @@ export function bricks() {
     for (let x = 0; x < W; x++) {
       if (!isMortar[y * W + x]) continue;
       const roll = rand();
-      if (roll < 0.07) c.tint(x, y, 0.86);
-      else if (roll < 0.085) c.set(x, y, hex("#a3a07c"));
+      if (roll < 0.07) c.tint(x, y, factor(0.82, 0.86));
+      else if (roll < 0.085) c.set(x, y, between2(["#86845f", "#a3a07c"]));
     }
   }
 
@@ -194,7 +267,7 @@ export function bricks() {
     }
   };
   for (let i = 0; i < 18; i++)
-    blob(between(0, W), between(0, H), between(14, 36), between(9, 20), 0.955);
+    blob(between(0, W), between(0, H), between(14, 36), between(9, 20), factor(0.94, 0.955));
   for (let i = 0; i < 8; i++)
     blob(between(0, W), between(0, H), between(10, 24), between(6, 12), 1.05);
 
@@ -206,7 +279,8 @@ export function bricks() {
     const width = between(1, 2);
     for (let y = 0; y < length; y++) {
       for (let dx = 0; dx < width; dx++) {
-        if (1 - y / length > bayer(x + dx, top + y) * 0.9) tint(x + dx, top + y, 0.945);
+        if (1 - y / length > bayer(x + dx, top + y) * 0.9)
+          tint(x + dx, top + y, factor(0.92, 0.945));
       }
     }
   }
@@ -218,7 +292,7 @@ export function bricks() {
     const length = between(22, 70);
     let drift = chance(0.5) ? -1 : 1;
     for (let step = 0; step < length; step++) {
-      tint(x, y, 0.74);
+      tint(x, y, factor(0.68, 0.74));
       tint(x + 1, y, 1.05);
       const roll = rand();
       if (roll < 0.3) x += drift;
