@@ -18,8 +18,8 @@
   --og-white: #ebe4d4;
 
   /* the wall */
-  --og-brick: #af9778;
-  --og-brick-deep: #9d8567;
+  --og-brick: #c9b190;
+  --og-brick-deep: #a8937a;
 
   /* dark red mud brick: carets, the active session, primary actions */
   --og-accent: #74291c;
@@ -50,6 +50,15 @@
   --og-font-mono:
     "SF Mono", ui-monospace, "JetBrains Mono", "Cascadia Code", Menlo, Consolas, "Liberation Mono",
     monospace;
+
+  /*
+   * Lettering written straight onto the bricks carries a soft pale halo, like
+   * chalk dust round the paint, so it stays sharp on a dark brick as well as a
+   * light one.
+   */
+  --og-halo:
+    0 0 1px rgba(246, 240, 227, 0.95), 0 0 3px rgba(246, 240, 227, 0.8),
+    0 0 8px rgba(246, 240, 227, 0.45);
 
   /* pixel-art edges: square corners, hard outlines, hard offset shadows */
   --og-line: 2px;

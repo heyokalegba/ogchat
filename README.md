@@ -5,9 +5,10 @@ chat with streaming replies, file attachments, local history, and one
 configurable OpenAI-compatible provider. No accounts, no cloud, no telemetry.
 
 The chat is written in strong black on an old wall of pixelated bricks where no
-two are alike: mostly muted tan, with browns, greys, dull dark reds and
-limewashed pale ones, each with its own peeling, discolouring and chipped
-corners. The rest of the interface is see-through, over a pixel-art New York
+two are alike: mostly muted tan, with browns, greys, dull reds and limewashed
+pale ones, each with its own peeling, discolouring and chipped corners. The
+wall is kept light, and the lettering carries a soft pale halo, so the text
+stays easy to read on every brick. The rest of the interface is see-through, over a pixel-art New York
 that is quietly alive. There are two scenes, switched from the top-right corner
 and remembered in your browser:
 

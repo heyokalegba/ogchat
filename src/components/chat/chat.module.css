@@ -152,6 +152,7 @@
   line-height: 1;
   letter-spacing: -0.02em;
   color: var(--og-ink);
+  text-shadow: var(--og-halo);
 }
 
 .wordmarkCaret {
@@ -169,6 +170,7 @@
   font-weight: 500;
   line-height: 1.55;
   color: var(--og-ink);
+  text-shadow: var(--og-halo);
 }
 
 .loading {
@@ -759,6 +761,23 @@ a.chip:hover {
 }
 
 /* ---------------------------------------------------------------- markdown */
+
+/* Replies are written straight onto the wall: a little heavier, with the halo. */
+.md {
+  font-weight: 500;
+  text-shadow: var(--og-halo);
+}
+
+/* Anything with its own background needs no halo. */
+.md .codeBlock,
+.md .tableWrap,
+.md :not(pre) > code {
+  text-shadow: none;
+}
+
+.md .tableWrap {
+  font-weight: 400;
+}
 
 .md > :first-child {
   margin-top: 0;
