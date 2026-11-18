@@ -4,4 +4,4 @@ data
 package-lock.json
 next-env.d.ts
 AGENTS.md
-src/components/shell/art/scenes.json
+src/components/shell/art/index.ts

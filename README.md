@@ -4,21 +4,35 @@ A personal AI chat interface that runs entirely on your machine. Multi-session
 chat with streaming replies, file attachments, local history, and one
 configurable OpenAI-compatible provider. No accounts, no cloud, no telemetry.
 
-The chat is written in strong black on an old wall of pixelated bricks where no
-two are alike: mostly muted tan, with browns, greys, dull reds and limewashed
-pale ones, each with its own peeling, discolouring and chipped corners. The
-wall sits midway between dark and pale: gritty enough to read as old city
-brick, light enough to write on. The lettering carries a soft pale halo, so the
-text stays easy to read on every brick. The rest of the interface is see-through, over a pixel-art New York
-that is quietly alive. There are two scenes, switched from the top-right corner
-and remembered in your browser:
+The chat is written on an old wall of pixelated bricks where no two are alike:
+mostly muted tan, with browns, greys, dull reds and limewashed pale ones, each
+with its own peeling, discolouring and chipped corners. The rest of the
+interface is see-through, over a pixel-art New York that keeps real time.
 
-- **skyline**: the harbour by day under a hazy, moody sky. Clouds drift, the
-  stacks smoke, windows switch on and off, lights cross the bridge.
-- **brooklyn**: a brownstone block at dusk, somewhere between Prospect Heights,
-  Bed-Stuy and Flatbush. Stoops, a corner bodega, street lamps just come on,
-  cars and a bus going by, apartment houses and a steeple behind, and beyond
-  them the canopy of Prospect Park with the arch at its gate.
+- **Two scenes**, switched from the top-right corner:
+  - **skyline**: the harbour, the bridge and the towers.
+  - **brooklyn**: a brownstone block somewhere between Prospect Heights,
+    Bed-Stuy and Flatbush, with stoops, a corner bodega, apartment houses and a
+    steeple behind, and Prospect Park's canopy and arch beyond.
+- **A living clock.** The scene shows the actual time of day in Brooklyn. The
+  sun rises on the left and sets on the right at the real times for the date,
+  higher in summer than in winter; the sky moves through day, golden hour, dusk
+  and night; stars come out and the moon shows its real phase.
+- **Night lights.** Windows and street lamps come on as it gets dark, and their
+  halos swell and settle on uneven rhythms, so the city shimmers.
+- **Always moving.** Clouds drift, chimneys smoke, traffic passes, birds cross.
+
+## The look panel
+
+Click the clock in the top-right corner. Everything applies as you move it and
+is remembered in your browser.
+
+| Control                 | What it does                                                                                                                                           |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Time in Brooklyn        | Drag to set the scene to any time of day. **The clock cannot be paused:** it runs on from wherever you leave it. `now` snaps it back to the real time. |
+| Wall                    | Darker and grittier to the left, paler to the right.                                                                                                   |
+| Text size               | 80% to 150%. Scales all the type in the app.                                                                                                           |
+| Text colour on the wall | Six colours that sit well on brick, or pick any. The halo behind the letters turns dark when you pick a light colour, so text stays outlined.          |
 
 ![ogchat conversation](docs/screens/03-conversation.png)
 
@@ -28,7 +42,9 @@ More screens: [first run](docs/screens/01-first-run.png) ·
 [inline error](docs/screens/04-inline-error.png) ·
 [settings](docs/screens/05-settings.png) ·
 [mobile](docs/screens/06-mobile.png) ·
-[brooklyn at dusk](docs/screens/08-brooklyn.png)
+[brooklyn](docs/screens/08-brooklyn.png) ·
+[brooklyn at night](docs/screens/09-night.png) ·
+[the look panel](docs/screens/10-look-panel.png)
 
 ## Run it
 
@@ -163,11 +179,12 @@ src/
     shell/                         the app shell: sidebar, top bar, settings panel
   lib/
     provider/adapter.ts            the only module that talks to the provider
+    daylight.ts                    sun, moon and clock over Brooklyn
     server/                        persistence, settings, turn handling, request guard
     client/api.ts                  browser client for the routes above
-tests/                             vitest: persistence, adapter, route contract, attachments
+tests/                             vitest: persistence, adapter, route contract, attachments, the clock
 scripts/mock-provider.mjs          stand-in provider for local trials
-scripts/make-art.mjs, scripts/art/  generate the two scenes and the brick wall
+scripts/make-art.mjs, scripts/art/  generate the scenes, the sky and the brick wall
 ```
 
 ### Changing provider
@@ -199,37 +216,43 @@ outlines) are CSS variables in `src/components/chat/theme.css`.
 
 ### Changing the look
 
+Day to day, use the look panel (above). To change what it starts from:
+
 - **Colors:** edit the variables at the top of `src/components/chat/theme.css`
   (ink, brick, the mud-brick red accent, muted green / blue / yellow).
-- **Text size:** the `font-size` values in `src/components/chat/chat.module.css`
-  (replies and the message box are 17px) and `shell.module.css` (the sidebar).
+- **Starting look:** `DEFAULT_LOOK` in `src/components/shell/look.ts` (scene,
+  wall lightness, text size and colour), and the colour swatches beside it.
 - **The art:** everything is drawn by code with no dependencies. Run
   `npm run art` after changing any of it to regenerate the PNGs under
   `src/components/*/art/`.
-  - `scripts/art/bricks.mjs`: the wall. `LIGHTNESS` at the top is one dial for
-    the whole wall, from 0 (dark and gritty) to 1 (pale); it ships at 0.5. The
-    brick colour families and how common each is come next; the kinds of wear
-    are further down.
-  - `scripts/art/skyline.mjs`: the harbour scene. Its `grit` function sets how
-    dark and how desaturated the whole scene is.
-  - `scripts/art/brooklyn.mjs`: the dusk block. Its `dusk` function does the
-    same job there.
+  - `scripts/art/bricks.mjs`: the wall. `LIGHTNESS` at the top sets the wall as
+    built, from 0 (dark and gritty) to 1 (pale); the panel's slider adjusts
+    around it. The brick colour families and how common each is come next; the
+    kinds of wear are further down.
+  - `scripts/art/sky.mjs`: the four skies, cloud tints, stars, sun and moon.
+  - `scripts/art/skyline.mjs` and `brooklyn.mjs`: the scenes. Each is drawn
+    once and turned out in four lights; `GRADES` near the top of each sets how
+    the other three differ from the one it was drawn in.
+- **The clock:** `src/lib/daylight.ts` works out where the sun and moon are
+  over Brooklyn and which light the scene is in. `BROOKLYN` at the top holds
+  the place; `skyBlend` holds the sun heights at which the light changes.
 - **The motion:** `src/components/shell/Backdrop.tsx` and `backdrop.module.css`
-  stack a scene's layers and move them. Cloud, traffic and bird speeds come
-  from `art/scenes.json`, which the art script writes; the rest are the
-  animation durations in that stylesheet.
-- **Another scene:** add a module like `brooklyn.mjs`, register it in
-  `scripts/make-art.mjs`, and add its image rules to `backdrop.module.css`. It
-  then appears in the switch on its own.
+  stack a scene's layers, crossfade them and move them. Speeds are the
+  animation durations in that stylesheet, plus the cloud, traffic and bird
+  timings each scene module sets.
+- **Another scene:** add a module like `brooklyn.mjs` and register it in
+  `scripts/make-art.mjs`. It then appears in the switch on its own.
 
 ### What the moving backdrop costs
 
-Very little, by design. A scene is eleven small PNGs, about 56 KB for the
-skyline and 70 KB for Brooklyn, drawn at 640x360 and scaled up; only the scene
-on show is downloaded. The wall tile is another 76 KB. The motion is plain CSS:
-layers slide or switch on and off. There is no video, no canvas and no script
-running, so it adds no measurable script time while idle. People who set
-"reduce motion" in their system settings get the same scene, standing still.
+Very little, by design. Every picture is small pixel art drawn at 640x360 and
+scaled up: about 100 KB of a scene is on show at any one time, plus 85 KB of
+shared sky and 76 KB for the wall, all served from your own machine. The motion
+is plain CSS sliding and fading layers. There is no video and no canvas; the
+only script is a clock that looks at the time every fifteen seconds. Idle, it
+uses a few milliseconds of script per ten seconds, by day or by night. People
+who set "reduce motion" in their system settings get the same scene, standing
+still.
 
 ## API
 

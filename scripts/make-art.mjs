@@ -6,49 +6,125 @@
  *   npm run art
  *
  * The drawing code lives in scripts/art/:
- *   bricks.mjs     the wall the chat sits on        -> src/components/chat/art/bricks.png
- *   skyline.mjs    scene one, the harbour by day    -> src/components/shell/art/*.png
- *   brooklyn.mjs   scene two, a block at dusk       -> src/components/shell/art/brooklyn/*.png
- *   lib.mjs        the canvas, PNG writer and shared pieces (clouds, smoke, birds)
+ *   bricks.mjs     the wall the chat sits on
+ *   sky.mjs        what both scenes share overhead: skies, clouds, stars, sun, moon
+ *   skyline.mjs    scene one: the harbour, the bridge and the towers
+ *   brooklyn.mjs   scene two: a brownstone block by Prospect Park
+ *   lib.mjs        the canvas, the PNG writer, and the light recorder
  *
- * Each scene is a stack of layers drawn at 640x360 and scaled up in CSS with
- * hard pixels: sky, two cloud strips, the skyline, the rooftops in front,
- * three "lights" layers that are switched on and off, and a traffic strip.
- * Where the moving pieces sit is written to scenes.json, which Backdrop.tsx
- * reads. The output is committed, so this only needs running after a change,
- * and it is seeded: the same script always draws the same pictures.
+ * Every scene is drawn once and turned out in four lights (day, golden hour,
+ * dusk, night) with identical geometry; the backdrop crossfades between them
+ * as the real time in Brooklyn moves on. Everything is 640x360, scaled up in
+ * CSS with hard pixels.
+ *
+ * Output goes to src/components/shell/art/ (and the wall to
+ * src/components/chat/art/), together with index.ts: a manifest that imports
+ * every picture and records where each scene's moving pieces sit, so
+ * Backdrop.tsx needs no hand-copied numbers. The output is committed, so this
+ * only needs running after a change, and it is seeded: the same script always
+ * draws the same pictures.
  */
 import fs from "node:fs";
 import path from "node:path";
-import { birds, CHAT_ART, ROOT, SHELL_ART, smoke, writePng, written } from "./art/lib.mjs";
+import { birds, CHAT_ART, ROOT, SHELL_ART, smoke, STATES, writePng, written } from "./art/lib.mjs";
 import { bricks } from "./art/bricks.mjs";
 import { brooklynScene } from "./art/brooklyn.mjs";
+import { cloudStrip, moon, sky, stars, sun } from "./art/sky.mjs";
 import { skylineScene } from "./art/skyline.mjs";
+
+// Start from an empty folder, so a renamed picture never leaves its old self behind.
+fs.rmSync(SHELL_ART, { recursive: true, force: true });
 
 writePng(path.join(CHAT_ART, "bricks.png"), bricks());
 
+/** name -> canvas, for everything under the shell's art folder. */
+const files = new Map();
+const add = (name, image) => files.set(name, image);
+
+for (const state of STATES) {
+  add(`sky-${state}.png`, sky(state));
+  add(`clouds-far-${state}.png`, cloudStrip("far", state));
+  add(`clouds-near-${state}.png`, cloudStrip("near", state));
+}
+const starfield = stars();
+add("stars.png", starfield.steady);
+add("stars-twinkle.png", starfield.twinkle);
+add("sun.png", sun(false));
+add("sun-low.png", sun(true));
+const lunar = moon();
+add("moon.png", lunar.canvas);
 const puff = smoke();
-writePng(path.join(SHELL_ART, "smoke.png"), puff.canvas);
-writePng(path.join(SHELL_ART, "birds.png"), birds());
+add("smoke.png", puff.canvas);
+add("birds.png", birds());
 
 const scenes = { skyline: skylineScene(puff), brooklyn: brooklynScene(puff) };
-const config = {};
 for (const [id, scene] of Object.entries(scenes)) {
-  const dir = id === "skyline" ? SHELL_ART : path.join(SHELL_ART, id);
-  for (const [name, image] of Object.entries(scene.images)) writePng(path.join(dir, name), image);
-  config[id] = scene.config;
+  for (const [name, image] of Object.entries(scene.images)) add(`${id}/${name}`, image);
 }
-fs.writeFileSync(path.join(SHELL_ART, "scenes.json"), `${JSON.stringify(config, null, 2)}\n`);
+for (const [name, image] of files) writePng(path.join(SHELL_ART, name), image);
 
-for (const { file, size, bytes } of written)
-  console.log(`${file.padEnd(52)} ${size.padEnd(9)} ${bytes} bytes`);
-const total = (prefix) => written.filter((w) => prefix(w.file)).reduce((n, w) => n + w.bytes, 0);
-const shared = total((f) => /(smoke|birds)\.png$/.test(f));
-console.log(`wall ${Math.round(total((f) => f.includes("bricks")) / 1024)} KB`);
-console.log(
-  `skyline scene ${Math.round((shared + total((f) => f.includes("shell/art/") && !f.includes("brooklyn") && !/(smoke|birds)/.test(f))) / 1024)} KB`,
-);
-console.log(
-  `brooklyn scene ${Math.round((shared + total((f) => f.includes("brooklyn"))) / 1024)} KB`,
-);
-console.log(`wrote ${path.relative(ROOT, path.join(SHELL_ART, "scenes.json"))}`);
+// ---------------------------------------------------------------- the manifest
+
+const ident = (name) =>
+  name.replace(/\.png$/, "").replace(/[^a-zA-Z0-9]+(.)/g, (_, ch) => ch.toUpperCase());
+const names = [...files.keys()];
+const src = (name) => `${ident(name)}.src`;
+const perState = (pattern) => `{ ${STATES.map((s) => `${s}: ${src(pattern(s))}`).join(", ")} }`;
+
+const sceneBlock = (id) => `{
+    city: ${perState((s) => `${id}/city-${s}.png`)},
+    rooftops: ${perState((s) => `${id}/rooftops-${s}.png`)},
+    lights: { a: ${src(`${id}/lights-a.png`)}, b: ${src(`${id}/lights-b.png`)}, c: ${src(`${id}/lights-c.png`)} },
+    glow: {
+      back: [${src(`${id}/glow-back-a.png`)}, ${src(`${id}/glow-back-b.png`)}],
+      front: [${src(`${id}/glow-front-a.png`)}, ${src(`${id}/glow-front-b.png`)}],
+    },
+    traffic: ${src(`${id}/traffic.png`)},
+    config: ${JSON.stringify(scenes[id].config, null, 2).replace(/\n/g, "\n    ")},
+  }`;
+
+const manifest = `// Generated by scripts/make-art.mjs (npm run art). Do not edit by hand.
+${names.map((name) => `import ${ident(name)} from "./${name}";`).join("\n")}
+
+/** The four lights every picture comes in. The backdrop crossfades between neighbours. */
+export const SKY_STATES = ${JSON.stringify(STATES)} as const;
+export type SkyState = (typeof SKY_STATES)[number];
+
+/** Overhead, shared by every scene. */
+export const SKY = {
+  sky: ${perState((s) => `sky-${s}.png`)},
+  cloudsFar: ${perState((s) => `clouds-far-${s}.png`)},
+  cloudsNear: ${perState((s) => `clouds-near-${s}.png`)},
+  stars: ${src("stars.png")},
+  starsTwinkle: ${src("stars-twinkle.png")},
+  sun: ${src("sun.png")},
+  sunLow: ${src("sun-low.png")},
+  /** Eight phases side by side, starting at new moon. */
+  moon: ${src("moon.png")},
+  smoke: ${src("smoke.png")},
+  birds: ${src("birds.png")},
+} as const;
+
+export const SCENES = {
+  skyline: ${sceneBlock("skyline")},
+  brooklyn: ${sceneBlock("brooklyn")},
+} as const;
+
+export type SceneId = keyof typeof SCENES;
+`;
+fs.writeFileSync(path.join(SHELL_ART, "index.ts"), manifest);
+
+// ---------------------------------------------------------------- report
+
+const kb = (test) =>
+  Math.round(written.filter((w) => test(w.file)).reduce((n, w) => n + w.bytes, 0) / 1024);
+const shared = (f) => f.includes("shell/art/") && !/shell\/art\/(skyline|brooklyn)\//.test(f);
+console.log(`${written.length} pictures`);
+console.log(`wall                 ${kb((f) => f.includes("bricks"))} KB`);
+console.log(`sky, shared          ${kb(shared)} KB`);
+for (const id of Object.keys(scenes)) {
+  const all = kb((f) => f.includes(`shell/art/${id}/`));
+  const two = kb((f) => f.includes(`shell/art/${id}/`) && !/-(golden|dusk)\.png$/.test(f));
+  console.log(`${id.padEnd(20)} ${all} KB in all, about ${two} KB on show at any one time`);
+}
+console.log(`wrote ${path.relative(ROOT, path.join(SHELL_ART, "index.ts"))}`);

@@ -1,38 +1,49 @@
-import scenes from "./art/scenes.json";
+import type { CSSProperties } from "react";
+import type { SkyView } from "@/lib/daylight";
+import { SCENES, SKY, type SceneId } from "./art";
 import styles from "./backdrop.module.css";
 
 /**
  * The living scene behind the interface.
  *
- * There are two, chosen in the top bar:
- *   skyline    the harbour by day, under a hazy sky
- *   brooklyn   a brownstone block at dusk, Prospect Park behind it
+ * Two scenes (the harbour skyline, a Brooklyn brownstone block), each drawn
+ * in four lights: day, golden hour, dusk and night. `view` says what the sky
+ * over Brooklyn looks like at the scene's current moment, and this crossfades
+ * the pictures to match: the sun and moon ride across, stars come out, windows
+ * and lamps come on and their halos breathe.
  *
- * Each is a stack of small pixel-art layers drawn by scripts/make-art.mjs
- * (under 80 KB a scene; only the one on show is downloaded) that CSS slides
- * and toggles: clouds drift at two speeds, chimneys smoke, windows switch on
- * and off, traffic passes, a beacon blinks, a flock crosses now and then.
- * There is no video, no canvas and no script running, and it all stands still
- * for people who ask for reduced motion.
- *
- * Where the moving pieces sit comes from art/scenes.json, written by the
- * same script, as percentages of the 640x360 scene.
+ * It is all small pixel-art layers (scripts/make-art.mjs) that CSS slides and
+ * fades. There is no video, no canvas and no animation loop in script; the
+ * only script is the clock that hands in a new `view` a few times a minute.
+ * Everything stands still for people who ask for reduced motion.
  */
 
-export type SceneId = keyof typeof scenes;
+const image = (src: string): CSSProperties => ({ backgroundImage: `url(${src})` });
 
-export const SCENES = (Object.keys(scenes) as SceneId[]).map((id) => ({
-  id,
-  label: scenes[id].label,
-  hint: scenes[id].hint,
-}));
-
-export function isSceneId(value: unknown): value is SceneId {
-  return typeof value === "string" && value in scenes;
+/** A picture that exists in every light: the `from` state, with `to` faded in over it. */
+function Blend(props: {
+  className: string | undefined;
+  sources: Record<string, string>;
+  view: SkyView;
+}) {
+  const { from, to, mix } = props.view.blend;
+  return (
+    <>
+      <div className={props.className} style={image(props.sources[from]!)} />
+      {mix > 0.004 && to !== from && (
+        <div className={props.className} style={{ ...image(props.sources[to]!), opacity: mix }} />
+      )}
+    </>
+  );
 }
 
-export function Backdrop({ scene }: { scene: SceneId }) {
-  const config = scenes[scene];
+export function Backdrop({ scene, view }: { scene: SceneId; view: SkyView }) {
+  const art = SCENES[scene];
+  const config = art.config;
+  const { blend, sun, moon } = view;
+  const night = blend.night;
+  // Windows that switch on and off are faint by day and full at night.
+  const switching = 0.3 + 0.7 * night;
 
   const smoke = (front: boolean) =>
     config.smoke
@@ -46,10 +57,13 @@ export function Backdrop({ scene }: { scene: SceneId }) {
             top: stack.top,
             width: stack.width,
             height: stack.height,
-            opacity: stack.opacity,
+            opacity: stack.opacity * (1 - night * 0.45),
           }}
         >
-          <div className={styles.smokeStrip} style={{ animationDelay: stack.delay }} />
+          <div
+            className={styles.smokeStrip}
+            style={{ ...image(SKY.smoke), animationDelay: stack.delay }}
+          />
         </div>
       ));
 
@@ -65,6 +79,7 @@ export function Backdrop({ scene }: { scene: SceneId }) {
           <div
             className={`${styles.laneStrip} ${lane.reverse ? styles.laneReverse : ""}`}
             style={{
+              ...image(art.traffic),
               // The strip image holds every lane as a row; show this one.
               backgroundSize: `50% ${lane.rows * 100}%`,
               backgroundPosition: `0 ${lane.rows > 1 ? (lane.row / (lane.rows - 1)) * 100 : 0}%`,
@@ -75,23 +90,65 @@ export function Backdrop({ scene }: { scene: SceneId }) {
         </div>
       ));
 
+  /** Halos round the lights: two layers per depth, each breathing on its own rhythm. */
+  const glow = (sources: readonly [string, string], phase: "Back" | "Front") =>
+    night > 0.03 && (
+      <div className={styles.glowGroup} style={{ opacity: night }}>
+        <div className={`${styles.layer} ${styles[`glow${phase}A`]}`} style={image(sources[0])} />
+        <div className={`${styles.layer} ${styles[`glow${phase}B`]}`} style={image(sources[1])} />
+      </div>
+    );
+
   return (
-    <div
-      className={`${styles.backdrop} ${styles[scene]}`}
-      style={{ background: config.sky }}
-      aria-hidden="true"
-    >
+    <div className={styles.backdrop} aria-hidden="true">
       {/* Keyed by scene, so switching starts the new one's motion from the top. */}
       <div key={scene} className={styles.scene}>
-        <div className={`${styles.layer} ${styles.sky}`} />
+        {/* The glow on the horizon is drawn on the sunset side; flip it for the morning. */}
+        <div className={`${styles.skyBox} ${blend.morning ? styles.mirrored : ""}`}>
+          <Blend className={styles.layer} sources={SKY.sky} view={view} />
+        </div>
+
+        {night > 0.03 && (
+          <div className={styles.stars} style={{ opacity: night }}>
+            <div className={styles.starLayer} style={image(SKY.stars)} />
+            <div
+              className={`${styles.starLayer} ${styles.twinkle}`}
+              style={image(SKY.starsTwinkle)}
+            />
+          </div>
+        )}
+
+        {sun.up && (
+          <div className={styles.orb} style={{ left: `${sun.x}%`, top: `${sun.y}%` }}>
+            <div className={styles.sun} style={{ ...image(SKY.sun), opacity: 1 - sun.low }} />
+            <div className={styles.sunLow} style={{ ...image(SKY.sunLow), opacity: sun.low }} />
+          </div>
+        )}
+        {moon.up && moon.opacity > 0 && (
+          <div
+            className={styles.orb}
+            style={{ left: `${moon.x}%`, top: `${moon.y}%`, opacity: moon.opacity }}
+          >
+            <div className={styles.moon}>
+              <div
+                className={styles.moonStrip}
+                style={{ ...image(SKY.moon), transform: `translateX(${-moon.frame * 12.5}%)` }}
+              />
+            </div>
+          </div>
+        )}
+
         <div
-          className={`${styles.clouds} ${styles.cloudsFar}`}
+          className={styles.clouds}
           style={{
             top: config.clouds.far.top,
             height: config.clouds.far.height,
             animationDuration: `${config.clouds.far.seconds}s`,
+            opacity: 0.9,
           }}
-        />
+        >
+          <Blend className={styles.cloudLayer} sources={SKY.cloudsFar} view={view} />
+        </div>
         <div
           className={`${styles.clouds} ${styles.cloudsNear}`}
           style={{
@@ -99,15 +156,28 @@ export function Backdrop({ scene }: { scene: SceneId }) {
             height: config.clouds.near.height,
             animationDuration: `${config.clouds.near.seconds}s`,
           }}
-        />
-        <div className={styles.flight} style={{ animationDuration: `${config.birds.seconds}s` }}>
-          <div className={styles.birds} style={{ top: config.birds.top }}>
-            <div className={styles.birdsStrip} />
-          </div>
+        >
+          <Blend className={styles.cloudLayer} sources={SKY.cloudsNear} view={view} />
         </div>
-        <div className={`${styles.layer} ${styles.city}`} />
-        <div className={`${styles.layer} ${styles.lightsA}`} />
-        <div className={`${styles.layer} ${styles.lightsC}`} />
+
+        {night < 0.75 && (
+          <div className={styles.flight} style={{ animationDuration: `${config.birds.seconds}s` }}>
+            <div className={styles.birds} style={{ top: config.birds.top }}>
+              <div className={styles.birdsStrip} style={image(SKY.birds)} />
+            </div>
+          </div>
+        )}
+
+        <Blend className={styles.layer} sources={art.city} view={view} />
+        <div
+          className={`${styles.layer} ${styles.lightsA}`}
+          style={{ ...image(art.lights.a), opacity: switching }}
+        />
+        <div
+          className={`${styles.layer} ${styles.lightsC}`}
+          style={{ ...image(art.lights.c), opacity: switching }}
+        />
+        {glow(art.glow.back, "Back")}
         {smoke(false)}
         {lanes(false)}
         {config.beacons.map((beacon) => (
@@ -117,8 +187,13 @@ export function Backdrop({ scene }: { scene: SceneId }) {
             style={{ left: beacon.left, top: beacon.top, animationDelay: beacon.delay }}
           />
         ))}
-        <div className={`${styles.layer} ${styles.rooftops}`} />
-        <div className={`${styles.layer} ${styles.lightsB}`} />
+
+        <Blend className={styles.layer} sources={art.rooftops} view={view} />
+        <div
+          className={`${styles.layer} ${styles.lightsB}`}
+          style={{ ...image(art.lights.b), opacity: switching }}
+        />
+        {glow(art.glow.front, "Front")}
         {smoke(true)}
         {lanes(true)}
       </div>

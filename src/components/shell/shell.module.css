@@ -45,7 +45,7 @@
   display: inline-flex;
   align-items: center;
   font-family: var(--og-font-mono);
-  font-size: 16.5px;
+  font-size: calc(16.5px * var(--og-type));
   font-weight: 700;
   color: var(--og-on-dark);
   user-select: none;
@@ -108,7 +108,7 @@
   outline: none;
   background: rgba(0, 0, 0, 0.45);
   font-family: var(--og-font-mono);
-  font-size: 13px;
+  font-size: calc(13px * var(--og-type));
   color: var(--og-on-dark);
   caret-color: var(--og-accent-on-dark);
   transition: border-color var(--og-fast) var(--og-ease);
@@ -137,7 +137,7 @@
   padding: 1px 5px;
   border: 1px solid rgba(246, 241, 230, 0.35);
   font-family: var(--og-font-mono);
-  font-size: 11px;
+  font-size: calc(11px * var(--og-type));
   color: var(--og-on-dark-3);
   transform: translateY(-50%);
   pointer-events: none;
@@ -153,7 +153,7 @@
 .listLabel {
   padding: 8px 18px 6px;
   font-family: var(--og-font-mono);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--og-type));
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -217,7 +217,7 @@
   white-space: nowrap;
   text-overflow: ellipsis;
   font-family: var(--og-font-mono);
-  font-size: 14px;
+  font-size: calc(14px * var(--og-type));
   color: var(--og-on-dark-2);
   transition: color var(--og-fast) var(--og-ease);
 }
@@ -234,7 +234,7 @@
 .itemAge {
   flex: none;
   font-family: var(--og-font-mono);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--og-type));
   color: var(--og-on-dark-3);
   font-variant-numeric: tabular-nums;
 }
@@ -287,7 +287,7 @@
   width: auto;
   padding: 0 8px;
   font-family: var(--og-font-mono);
-  font-size: 12px;
+  font-size: calc(12px * var(--og-type));
   font-weight: 700;
   color: var(--og-white);
   background: var(--og-accent-bright);
@@ -304,7 +304,7 @@
   outline: none;
   background: var(--og-ink);
   font-family: var(--og-font-mono);
-  font-size: 14px;
+  font-size: calc(14px * var(--og-type));
   color: var(--og-on-dark);
   caret-color: var(--og-accent-on-dark);
 }
@@ -316,7 +316,7 @@
 .listEmpty {
   padding: 10px 12px;
   font-family: var(--og-font-mono);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--og-type));
   line-height: 1.6;
   color: var(--og-on-dark-2);
 }
@@ -334,7 +334,7 @@
   height: 36px;
   padding: 0 10px;
   font-family: var(--og-font-mono);
-  font-size: 13px;
+  font-size: calc(13px * var(--og-type));
   color: var(--og-on-dark);
   transition:
     color var(--og-fast) var(--og-ease),
@@ -395,7 +395,7 @@
   padding: 5px 10px;
   background: var(--og-ink);
   font-family: var(--og-font-mono);
-  font-size: 14px;
+  font-size: calc(14px * var(--og-type));
   font-weight: 600;
   color: var(--og-on-dark);
 }
@@ -404,11 +404,18 @@
   color: var(--og-yellow);
 }
 
-/* Which scene is behind the wall: two black labels, the chosen one inverted. */
-.sceneSwitch {
+/* Top right: which scene is behind the wall, and the clock that opens the look panel. */
+.topTools {
   flex: none;
   display: flex;
+  align-items: center;
+  gap: 8px;
   margin-left: auto;
+}
+
+/* Two black labels, the chosen one inverted. */
+.sceneSwitch {
+  display: flex;
   border: var(--og-line) solid var(--og-ink);
   background: var(--og-ink);
 }
@@ -417,7 +424,7 @@
   height: 26px;
   padding: 0 9px;
   font-family: var(--og-font-mono);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--og-type));
   font-weight: 600;
   color: var(--og-on-dark-2);
   transition:
@@ -433,6 +440,253 @@
 .shell .sceneActive:hover {
   color: var(--og-ink);
   background: var(--og-yellow);
+}
+
+.shell .lookButton {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 10px;
+  border: var(--og-line) solid var(--og-ink);
+  background: var(--og-ink);
+  font-family: var(--og-font-mono);
+  font-size: calc(12.5px * var(--og-type));
+  font-weight: 600;
+  color: var(--og-on-dark);
+  transition: background var(--og-fast) var(--og-ease);
+}
+
+.shell .lookButton:hover,
+.shell .lookButtonOpen {
+  color: var(--og-ink);
+  background: var(--og-yellow);
+}
+
+.look .sceneSwitch {
+  border-color: rgba(246, 241, 230, 0.5);
+}
+
+.lookClock {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------- look panel */
+
+/* Black glass, like the sidebar, so the scene shows through while you change it. */
+.look {
+  position: fixed;
+  z-index: 40;
+  top: 56px;
+  right: 20px;
+  width: min(330px, calc(100vw - 24px));
+  max-height: calc(100dvh - 72px);
+  overflow-y: auto;
+  border: 3px solid var(--og-ink);
+  color: var(--og-on-dark);
+  background: rgba(8, 8, 9, 0.92);
+  box-shadow: 6px 6px 0 var(--og-ink);
+  text-shadow: none;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(246, 241, 230, 0.35) transparent;
+  animation: panel-in 160ms var(--og-ease) both;
+}
+
+.lookHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 10px 2px 16px;
+}
+
+.lookTitle {
+  margin: 0;
+  font-family: var(--og-font-mono);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.lookSection {
+  padding: 10px 16px 12px;
+  border-top: 1px solid rgba(246, 241, 230, 0.16);
+}
+
+.lookSection:first-of-type {
+  border-top: 0;
+}
+
+.lookRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 24px;
+}
+
+.lookLabel {
+  font-family: var(--og-font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--og-on-dark-3);
+}
+
+.lookValue {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 2px 0 6px;
+  font-family: var(--og-font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.lookAside {
+  font-family: var(--og-font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--og-on-dark-2);
+}
+
+.lookNote {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--og-on-dark-2);
+}
+
+.shell .lookAction {
+  padding: 2px 8px;
+  border: 1px solid rgba(246, 241, 230, 0.5);
+  font-family: var(--og-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--og-on-dark);
+  transition:
+    color var(--og-fast) var(--og-ease),
+    background var(--og-fast) var(--og-ease);
+}
+
+.shell .lookAction:hover:not(:disabled) {
+  color: var(--og-ink);
+  border-color: var(--og-yellow);
+  background: var(--og-yellow);
+}
+
+.shell .lookAction:disabled {
+  opacity: 0.38;
+}
+
+.lookFoot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 16px 14px;
+  border-top: 1px solid rgba(246, 241, 230, 0.16);
+}
+
+.ticks {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+  font-family: var(--og-font-mono);
+  font-size: 10px;
+  color: var(--og-on-dark-3);
+}
+
+/* A slider in the house style: a hard track and a square yellow handle. */
+.slider {
+  display: block;
+  width: 100%;
+  height: 22px;
+  margin: 2px 0 0;
+  background: transparent;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border: 1px solid rgba(246, 241, 230, 0.55);
+  background: rgba(246, 241, 230, 0.14);
+}
+
+.slider::-moz-range-track {
+  height: 4px;
+  border: 1px solid rgba(246, 241, 230, 0.55);
+  background: rgba(246, 241, 230, 0.14);
+}
+
+.slider::-webkit-slider-thumb {
+  width: 12px;
+  height: 18px;
+  margin-top: -7px;
+  border: 2px solid var(--og-ink);
+  border-radius: 0;
+  background: var(--og-yellow);
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.slider::-moz-range-thumb {
+  width: 9px;
+  height: 15px;
+  border: 2px solid var(--og-ink);
+  border-radius: 0;
+  background: var(--og-yellow);
+}
+
+.shell .slider:focus-visible {
+  outline: 2px solid var(--og-white);
+  outline-offset: 2px;
+}
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.shell .swatch {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 2px solid rgba(246, 241, 230, 0.55);
+  cursor: pointer;
+}
+
+.shell .swatch:hover {
+  border-color: var(--og-on-dark);
+}
+
+.shell .swatchActive,
+.shell .swatchActive:hover {
+  border-color: var(--og-yellow);
+  box-shadow: 0 0 0 2px var(--og-yellow);
+}
+
+.swatchCustom {
+  font-family: var(--og-font-mono);
+  font-size: 16px;
+  color: var(--og-on-dark);
+  background: rgba(246, 241, 230, 0.12);
+}
+
+/* The real colour input covers the swatch invisibly, so clicking it opens the picker. */
+.swatchCustom input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .shell .menuButton {
@@ -501,6 +755,11 @@
     padding: 0 12px;
   }
 
+  /* On a phone the scene switch lives in the look panel, leaving room for the title. */
+  .topTools > .sceneSwitch {
+    display: none;
+  }
+
   .surfaceSlot {
     padding: 0;
   }
@@ -560,7 +819,7 @@
 .panelTitle {
   margin: 0;
   font-family: var(--og-font-mono);
-  font-size: 15.5px;
+  font-size: calc(15.5px * var(--og-type));
   font-weight: 700;
   color: var(--og-ink);
 }
@@ -596,7 +855,7 @@
 
 .label {
   font-family: var(--og-font-mono);
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--og-type));
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -605,7 +864,7 @@
 
 .overlay .linkButton {
   font-family: var(--og-font-mono);
-  font-size: 12px;
+  font-size: calc(12px * var(--og-type));
   font-weight: 600;
   color: var(--og-ink);
   text-decoration: underline;
@@ -626,7 +885,7 @@
   outline: none;
   background: var(--og-white);
   font-family: var(--og-font-mono);
-  font-size: 14.5px;
+  font-size: calc(14.5px * var(--og-type));
   color: var(--og-ink);
   caret-color: var(--og-accent);
   transition: box-shadow var(--og-fast) var(--og-ease);
@@ -646,7 +905,7 @@
 
 .help {
   margin: 0;
-  font-size: 14px;
+  font-size: calc(14px * var(--og-type));
   line-height: 1.5;
   color: #25333f;
 }
@@ -662,7 +921,7 @@
   margin: 0;
   padding: 8px 10px;
   border: var(--og-line) solid var(--og-ink);
-  font-size: 14.5px;
+  font-size: calc(14.5px * var(--og-type));
   font-weight: 600;
   line-height: 1.5;
   color: var(--og-white);
@@ -683,7 +942,7 @@
   background: var(--og-white);
   box-shadow: var(--og-shadow-s);
   font-family: var(--og-font-mono);
-  font-size: 13px;
+  font-size: calc(13px * var(--og-type));
   font-weight: 700;
   color: var(--og-ink);
   transition:

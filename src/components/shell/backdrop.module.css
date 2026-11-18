@@ -1,7 +1,7 @@
 /*
  * The scene behind the interface: layered pixel art with a little life in it.
- * Everything here animates with transforms or simple on/off switches, so it
- * costs next to nothing. See Backdrop.tsx.
+ * Everything here moves with transforms and opacity, which the browser's
+ * compositor handles on its own, so it costs next to nothing. See Backdrop.tsx.
  */
 
 .backdrop {
@@ -9,6 +9,7 @@
   z-index: 0;
   inset: 0;
   overflow: hidden;
+  background: #151b2e;
   pointer-events: none;
 }
 
@@ -31,71 +32,105 @@
   image-rendering: pixelated;
 }
 
+/* A full-scene picture. The light changes by fading one over another. */
 .layer {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  transition: opacity 900ms linear;
+}
+
+.skyBox {
+  position: absolute;
+  inset: 0;
+}
+
+.mirrored {
+  transform: scaleX(-1);
+}
+
+/* ---------------------------------------------------------------- stars, sun, moon */
+
+.stars {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 61.111%;
+  transition: opacity 900ms linear;
+}
+
+.starLayer {
   position: absolute;
   inset: 0;
   background-repeat: no-repeat;
   background-size: 100% 100%;
 }
 
-/* ---------------------------------------------------------------- which pictures */
-
-/* Scene one: the harbour by day. */
-.skyline .sky {
-  background-image: url("./art/sky.png");
-}
-.skyline .cloudsFar {
-  background-image: url("./art/clouds-far.png");
-}
-.skyline .cloudsNear {
-  background-image: url("./art/clouds-near.png");
-}
-.skyline .city {
-  background-image: url("./art/skyline.png");
-}
-.skyline .rooftops {
-  background-image: url("./art/rooftops.png");
-}
-.skyline .lightsA {
-  background-image: url("./art/lights-a.png");
-}
-.skyline .lightsB {
-  background-image: url("./art/lights-b.png");
-}
-.skyline .lightsC {
-  background-image: url("./art/lights-c.png");
-}
-.skyline .laneStrip {
-  background-image: url("./art/traffic.png");
+.twinkle {
+  animation: twinkle 4.3s steps(1) infinite;
 }
 
-/* Scene two: a Brooklyn block at dusk. */
-.brooklyn .sky {
-  background-image: url("./art/brooklyn/sky.png");
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  23% {
+    opacity: 0.35;
+  }
+  41% {
+    opacity: 0.9;
+  }
+  62% {
+    opacity: 0.2;
+  }
+  79% {
+    opacity: 0.7;
+  }
 }
-.brooklyn .cloudsFar {
-  background-image: url("./art/brooklyn/clouds-far.png");
+
+/* The sun or the moon, placed by its centre. It glides when the time is changed. */
+.orb {
+  position: absolute;
+  width: 0;
+  height: 0;
+  transition:
+    left 500ms ease-out,
+    top 500ms ease-out,
+    opacity 900ms linear;
 }
-.brooklyn .cloudsNear {
-  background-image: url("./art/brooklyn/clouds-near.png");
+
+.sun,
+.sunLow,
+.moon {
+  position: absolute;
+  aspect-ratio: 1;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  transform: translate(-50%, -50%);
+  transition: opacity 900ms linear;
 }
-.brooklyn .city {
-  background-image: url("./art/brooklyn/skyline.png");
+
+/* Widths are the sprites' pixel sizes as a share of the 640-wide scene, seen from the scene. */
+.sun {
+  width: calc(44 / 640 * max(100vw, 177.778vh));
 }
-.brooklyn .rooftops {
-  background-image: url("./art/brooklyn/rooftops.png");
+
+.sunLow {
+  width: calc(56 / 640 * max(100vw, 177.778vh));
 }
-.brooklyn .lightsA {
-  background-image: url("./art/brooklyn/lights-a.png");
+
+.moon {
+  width: calc(28 / 640 * max(100vw, 177.778vh));
+  overflow: hidden;
 }
-.brooklyn .lightsB {
-  background-image: url("./art/brooklyn/lights-b.png");
-}
-.brooklyn .lightsC {
-  background-image: url("./art/brooklyn/lights-c.png");
-}
-.brooklyn .laneStrip {
-  background-image: url("./art/brooklyn/traffic.png");
+
+/* Eight phases side by side; shift to show one. */
+.moonStrip {
+  width: 800%;
+  height: 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
 }
 
 /* ---------------------------------------------------------------- clouds */
@@ -105,18 +140,20 @@
   position: absolute;
   left: 0;
   width: 200%;
-  background-repeat: repeat-x;
-  background-size: 50% 100%;
   /* One scene pixel per step, so the clouds move the way pixel art moves. */
   animation: drift 420s steps(640) infinite;
 }
 
-.cloudsFar {
-  opacity: 0.9;
-}
-
 .cloudsNear {
   animation-delay: -90s;
+}
+
+.cloudLayer {
+  position: absolute;
+  inset: 0;
+  background-repeat: repeat-x;
+  background-size: 50% 100%;
+  transition: opacity 900ms linear;
 }
 
 @keyframes drift {
@@ -125,7 +162,7 @@
   }
 }
 
-/* ---------------------------------------------------------------- windows, water, lamps */
+/* ---------------------------------------------------------------- windows, water */
 
 /* Lit windows, glints on the river, a neon sign: switched on and off. */
 .lightsA {
@@ -182,18 +219,93 @@
   }
 }
 
+/* ---------------------------------------------------------------- halos at night */
+
+/*
+ * Soft halos round the lit windows and lamps. Each layer swells and settles
+ * on its own uneven rhythm, with periods that never line up, so the city
+ * shimmers the way lights do through air and never pulses as one.
+ */
+.glowGroup {
+  position: absolute;
+  inset: 0;
+  transition: opacity 900ms linear;
+}
+
+.glowBackA {
+  animation: breathe-a 7.3s ease-in-out infinite;
+}
+
+.glowBackB {
+  animation: breathe-b 10.1s ease-in-out infinite;
+}
+
+.glowFrontA {
+  animation: breathe-b 8.7s ease-in-out -3s infinite;
+}
+
+.glowFrontB {
+  animation: breathe-a 11.9s ease-in-out -5s infinite;
+}
+
+@keyframes breathe-a {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  17% {
+    opacity: 0.92;
+  }
+  31% {
+    opacity: 0.68;
+  }
+  52% {
+    opacity: 1;
+  }
+  69% {
+    opacity: 0.58;
+  }
+  84% {
+    opacity: 0.86;
+  }
+}
+
+@keyframes breathe-b {
+  0%,
+  100% {
+    opacity: 0.88;
+  }
+  21% {
+    opacity: 0.55;
+  }
+  38% {
+    opacity: 0.97;
+  }
+  57% {
+    opacity: 0.62;
+  }
+  73% {
+    opacity: 0.8;
+  }
+  90% {
+    opacity: 0.48;
+  }
+}
+
 /* ---------------------------------------------------------------- smoke */
 
 .smoke {
   position: absolute;
   overflow: hidden;
+  transition: opacity 900ms linear;
 }
 
 /* Six frames side by side; step through them. */
 .smokeStrip {
   width: 600%;
   height: 100%;
-  background: url("./art/smoke.png") 0 0 / 100% 100% no-repeat;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
   animation: puff 2.8s steps(6) infinite;
 }
 
@@ -245,7 +357,7 @@
   animation: og-blink 2.4s steps(1) infinite;
 }
 
-/* A flock crosses the sky, then stays away for a while. */
+/* A flock crosses the sky, then stays away for a while. Not at night. */
 .flight {
   position: absolute;
   inset: 0;
@@ -264,7 +376,8 @@
 .birdsStrip {
   width: 200%;
   height: 100%;
-  background: url("./art/birds.png") 0 0 / 100% 100% no-repeat;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
   animation: flap 0.56s steps(2) infinite;
 }
 
@@ -287,6 +400,7 @@
 @media (prefers-reduced-motion: reduce) {
   .backdrop * {
     animation: none !important;
+    transition: none !important;
   }
   .flight {
     display: none;

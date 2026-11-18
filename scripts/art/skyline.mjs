@@ -1,5 +1,5 @@
 /**
- * Scene one: the harbour skyline by day, under a moody, hazy sky.
+ * Scene one: the harbour skyline, under a moody, hazy sky.
  *
  * Distant towers, the city in muted colour, a suspension bridge, the river,
  * and dark rooftops along the bottom edge. The outline is deliberately uneven:
@@ -7,12 +7,12 @@
  * and masts breaking the roofline, so it reads as a skyline and not a band.
  */
 import {
-  bandedSky,
   bayer,
   canvas,
-  clouds,
   desat,
   dice,
+  emitter,
+  grade,
   H,
   hex,
   mix,
@@ -22,6 +22,7 @@ import {
   W,
   waterTower,
   weather,
+  STATES,
 } from "./lib.mjs";
 
 const GROUND = 320; // where the buildings stand and the river begins
@@ -41,36 +42,16 @@ const DUST = hex("#6a635b");
 const grit = (c) => desat(mix(shade(c, 0.83), DUST, 0.08), 0.14);
 const G = (h) => grit(hex(h));
 
-function sky() {
-  // Slate blue overhead, sinking into a band of grey-yellow haze.
-  const bands = [
-    "#33557a",
-    "#3d6085",
-    "#4a6c8e",
-    "#5c7b97",
-    "#718b9e",
-    "#879aa2",
-    "#9aa19a",
-    "#a6a18b",
-  ].map(hex);
-  const c = bandedSky(bands, GROUND - 4, 11);
-  // The sun, low in brightness and veiled: a pale disc the haze drifts across.
-  const SUN = { x: 516, y: 98, r: 14 };
-  for (let y = -SUN.r - 8; y <= SUN.r + 8; y++) {
-    for (let x = -SUN.r - 8; x <= SUN.r + 8; x++) {
-      const dist = Math.hypot(x, y);
-      const px = SUN.x + x;
-      const py = SUN.y + y;
-      if (dist <= SUN.r) {
-        const veiled = (py % 5 === 0 || py % 5 === 1) && bayer(px, py) > 0.35; // haze bars
-        c.blend(px, py, dist < SUN.r - 3 ? hex("#d5cdb0") : hex("#c6bfa4"), veiled ? 0.45 : 0.86);
-      } else if (dist <= SUN.r + 8 && 1 - (dist - SUN.r) / 8 > bayer(px, py) * 1.5) {
-        c.blend(px, py, hex("#b9b7a2"), 0.5);
-      }
-    }
-  }
-  return c;
-}
+/**
+ * The city is drawn as it looks by day; the other lights are that picture
+ * regraded, with more windows lit as it gets darker.
+ */
+const GRADES = {
+  day: (c) => c,
+  golden: grade({ gain: [1.0, 0.9, 0.78], tint: "#d08a4a", amount: 0.13 }),
+  dusk: grade({ gain: [0.6, 0.57, 0.7], tint: "#3a3050", amount: 0.24 }),
+  night: grade({ gain: [0.3, 0.33, 0.46], tint: "#131a30", amount: 0.3 }),
+};
 
 /** How tall the city stands at x: two clusters with lower ground between and beside them. */
 const rise = (x) =>
@@ -82,6 +63,13 @@ function city() {
   const lights = { a: canvas(W, H), b: canvas(W, H), c: canvas(W, H) };
   const d = dice(718);
   const { rand, pick, between, chance } = d;
+  // Lights are recorded, not painted, and decided by their own dice, so the
+  // buildings come out the same however the lighting rules change.
+  const emit = emitter();
+  const L = dice(4242);
+  /** When an otherwise dark window comes on: at dusk, only at night, or never. */
+  const later = (evening, night) =>
+    L.chance(evening) ? "evening" : L.chance(night) ? "night" : null;
 
   const lit = ["#d8c478", "#c9ae5c", "#ddd096", "#bd9a50"].map(hex);
   const iron = G("#2b2724");
@@ -96,14 +84,21 @@ function city() {
       for (let wx = x + o.left; wx + o.ww < x + w - 2; wx += o.ww + o.gapX) {
         const on = chance(o.lit);
         const tone = pick(lit);
-        c.rect(wx, wy, o.ww, o.wh, on ? tone : useGlass ? glass : dark);
-        if (on && o.wh > 3 && chance(0.4)) c.rect(wx, wy, o.ww, 1, shade(tone, 0.72)); // a blind
+        const blind = on && o.wh > 3 && chance(0.4);
+        c.rect(wx, wy, o.ww, o.wh, useGlass ? glass : dark);
         if (o.sill) c.rect(wx - 1, wy + o.wh, o.ww + 2, 1, shade(color, 1.25));
         c.tint(wx, wy + o.wh + (o.sill ? 1 : 0), 0.84); // stain under the window
         c.tint(wx, wy + o.wh + (o.sill ? 2 : 1), 0.92);
+        let when = on ? "always" : null;
+        let color2 = tone;
         if (!on && o.flicker && chance(o.flickerRate) && o.flicker.allowed(wx, wy)) {
-          o.flicker.layer().rect(wx, wy, o.ww, o.wh, pick(lit));
+          when = o.flicker.layer(); // one of the windows that switch on and off
+          color2 = pick(lit);
         }
+        when ??= later(0.13, 0.3);
+        if (!when) continue;
+        const id = emit.light(c, wx, wy, o.ww, o.wh, color2, when);
+        if (blind) emit.detail(c, id, wx, wy, o.ww, 1, shade(tone, 0.72), when);
       }
     }
   };
@@ -133,8 +128,10 @@ function city() {
     if (top < 0.55) skyline.rect(x + Math.floor(w / 2), GROUND - h - between(10, 26), 1, 26, color);
     else if (top < 0.7) crown(skyline, x + Math.floor(w / 2), GROUND - h, w, color, 4);
     for (let wy = GROUND - h + 5; wy < GROUND - 5; wy += 5) {
-      for (let wx = x + 2; wx < x + w - 2; wx += 4)
+      for (let wx = x + 2; wx < x + w - 2; wx += 4) {
         if (chance(0.55)) skyline.set(wx, wy, shade(color, 0.9));
+        if (L.chance(0.2)) emit.light(skyline, wx, wy, 1, 1, L.pick(lit), "night");
+      }
     }
     x += w;
   }
@@ -146,8 +143,12 @@ function city() {
       skyline.rect(left, y, w, h, color);
       skyline.rect(left + w - 2, y, 2, h, shade(color, 0.9));
       for (let wy = y + 3; wy < y + h - 2; wy += 4) {
-        for (let wx = left + 2; wx < left + w - 3; wx += 3)
+        for (let wx = left + 2; wx < left + w - 3; wx += 3) {
           if (chance(0.6)) skyline.set(wx, wy, shade(color, 0.88));
+          if (L.chance(0.26)) {
+            emit.light(skyline, wx, wy, 1, 1, L.pick(lit), L.chance(0.3) ? "evening" : "night");
+          }
+        }
       }
     }
     skyline.rect(x, y - spire, 1, spire, color);
@@ -236,7 +237,7 @@ function city() {
   ].map(G);
   const midFlicker = {
     allowed: (x, y) => x < BRIDGE_LEFT - 4 || y < TOWER_TOP - 6, // never over the bridge
-    layer: () => (chance(0.5) ? lights.a : lights.c),
+    layer: () => (chance(0.5) ? "a" : "c"),
   };
   const grid = {
     ww: 2,
@@ -284,11 +285,11 @@ function city() {
       // curtain wall: tall strips of glass
       for (let wx = x + 3; wx < x + w - 4; wx += 3) {
         for (let wy = top + 5; wy < GROUND - 5; wy++) {
-          skyline.set(
-            wx,
-            wy,
-            chance(0.07) ? pick(lit) : wy % 7 === 0 ? G("#22303d") : G("#33475a"),
-          );
+          const on = chance(0.07);
+          const tone = on ? pick(lit) : null;
+          skyline.set(wx, wy, wy % 7 === 0 ? G("#22303d") : G("#33475a"));
+          const when = on ? "always" : later(0.1, 0.3);
+          if (when) emit.light(skyline, wx, wy, 1, 1, tone ?? L.pick(lit), when);
         }
       }
     }
@@ -414,6 +415,8 @@ function city() {
       const y = Math.round(y0 + (y1 - y0) * t + sag * 4 * t * (1 - t));
       skyline.set(x, y, cable);
       skyline.set(x, y + 1, cable);
+      // the necklace of lamps along the cables, on from dusk
+      if (x % 7 === 3 && x < W) emit.light(skyline, x, y - 1, 1, 1, hex("#e9d79a"), "evening");
       if (x % 4 === 0)
         for (let yy = y + 2; yy < DECK; yy += 2) skyline.set(x, yy, shade(cable, 1.55));
       if (x % 12 === 0) for (let yy = y + 2; yy < DECK; yy++) skyline.set(x, yy, shade(cable, 1.3));
@@ -426,6 +429,12 @@ function city() {
   hang(mid2, TOWER_TOP + 3, W + 60, DECK + 10, -10); // right approach
   bridgeTower(TOWER_1);
   bridgeTower(TOWER_2);
+  // the towers are floodlit after dark
+  for (const x of [TOWER_1, TOWER_2]) {
+    emit.spill(skyline, x + TOWER_W / 2, DECK - 18, 22, hex("#c9ab70"), 0.3, "evening", {
+      halo: false,
+    });
+  }
   skyline.rect(BRIDGE_LEFT - 8, DECK, W - BRIDGE_LEFT + 8, 5, G("#2c2826")); // roadway, in front of the towers
   skyline.rect(BRIDGE_LEFT - 8, DECK, W - BRIDGE_LEFT + 8, 1, G("#6a5f55"));
   for (let x = BRIDGE_LEFT - 6; x < W; x += 6) skyline.rect(x, DECK + 5, 1, 4, G("#2c2826"));
@@ -446,7 +455,7 @@ function city() {
     "#3a3d42",
   ].map(G);
   const tags = ["#a8934a", "#74907c", "#9a5544", "#8097aa", "#b9b3a2"].map(hex);
-  const nearFlicker = { allowed: () => true, layer: () => lights.b };
+  const nearFlicker = { allowed: () => true, layer: () => "b" };
   for (let x = -10; x < W;) {
     const tall = chance(0.2);
     const w = tall ? between(24, 36) : between(30, 60);
@@ -532,7 +541,30 @@ function city() {
     x += w;
   }
 
-  return { skyline, rooftops, lights, beacons };
+  // The switching layers: river glints were drawn straight in; add the windows.
+  emit.switching(skyline, "a", lights.a);
+  emit.switching(skyline, "c", lights.c);
+  emit.switching(rooftops, "b", lights.b);
+
+  // Halos for everything lit at night, dealt between two layers per depth so
+  // neighbouring lights can pulse out of step.
+  const glow = {
+    backA: canvas(W, H),
+    backB: canvas(W, H),
+    frontA: canvas(W, H),
+    frontB: canvas(W, H),
+  };
+  emit.halos(skyline, [glow.backA, glow.backB], dice(51));
+  emit.halos(rooftops, [glow.frontA, glow.frontB], dice(52));
+
+  const states = {};
+  for (const state of STATES) {
+    states[state] = {
+      city: emit.render(skyline, state, GRADES[state]),
+      rooftops: emit.render(rooftops, state, GRADES[state]),
+    };
+  }
+  return { states, lights, glow, beacons };
 }
 
 /** Two lanes of lights on the bridge, as seamless strips: headlights, then tail lights. */
@@ -554,34 +586,25 @@ function traffic() {
 export function skylineScene(puff) {
   const scene = city();
   const lane = W - BRIDGE_LEFT + 8;
+  const images = {
+    "lights-a.png": scene.lights.a,
+    "lights-b.png": scene.lights.b,
+    "lights-c.png": scene.lights.c,
+    "glow-back-a.png": scene.glow.backA,
+    "glow-back-b.png": scene.glow.backB,
+    "glow-front-a.png": scene.glow.frontA,
+    "glow-front-b.png": scene.glow.frontB,
+    "traffic.png": traffic(),
+  };
+  for (const state of STATES) {
+    images[`city-${state}.png`] = scene.states[state].city;
+    images[`rooftops-${state}.png`] = scene.states[state].rooftops;
+  }
   return {
-    images: {
-      "sky.png": sky(),
-      "clouds-far.png": clouds(
-        31,
-        150,
-        5,
-        0.7,
-        ["#d6d3c9", "#bcbeba", "#929b9f", "#77858f"].map(hex),
-      ),
-      "clouds-near.png": clouds(
-        77,
-        170,
-        4,
-        1.25,
-        ["#d6d3c9", "#bcbeba", "#929b9f", "#77858f"].map(hex),
-      ),
-      "skyline.png": scene.skyline,
-      "rooftops.png": scene.rooftops,
-      "lights-a.png": scene.lights.a,
-      "lights-b.png": scene.lights.b,
-      "lights-c.png": scene.lights.c,
-      "traffic.png": traffic(),
-    },
+    images,
     config: {
       label: "skyline",
-      hint: "the harbour by day",
-      sky: "#33557a",
+      hint: "the harbour, the bridge and the towers",
       clouds: {
         far: { top: "0%", height: pctY(150), seconds: 420 },
         near: { top: "1.5%", height: pctY(170), seconds: 250 },

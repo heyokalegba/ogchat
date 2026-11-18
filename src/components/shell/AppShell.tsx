@@ -1,18 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ChatSurface } from "@/components/chat";
 import { MenuIcon } from "@/components/chat/icons";
 import "@/components/chat/theme.css";
 import { createApi } from "@/lib/client/api";
+import { brooklynClock, offsetForClockTime, readSky } from "@/lib/daylight";
 import type { PublicSettings, SessionMeta } from "@/lib/types";
-import { Backdrop, isSceneId, SCENES, type SceneId } from "./Backdrop";
+import { SCENES, type SceneId } from "./art";
+import { Backdrop } from "./Backdrop";
+import { DEFAULT_LOOK, loadLook, lookVariables, saveLook, type Look } from "./look";
+import { LookPanel } from "./LookPanel";
 import { SettingsPanel } from "./SettingsPanel";
 import styles from "./shell.module.css";
 import { Sidebar } from "./Sidebar";
 
 const SEARCH_DEBOUNCE_MS = 140;
-const SCENE_KEY = "ogchat:scene";
+/** How often the scene looks at the clock. The sun moves a quarter of a degree a minute. */
+const CLOCK_TICK_MS = 15_000;
+const SCENE_IDS = Object.keys(SCENES) as SceneId[];
 
 function sessionFromUrl(): string | null {
   return new URLSearchParams(window.location.search).get("s");
@@ -41,8 +47,11 @@ export function AppShell() {
   const [activeTitle, setActiveTitle] = useState<string | null>(null);
   const [openToken, setOpenToken] = useState(0);
   const [ready, setReady] = useState(false);
-  /** Which backdrop is on show. Remembered in this browser. */
-  const [scene, setScene] = useState<SceneId>("skyline");
+  /** Scene, time of day, wall and text preferences. Remembered in this browser. */
+  const [look, setLook] = useState<Look>(DEFAULT_LOOK);
+  const [lookOpen, setLookOpen] = useState(false);
+  /** The real time, re-read every few seconds. Null until the page is live in the browser. */
+  const [realNow, setRealNow] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [settings, setSettings] = useState<PublicSettings | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -71,12 +80,7 @@ export function AppShell() {
   // First load: which session the URL points at, the session list, the provider settings.
   useEffect(() => {
     setActiveId(sessionFromUrl());
-    try {
-      const saved = window.localStorage.getItem(SCENE_KEY);
-      if (isSceneId(saved)) setScene(saved);
-    } catch {
-      // Storage can be unavailable (private mode); the default scene is fine.
-    }
+    setLook(loadLook());
     setReady(true);
     void refreshSessions("");
     api.getSettings().then(setSettings, () => {});
@@ -207,14 +211,43 @@ export function AppShell() {
   }, [api]);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
 
-  const chooseScene = useCallback((next: SceneId) => {
-    setScene(next);
-    try {
-      window.localStorage.setItem(SCENE_KEY, next);
-    } catch {
-      // Not remembered, but still switched.
-    }
+  const changeLook = useCallback((patch: Partial<Look>) => {
+    setLook((current) => {
+      const next = { ...current, ...patch };
+      saveLook(next);
+      return next;
+    });
   }, []);
+
+  // The scene's clock: real time, looked at again every few seconds and
+  // whenever the tab comes back. It is never stopped; setting a time only
+  // shifts it, and it runs on from there.
+  useEffect(() => {
+    const tick = () => setRealNow(Date.now());
+    tick();
+    const timer = setInterval(tick, CLOCK_TICK_MS);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, []);
+  const sceneNow = realNow === null ? null : realNow + look.clockOffsetMs;
+  const view = useMemo(() => (sceneNow === null ? null : readSky(sceneNow)), [sceneNow]);
+  const clock = useMemo(() => (sceneNow === null ? null : brooklynClock(sceneNow)), [sceneNow]);
+
+  const setSceneTime = useCallback(
+    (minutes: number) => {
+      const now = Date.now();
+      setRealNow(now);
+      changeLook({ clockOffsetMs: offsetForClockTime(now, minutes) });
+    },
+    [changeLook],
+  );
+  const snapToNow = useCallback(() => {
+    setRealNow(Date.now());
+    changeLook({ clockOffsetMs: 0 });
+  }, [changeLook]);
 
   const provider = useMemo(
     () => (settings ? { ready: settings.apiKey.set, model: settings.model } : null),
@@ -222,8 +255,8 @@ export function AppShell() {
   );
 
   return (
-    <div className={`ogchat ${styles.shell}`}>
-      {ready && <Backdrop scene={scene} />}
+    <div className={`ogchat ${styles.shell}`} style={lookVariables(look) as CSSProperties}>
+      {ready && view && <Backdrop scene={look.scene} view={view} />}
       <Sidebar
         sessions={sessions}
         activeId={activeId}
@@ -255,19 +288,32 @@ export function AppShell() {
             <span className={styles.topPath}>~/</span>
             {activeId ? (activeTitle ?? "session") : "new session"}
           </div>
-          <div className={styles.sceneSwitch} role="group" aria-label="Backdrop">
-            {SCENES.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                className={`${styles.sceneButton} ${option.id === scene ? styles.sceneActive : ""}`}
-                aria-pressed={option.id === scene}
-                title={option.hint}
-                onClick={() => chooseScene(option.id)}
-              >
-                {option.label}
-              </button>
-            ))}
+          <div className={styles.topTools}>
+            <div className={styles.sceneSwitch} role="group" aria-label="Scene">
+              {SCENE_IDS.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`${styles.sceneButton} ${id === look.scene ? styles.sceneActive : ""}`}
+                  aria-pressed={id === look.scene}
+                  title={SCENES[id].config.hint}
+                  onClick={() => changeLook({ scene: id })}
+                >
+                  {SCENES[id].config.label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className={`${styles.lookButton} ${lookOpen ? styles.lookButtonOpen : ""}`}
+              aria-haspopup="dialog"
+              aria-expanded={lookOpen}
+              title="Time of day, wall and text"
+              onClick={() => setLookOpen((open) => !open)}
+            >
+              <span className={styles.lookClock}>{clock ? clock.label : "look"}</span>
+              <span aria-hidden="true">{lookOpen ? "▴" : "▾"}</span>
+            </button>
           </div>
         </header>
         <div className={styles.surfaceSlot}>
@@ -285,6 +331,17 @@ export function AppShell() {
           )}
         </div>
       </main>
+
+      {lookOpen && clock && (
+        <LookPanel
+          look={look}
+          clock={clock}
+          onChange={changeLook}
+          onSetTime={setSceneTime}
+          onSnapToNow={snapToNow}
+          onClose={() => setLookOpen(false)}
+        />
+      )}
 
       {settingsOpen && settings && (
         <SettingsPanel

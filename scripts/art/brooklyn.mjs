@@ -1,5 +1,5 @@
 /**
- * Scene two: a brownstone block in Brooklyn at dusk.
+ * Scene two: a brownstone block in Brooklyn.
  *
  * Prospect Heights by way of Bed-Stuy and Flatbush: a row of brownstones with
  * stoops, cornices and bay fronts, a corner bodega, street trees and
@@ -9,13 +9,12 @@
  * tower downtown catching the last light. The sun has just gone.
  */
 import {
-  bandedSky,
   bayer,
   canvas,
-  clouds,
   desat,
   dice,
-  glow,
+  emitter,
+  grade,
   H,
   hex,
   mix,
@@ -25,6 +24,7 @@ import {
   W,
   waterTower,
   weather,
+  STATES,
 } from "./lib.mjs";
 
 const SIDEWALK = 334; // top of the pavement; house fronts stand on it
@@ -37,53 +37,19 @@ const VIOLET = hex("#3a3050");
 const dusk = (c) => desat(mix(shade(c, 0.78), VIOLET, 0.14), 0.1);
 const D = (h) => dusk(hex(h));
 
-const WARM = ["#e0b565", "#d29a50", "#ecd08a", "#b98548", "#dfa85a"].map(hex);
+/**
+ * The block is drawn as it looks at dusk; the other lights are that picture
+ * regraded (brightened for day, darkened for night), with lamps and windows
+ * coming on as it gets darker.
+ */
+const GRADES = {
+  day: grade({ gain: [1.62, 1.56, 1.36], tint: "#b9b3a6", amount: 0.06 }),
+  golden: grade({ gain: [1.5, 1.28, 1.02], tint: "#d08a4a", amount: 0.1 }),
+  dusk: (c) => c,
+  night: grade({ gain: [0.6, 0.62, 0.78], tint: "#131a30", amount: 0.22 }),
+};
 
-function sky() {
-  // Indigo overhead, through mauve, down to the afterglow.
-  const bands = [
-    "#252c48",
-    "#2f3558",
-    "#434467",
-    "#5c5173",
-    "#7a5e77",
-    "#986b71",
-    "#b47c67",
-    "#c59268",
-  ].map(hex);
-  const c = bandedSky(bands, 252, 21);
-  const d = dice(22);
-  // Where the sun went down: a warmer bloom low on the right.
-  for (let y = 150; y < 262; y++) {
-    for (let x = 300; x < W; x++) {
-      const amount = 1 - Math.hypot((x - 478) / 170, (y - 256) / 96);
-      if (amount > bayer(x, y)) c.blend(x, y, hex("#d9a36c"), Math.min(0.5, amount * 0.7));
-    }
-  }
-  // First stars, high up.
-  for (let n = 0; n < 54; n++) {
-    const x = d.between(0, W - 1);
-    const y = d.between(2, 128);
-    if (d.chance(1 - y / 150)) c.set(x, y, d.chance(0.35) ? hex("#d2cfdc") : hex("#8e8ea9"));
-  }
-  // A thin moon.
-  const MOON = { x: 92, y: 54, r: 9 };
-  for (let y = -MOON.r - 5; y <= MOON.r + 5; y++) {
-    for (let x = -MOON.r - 5; x <= MOON.r + 5; x++) {
-      const dist = Math.hypot(x, y);
-      const cut = Math.hypot(x - 4, y + 2);
-      if (dist <= MOON.r && cut > MOON.r - 0.5) c.set(MOON.x + x, MOON.y + y, hex("#d9d3c1"));
-      else if (
-        dist <= MOON.r + 5 &&
-        cut > MOON.r &&
-        1 - (dist - MOON.r) / 5 > bayer(MOON.x + x, MOON.y + y) * 2.2
-      ) {
-        c.blend(MOON.x + x, MOON.y + y, hex("#9c98b0"), 0.5);
-      }
-    }
-  }
-  return c;
-}
+const WARM = ["#e0b565", "#d29a50", "#ecd08a", "#b98548", "#dfa85a"].map(hex);
 
 /** A tree crown: a ragged disc, dark below, catching sky light along its top edge. */
 function crown(c, d, cx, cy, r, tones) {
@@ -108,6 +74,14 @@ function block() {
   const lights = { a: canvas(W, H), b: canvas(W, H), c: canvas(W, H) };
   const d = dice(1127);
   const { rand, pick, between, chance } = d;
+  // Lights are recorded, not painted, and decided by their own dice, so the
+  // houses come out the same however the lighting rules change.
+  const emit = emitter();
+  const L = dice(9911);
+  /** A window that was lit in the dusk drawing: some burn all day, the rest come on at dusk. */
+  const litFrom = () => (L.chance(0.2) ? "always" : "evening");
+  /** A window that was dark at dusk: some come on at night. */
+  const lateOn = () => (L.chance(0.34) ? "night" : null);
   const iron = hex("#15151a");
   const woods = [D("#5c4434"), D("#66493a")];
   const beacons = [];
@@ -126,9 +100,12 @@ function block() {
     for (let wy = PARK_BASE - h + 4; wy < PARK_BASE - 4; wy += 4) {
       for (let wx = x + 2; wx < x + w - 3; wx += 3) {
         const roll = rand();
-        if (roll < 0.16) skyline.set(wx, wy, hex("#b89f66"));
-        else if (roll < 0.22) (chance(0.5) ? lights.a : lights.c).set(wx, wy, hex("#c9ae70"));
-        else if (roll < 0.6) skyline.set(wx, wy, shade(color, 0.86));
+        if (roll < 0.6) skyline.set(wx, wy, shade(color, 0.86));
+        if (roll < 0.16) emit.light(skyline, wx, wy, 1, 1, hex("#b89f66"), litFrom());
+        else if (roll < 0.22)
+          emit.light(skyline, wx, wy, 1, 1, hex("#c9ae70"), chance(0.5) ? "a" : "c");
+        else if (roll < 0.6 && L.chance(0.3))
+          emit.light(skyline, wx, wy, 1, 1, hex("#b89f66"), "night");
       }
     }
     x += w;
@@ -150,8 +127,12 @@ function block() {
       skyline.rect(left + w - 3, y, 3, h, shade(stone, 0.82));
       skyline.rect(left, y, 2, h, mix(stone, hex("#c08a70"), 0.35)); // last light on the west face
       for (let wy = y + 4; wy < y + h - 2; wy += 5) {
-        for (let wx = left + 3; wx < left + w - 4; wx += 3)
-          skyline.set(wx, wy, chance(0.2) ? hex("#c4aa6c") : shade(stone, 0.8));
+        for (let wx = left + 3; wx < left + w - 4; wx += 3) {
+          const on = chance(0.2);
+          skyline.set(wx, wy, shade(stone, 0.8));
+          const when = on ? "evening" : lateOn();
+          if (when) emit.light(skyline, wx, wy, 1, 1, hex("#c4aa6c"), when);
+        }
       }
     }
     for (const [dx, dy] of [
@@ -164,7 +145,8 @@ function block() {
       [-2, 1],
       [1, 1],
     ]) {
-      skyline.set(cx + dx, y + 20 + dy, hex("#e6d49a")); // clock face
+      skyline.set(cx + dx, y + 20 + dy, hex("#9a93a8")); // clock face, lit from dusk
+      emit.light(skyline, cx + dx, y + 20 + dy, 1, 1, hex("#e6d49a"), "evening");
     }
     skyline.set(cx - 1, y + 21, hex("#3a3448"));
     for (const [w, dy] of [
@@ -194,8 +176,11 @@ function block() {
     crown(skyline, d, x, 250 + between(-6, 4), between(11, 18), front);
   for (const x of [226, 330, 486, 636]) {
     skyline.rect(x, 252, 1, 12, iron); // park lamps
-    skyline.rect(x - 1, 251, 3, 2, hex("#ecd592"));
-    glow(skyline, x, 252, 11, hex("#c9a25c"), 0.5);
+    skyline.rect(x - 1, 251, 3, 2, hex("#8c8676"));
+    const lamp = emit.light(skyline, x - 1, 251, 3, 2, hex("#ecd592"), "evening");
+    emit.spill(skyline, x, 252, 11, hex("#c9a25c"), 0.5, "evening", {
+      of: { id: lamp, x, y: 251 },
+    });
   }
 
   // ------------------------------------------------------------ the memorial arch at the park gate
@@ -248,11 +233,11 @@ function block() {
       skyline.rect(cx, top + 12, 3, 4, bronze);
     }
     weather(skyline, d, x, top + 12, w, base - top - 12, 0.7);
-    glow(skyline, x + w / 2, base - 6, 26, hex("#d2a862"), 0.42); // floodlit from below
+    emit.spill(skyline, x + w / 2, base - 6, 26, hex("#d2a862"), 0.42, "evening"); // floodlit from below
   }
 
   // ------------------------------------------------------------ mid: apartment houses and a church
-  const midFlicker = () => (chance(0.5) ? lights.a : lights.c);
+  const midFlicker = () => (chance(0.5) ? "a" : "c");
   const apartment = (x, w, h, color) => {
     const top = SIDEWALK - h;
     skyline.rect(x, top, w, h, color);
@@ -273,12 +258,22 @@ function block() {
         const on = chance(0.38);
         const tone = pick(WARM);
         skyline.rect(wx - 1, wy - 1, 5, 1, shade(color, 1.18)); // lintel
-        skyline.rect(wx, wy, 3, 5, on ? tone : hex("#1b1c25"));
-        if (on && chance(0.45)) skyline.rect(wx, wy, 3, 2, shade(tone, 0.7));
-        if (!on) skyline.set(wx, wy, hex("#3d3e58")); // the sky in the glass
+        skyline.rect(wx, wy, 3, 5, hex("#1b1c25"));
+        const blind = on && chance(0.45);
+        skyline.set(wx, wy, hex("#3d3e58")); // the sky in the glass
         skyline.rect(wx - 1, wy + 5, 5, 1, shade(color, 1.22));
         skyline.tint(wx + 1, wy + 6, 0.84);
-        if (!on && chance(0.12)) midFlicker().rect(wx, wy, 3, 5, pick(WARM));
+        let when = on ? litFrom() : null;
+        let glass = tone;
+        if (!on && chance(0.12)) {
+          when = midFlicker(); // one of the windows that switch on and off
+          glass = pick(WARM);
+        }
+        when ??= lateOn();
+        if (when) {
+          const id = emit.light(skyline, wx, wy, 3, 5, glass, when);
+          if (blind) emit.detail(skyline, id, wx, wy, 3, 2, shade(tone, 0.7), when);
+        }
       }
     }
     // fire escape down one bay
@@ -316,14 +311,19 @@ function block() {
     skyline.rect(x + 12, 250, 30, SIDEWALK - 250, stone); // nave wall
     for (let i = 0; i < 16; i++)
       skyline.rect(x + 12 + i, 250 - i, 30 - i * 2, 1, i % 3 ? slate : shade(slate, 0.85)); // gable roof
-    skyline.rect(x + 25, 254, 4, 6, hex("#b98a4c")); // window in the gable
+    skyline.rect(x + 25, 254, 4, 6, hex("#22232c")); // window in the gable
+    emit.light(skyline, x + 25, 254, 4, 6, hex("#b98a4c"), "evening");
     skyline.rect(x, 178, 12, SIDEWALK - 178, stone); // tower
     skyline.rect(x + 9, 178, 3, SIDEWALK - 178, shade(stone, 0.74));
     weather(skyline, d, x, 178, 12, 90);
     skyline.rect(x - 1, 176, 14, 2, shade(stone, 1.15));
     for (const wy of [186, 204, 224]) {
-      skyline.rect(x + 4, wy, 3, 8, wy === 224 ? hex("#a87f48") : hex("#17171d")); // louvres, one lit
-      skyline.set(x + 5, wy - 1, wy === 224 ? hex("#a87f48") : hex("#17171d"));
+      skyline.rect(x + 4, wy, 3, 8, hex("#17171d")); // louvres, one lit after dark
+      skyline.set(x + 5, wy - 1, hex("#17171d"));
+      if (wy === 224) {
+        emit.light(skyline, x + 4, wy, 3, 8, hex("#a87f48"), "evening");
+        emit.light(skyline, x + 5, wy - 1, 1, 1, hex("#a87f48"), "evening");
+      }
     }
     for (let i = 0; i < 36; i++) {
       const sw = Math.max(1, Math.round(12 * (1 - i / 36)));
@@ -376,22 +376,29 @@ function block() {
     const on = chance(litRate);
     const tone = pick(WARM);
     rooftops.rect(wx - 1, wy - 2, ww + 2, 2, shade(color, 1.24)); // lintel
-    rooftops.rect(wx, wy, ww, wh, on ? tone : hex("#191a22"));
+    rooftops.rect(wx, wy, ww, wh, hex("#191a22"));
+    let dressing = null;
     if (on) {
-      if (chance(0.45))
-        rooftops.rect(wx, wy, ww, Math.ceil(wh * 0.4), shade(tone, 0.68)); // a shade pulled down
-      else if (chance(0.3)) rooftops.rect(wx, wy, 1, wh, shade(tone, 0.6)); // a curtain
-    } else {
-      rooftops.rect(wx, wy, 2, 2, hex("#3b3c57")); // the sky in the glass
+      if (chance(0.45)) dressing = "shade";
+      else if (chance(0.3)) dressing = "curtain";
     }
-    rooftops.rect(wx, wy + Math.floor(wh / 2), ww, 1, on ? shade(tone, 0.55) : hex("#0f1015")); // sash
+    rooftops.rect(wx, wy, 2, 2, hex("#3b3c57")); // the sky in the glass
+    const sash = wy + Math.floor(wh / 2);
+    rooftops.rect(wx, sash, ww, 1, hex("#0f1015"));
     rooftops.rect(wx - 1, wy + wh, ww + 2, 1, shade(color, 1.3)); // sill
     rooftops.tint(wx + 1, wy + wh + 1, 0.82);
     rooftops.tint(wx + 2, wy + wh + 2, 0.9);
-    if (!on && chance(0.32)) {
-      lights.b.rect(wx, wy, ww, wh, tone);
-      lights.b.rect(wx, wy + Math.floor(wh / 2), ww, 1, shade(tone, 0.55));
+    let when = on ? litFrom() : null;
+    if (!on && chance(0.32)) when = "b"; // one of the windows that switch on and off
+    when ??= lateOn();
+    if (!when) return;
+    const id = emit.light(rooftops, wx, wy, ww, wh, tone, when);
+    if (dressing === "shade") {
+      emit.detail(rooftops, id, wx, wy, ww, Math.ceil(wh * 0.4), shade(tone, 0.68), when); // pulled down
+    } else if (dressing === "curtain") {
+      emit.detail(rooftops, id, wx, wy, 1, wh, shade(tone, 0.6), when);
     }
+    emit.detail(rooftops, id, wx, sash, ww, 1, shade(tone, 0.55), when);
   };
 
   const brownstone = (x, w, floors, color, shop) => {
@@ -444,12 +451,14 @@ function block() {
       }
       rooftops.rect(x, sy + 10, w - 1, 1, hex("#2a1a17"));
       const wy = sy + 12;
-      rooftops.rect(x + 3, wy, w - 16, 14, hex("#e3bd72"));
+      rooftops.rect(x + 3, wy, w - 16, 14, hex("#2b2a2e"));
+      emit.light(rooftops, x + 3, wy, w - 16, 14, hex("#e3bd72"), "always"); // open all hours
       for (let lx = x + 4; lx < x + w - 14; lx += 3)
         rooftops.rect(lx, wy + 8 + (lx % 2), 2, 6 - (lx % 2), hex("#7a5a34")); // stock on the shelves
       rooftops.rect(x + 3, wy + 6, w - 16, 1, hex("#a67c44"));
       rooftops.rect(x + w - 11, wy - 1, 8, 21, hex("#3a2a22")); // door
-      rooftops.rect(x + w - 10, wy, 6, 12, hex("#d8ae66"));
+      rooftops.rect(x + w - 10, wy, 6, 12, hex("#2b2a2e"));
+      emit.light(rooftops, x + w - 10, wy, 6, 12, hex("#d8ae66"), "always");
       for (const [cx, tone] of [
         [x + 3, "#7b8c4a"],
         [x + 9, "#b0683c"],
@@ -458,7 +467,7 @@ function block() {
         rooftops.rect(cx, SIDEWALK - 5, 5, 5, hex("#4a3628")); // crates
         rooftops.rect(cx, SIDEWALK - 6, 5, 2, hex(tone));
       }
-      glow(rooftops, x + w / 2, SIDEWALK - 2, 20, hex("#d9b061"), 0.5);
+      emit.spill(rooftops, x + w / 2, SIDEWALK - 2, 20, hex("#d9b061"), 0.5, "evening");
       // the neon in the window comes and goes
       for (const [dx, dy] of [
         [0, 0],
@@ -477,7 +486,7 @@ function block() {
         [6, 1],
         [5, 1],
       ]) {
-        lights.b.set(x + 6 + dx, wy + 2 + dy, hex("#e0735e"));
+        emit.light(rooftops, x + 6 + dx, wy + 2 + dy, 1, 1, hex("#e0735e"), "b");
       }
       return top;
     }
@@ -488,7 +497,11 @@ function block() {
     }
     const doorX = bayX(doorBay) - 1;
     rooftops.rect(doorX - 1, fy + 5, 9, 2, shade(color, 1.26)); // door hood
-    rooftops.rect(doorX, fy + 7, 7, 2, chance(0.6) ? pick(WARM) : hex("#22232c")); // transom
+    const transomLit = chance(0.6);
+    const transomTone = transomLit ? pick(WARM) : L.pick(WARM);
+    rooftops.rect(doorX, fy + 7, 7, 2, hex("#22232c")); // transom
+    const transomWhen = transomLit ? "evening" : lateOn();
+    if (transomWhen) emit.light(rooftops, doorX, fy + 7, 7, 2, transomTone, transomWhen);
     rooftops.rect(
       doorX,
       fy + 9,
@@ -506,7 +519,9 @@ function block() {
       if (b === doorBay) continue;
       const wx = bayX(b);
       const on = chance(0.3);
-      rooftops.rect(wx, fy + 3, 5, 5, on ? pick(WARM) : hex("#16171d"));
+      const tone = on ? pick(WARM) : null;
+      rooftops.rect(wx, fy + 3, 5, 5, hex("#16171d"));
+      if (on) emit.light(rooftops, wx, fy + 3, 5, 5, tone, "evening");
       rooftops.rect(wx + 1, fy + 3, 1, 5, iron);
       rooftops.rect(wx + 3, fy + 3, 1, 5, iron);
     }
@@ -619,28 +634,52 @@ function block() {
       [5, -1],
     ])
       rooftops.set(lx + dx, 300 + dy, iron);
-    rooftops.rect(lx + 4, 300, 3, 2, hex("#f2dfa0"));
-    glow(rooftops, lx + 5, 303, 20, hex("#d9b061"), 0.6);
-    for (let y = 0; y < 5; y++) {
-      for (let x = -14; x <= 16; x++) {
-        if (1 - Math.abs(x) / 16 > bayer(lx + x, SIDEWALK + y) * 1.2)
-          rooftops.blend(lx + x, SIDEWALK + y, hex("#d9b061"), 0.3); // on the pavement
-      }
-    }
+    rooftops.rect(lx + 4, 300, 3, 2, hex("#8f8a7c"));
+    emit.light(rooftops, lx + 4, 300, 3, 2, hex("#f2dfa0"), "evening");
+    emit.spill(rooftops, lx + 5, 303, 20, hex("#d9b061"), 0.6, "evening");
+    emit.custom(
+      rooftops,
+      (c) => {
+        for (let y = 0; y < 5; y++) {
+          for (let x = -14; x <= 16; x++) {
+            if (1 - Math.abs(x) / 16 > bayer(lx + x, SIDEWALK + y) * 1.2) {
+              c.blend(lx + x, SIDEWALK + y, hex("#d9b061"), 0.3); // on the pavement
+            }
+          }
+        }
+      },
+      "evening",
+    );
     for (const [dx, dy] of [
       [3, 0],
       [8, 1],
       [5, 2],
       [11, 0],
     ])
-      rooftops.set(lx + dx, 346 + dy, hex("#8a7748")); // in the wet road
-    // a faint shimmer, for the flicker layer
-    lights.c.rect(lx + 4, 299, 3, 1, hex("#fff0bd"));
-    lights.c.set(lx + 3, 301, hex("#e8cf8c"));
-    lights.c.set(lx + 7, 301, hex("#e8cf8c"));
+      emit.custom(rooftops, (c) => c.set(lx + dx, 346 + dy, hex("#8a7748")), "evening"); // in the wet road
   }
 
-  return { skyline, rooftops, lights, beacons, chimneys };
+  emit.switching(skyline, "a", lights.a);
+  emit.switching(skyline, "c", lights.c);
+  emit.switching(rooftops, "b", lights.b);
+
+  const glow = {
+    backA: canvas(W, H),
+    backB: canvas(W, H),
+    frontA: canvas(W, H),
+    frontB: canvas(W, H),
+  };
+  emit.halos(skyline, [glow.backA, glow.backB], dice(61));
+  emit.halos(rooftops, [glow.frontA, glow.frontB], dice(62));
+
+  const states = {};
+  for (const state of STATES) {
+    states[state] = {
+      city: emit.render(skyline, state, GRADES[state]),
+      rooftops: emit.render(rooftops, state, GRADES[state]),
+    };
+  }
+  return { states, lights, glow, beacons, chimneys };
 }
 
 /**
@@ -692,23 +731,25 @@ function traffic() {
 export function brooklynScene(puff) {
   const scene = block();
   const smokers = scene.chimneys.filter(([x]) => x < 215 || x > 515).slice(0, 2);
-  const tones = ["#4d4a66", "#645d78", "#93707a", "#c58d71"].map(hex); // lit from below
+  const images = {
+    "lights-a.png": scene.lights.a,
+    "lights-b.png": scene.lights.b,
+    "lights-c.png": scene.lights.c,
+    "glow-back-a.png": scene.glow.backA,
+    "glow-back-b.png": scene.glow.backB,
+    "glow-front-a.png": scene.glow.frontA,
+    "glow-front-b.png": scene.glow.frontB,
+    "traffic.png": traffic(),
+  };
+  for (const state of STATES) {
+    images[`city-${state}.png`] = scene.states[state].city;
+    images[`rooftops-${state}.png`] = scene.states[state].rooftops;
+  }
   return {
-    images: {
-      "sky.png": sky(),
-      "clouds-far.png": clouds(131, 150, 4, 0.8, tones),
-      "clouds-near.png": clouds(177, 170, 3, 1.3, tones),
-      "skyline.png": scene.skyline,
-      "rooftops.png": scene.rooftops,
-      "lights-a.png": scene.lights.a,
-      "lights-b.png": scene.lights.b,
-      "lights-c.png": scene.lights.c,
-      "traffic.png": traffic(),
-    },
+    images,
     config: {
       label: "brooklyn",
-      hint: "a brownstone block at dusk",
-      sky: "#252c48",
+      hint: "a brownstone block by Prospect Park",
       clouds: {
         far: { top: "2%", height: pctY(150), seconds: 520 },
         near: { top: "6%", height: pctY(170), seconds: 320 },

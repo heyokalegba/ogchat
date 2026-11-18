@@ -45,9 +45,17 @@ export const luma = (c) => 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
 /** Pulls a colour toward grey: 0 leaves it alone, 1 removes all colour. */
 export const desat = (c, t) => mix(c, Array(3).fill(Math.round(luma(c))), t);
 
-/** A transparent canvas. Pixels are opaque once drawn. */
+/**
+ * A transparent canvas. Pixels are opaque once drawn.
+ *
+ * It also keeps an ownership map: `mark` claims a patch of pixels for a light
+ * (a window, a lamp), and anything drawn over a pixel afterwards takes the
+ * claim away. That is how a window knows, later, which of its pixels are still
+ * showing and which have a fire escape or a tree in front of them.
+ */
 export function canvas(w, h) {
   const data = new Uint8Array(w * h * 4);
+  const owner = new Uint32Array(w * h);
   const inside = (x, y) => x >= 0 && y >= 0 && x < w && y < h;
   const set = (x, y, c) => {
     x = Math.round(x);
@@ -58,7 +66,27 @@ export function canvas(w, h) {
     data[i + 1] = c[1];
     data[i + 2] = c[2];
     data[i + 3] = 255;
+    owner[y * w + x] = 0;
   };
+  /** A see-through pixel, for halos. Keeps the stronger of what is there and what is asked. */
+  const setAlpha = (x, y, c, alpha) => {
+    x = Math.round(x);
+    y = Math.round(y);
+    if (!inside(x, y)) return;
+    const i = (y * w + x) * 4;
+    const a = Math.round(alpha * 255);
+    if (data[i + 3] >= a) return;
+    data[i] = c[0];
+    data[i + 1] = c[1];
+    data[i + 2] = c[2];
+    data[i + 3] = a;
+  };
+  const mark = (x, y, rw, rh, id) => {
+    for (let yy = y; yy < y + rh; yy++) {
+      for (let xx = x; xx < x + rw; xx++) if (inside(xx, yy)) owner[yy * w + xx] = id;
+    }
+  };
+  const owns = (x, y, id) => inside(x, y) && owner[y * w + x] === id;
   const get = (x, y) => {
     x = Math.round(x);
     y = Math.round(y);
@@ -79,7 +107,157 @@ export function canvas(w, h) {
   const rect = (x, y, rw, rh, c) => {
     for (let yy = y; yy < y + rh; yy++) for (let xx = x; xx < x + rw; xx++) set(xx, yy, c);
   };
-  return { w, h, data, set, get, tint, blend, rect };
+  /** A copy with every drawn pixel passed through `fn` (a colour grade). */
+  const graded = (fn) => {
+    const copy = canvas(w, h);
+    for (let i = 0; i < w * h; i++) {
+      if (!data[i * 4 + 3]) continue;
+      const [r, g, b] = fn([data[i * 4], data[i * 4 + 1], data[i * 4 + 2]]);
+      copy.data[i * 4] = r;
+      copy.data[i * 4 + 1] = g;
+      copy.data[i * 4 + 2] = b;
+      copy.data[i * 4 + 3] = data[i * 4 + 3];
+    }
+    return copy;
+  };
+  return { w, h, data, set, setAlpha, get, tint, blend, rect, mark, owns, graded };
+}
+
+/** The four lights a scene is drawn in. The backdrop crossfades between neighbours. */
+export const STATES = ["day", "golden", "dusk", "night"];
+
+/** Which lights are on in each state. "always" lights burn even by day. */
+const LIT_IN = {
+  day: ["always"],
+  golden: ["always"],
+  dusk: ["always", "evening"],
+  night: ["always", "evening", "night"],
+};
+
+/** A colour grade: per-channel gain, then a pull toward a tint. */
+export function grade({ gain, tint, amount = 0 }) {
+  const target = tint ? hex(tint) : null;
+  return (c) => {
+    const lit = c.map((v, i) => Math.max(0, Math.min(255, Math.round(v * gain[i]))));
+    return target ? mix(lit, target, amount) : lit;
+  };
+}
+
+/**
+ * Remembers every light in a scene while it is being drawn, so the same
+ * drawing can be turned out in four lights with identical geometry.
+ *
+ * Draw the unlit look of a window as usual, then call `light` to claim its
+ * pixels and say when it is on:
+ *   "always" | "evening" | "night"   lit in the still pictures from that state on
+ *   "a" | "b" | "c"                  a window that switches on and off (the lights layers)
+ */
+export function emitter() {
+  const ops = [];
+  let nextId = 1;
+  return {
+    /** A lit patch. Returns its id, for `detail`. */
+    light(c, x, y, w, h, color, when) {
+      const id = nextId++;
+      c.mark(x, y, w, h, id);
+      ops.push({ kind: "rect", c, id, x, y, w, h, color, when });
+      return id;
+    },
+    /** Part of an existing light: a blind, a sash bar. Shown only where that light still shows. */
+    detail(c, id, x, y, w, h, color, when) {
+      ops.push({ kind: "rect", c, id, x, y, w, h, color, when });
+    },
+    /** Light spilling onto whatever is around: a lamp's pool, a shop front. */
+    spill(c, cx, cy, r, color, strength, when, { halo = true, of = null } = {}) {
+      // `of` ties the spill to a light: if that light ends up hidden, so does its spill.
+      ops.push({ kind: "spill", c, cx, cy, r, color, strength, when, halo, of });
+    },
+    /** Anything else that only happens when lit. `fn` gets the canvas to draw on. */
+    custom(c, fn, when) {
+      ops.push({ kind: "custom", c, fn, when });
+    },
+
+    /** The source canvas as it looks in one state: graded, then with that state's lights on. */
+    render(source, state, gradeFn) {
+      const out = source.graded(gradeFn);
+      const on = LIT_IN[state];
+      for (const op of ops) {
+        if (op.c !== source || !on.includes(op.when)) continue;
+        if (op.kind === "rect") {
+          for (let y = op.y; y < op.y + op.h; y++) {
+            for (let x = op.x; x < op.x + op.w; x++)
+              if (source.owns(x, y, op.id)) out.set(x, y, op.color);
+          }
+        } else if (op.kind === "spill") {
+          if (!hidden(source, op)) glow(out, op.cx, op.cy, op.r, op.color, op.strength);
+        } else {
+          op.fn(out);
+        }
+      }
+      return out;
+    },
+
+    /** One of the switching layers: just the windows tagged with `which`. */
+    switching(source, which, into) {
+      for (const op of ops) {
+        if (op.c !== source || op.when !== which || op.kind !== "rect") continue;
+        for (let y = op.y; y < op.y + op.h; y++) {
+          for (let x = op.x; x < op.x + op.w; x++)
+            if (source.owns(x, y, op.id)) into.set(x, y, op.color);
+        }
+      }
+      return into;
+    },
+
+    /**
+     * Halos for everything that is lit at night on `source`, dealt out between
+     * a few canvases so neighbouring lights can pulse out of step.
+     */
+    halos(source, into, d) {
+      for (const op of ops) {
+        if (op.c !== source || !LIT_IN.night.includes(op.when)) continue;
+        const target = into[Math.floor(d.rand() * into.length)];
+        const roll = d.rand();
+        if (op.kind === "rect") {
+          // Not every light gets one: a haze over the whole city would flatten it.
+          const shown =
+            source.owns(op.x, op.y, op.id) || source.owns(op.x + op.w - 1, op.y + op.h - 1, op.id);
+          if (!shown) continue;
+          const small = op.w * op.h < 4;
+          if (roll > (small ? 0.22 : 0.42)) continue;
+          const r = small ? 1.7 : Math.max(op.w, op.h) * 0.7 + 1.8;
+          halo(
+            target,
+            op.x + op.w / 2 - 0.5,
+            op.y + op.h / 2 - 0.5,
+            r,
+            op.color,
+            small ? 0.4 : 0.36,
+          );
+        } else if (op.kind === "spill" && op.halo && !hidden(source, op)) {
+          halo(target, op.cx, op.cy, op.r * 0.5, op.color, 0.24);
+        }
+      }
+    },
+  };
+}
+
+/** True when a spill belongs to a light that something has since been drawn over. */
+function hidden(source, op) {
+  return op.of ? !source.owns(op.of.x, op.of.y, op.of.id) : false;
+}
+
+/** A soft halo in three steps of transparency, so it still reads as pixel art. */
+export function halo(c, cx, cy, r, color, strength) {
+  const tone = mix(color, hex("#fff2c8"), 0.25);
+  for (let y = Math.floor(-r); y <= Math.ceil(r); y++) {
+    for (let x = Math.floor(-r); x <= Math.ceil(r); x++) {
+      const d = Math.hypot(x, y) / r;
+      if (d > 1) continue;
+      const level = d < 0.4 ? 1 : d < 0.72 ? 0.55 : 0.26;
+      c.setAlpha(cx + x, cy + y, tone, strength * level);
+    }
+  }
 }
 
 const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
