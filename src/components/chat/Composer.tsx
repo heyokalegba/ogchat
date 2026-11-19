@@ -124,7 +124,6 @@ export function Composer(props: ComposerProps) {
             className={styles.input}
             rows={1}
             value={value}
-            placeholder="Message"
             aria-label="Message"
             autoComplete="off"
             spellCheck
@@ -132,7 +131,7 @@ export function Composer(props: ComposerProps) {
             onKeyDown={onKeyDown}
             onPaste={onPaste}
           />
-          <BlockCaret target={textarea} value={value} placeholder="Message" />
+          <BlockCaret target={textarea} value={value} />
           <input
             ref={picker}
             type="file"
