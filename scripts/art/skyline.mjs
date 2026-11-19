@@ -650,9 +650,9 @@ function city(season = "summer") {
   }
 
   // The switching layers: river glints were drawn straight in; add the windows.
-  // Winter: snow on the level tops, from the mid-rise roofs down to the near ones.
+  // Under snow: it lies on the level tops, from the mid-rise roofs down to the near ones.
   // The far towers are too far off to show it.
-  if (season === "winter") {
+  if (season === "snow") {
     snowfall(skyline, SNOW, { from: 96, to: GROUND - 6 });
     snowfall(rooftops, SNOW);
   }

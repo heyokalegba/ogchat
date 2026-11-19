@@ -3,6 +3,9 @@
 A personal AI chat interface that runs entirely on your machine. Multi-session
 chat with streaming replies, file attachments, local history, and one
 configurable OpenAI-compatible provider. No accounts, no cloud, no telemetry.
+Besides your provider it talks to one thing, and only if you leave it on: a
+public weather service, asked what the weather is in New York (see
+[Weather](#the-weather-is-new-yorks)).
 
 The chat is written on an old wall of pixelated bricks where no two are alike:
 mostly muted tan, with browns, greys, dull reds and limewashed pale ones, each
@@ -65,16 +68,18 @@ interface is see-through, over a pixel-art New York that keeps real time.
 - **Seasons.** The scene follows the calendar in Brooklyn. In spring the trees
   are in fresh leaf and blossom, with petals on the pavement; in summer they
   are full and dark; in autumn they turn and drop their leaves along the kerb,
-  and a few come down on the wind; in winter they are bare, and there is snow
-  on the roofs and cornices, the stoops, the parked cars and the pavement. The
-  skyline, with no trees, shows winter by the snow on its roofs.
-- **Weather.** Clear, cloudy, rain, thunderstorm, fog or snow, weighted by the
-  season (snow only in winter, thunder mostly in summer) and holding for hours
-  at a time. It is made up by the clock, not fetched from anywhere, so it is
-  not the real weather in Brooklyn, but the rain that is falling is still
-  falling after a reload. A covered sky hides the sun and stars and flattens
-  the light; rain and snow thin out the people on the street and call off the
-  barbecues.
+  and a few come down on the wind; in winter they are bare. Snow lies only
+  when it is lying in New York: then it is on the roofs and cornices, the
+  stoops, the parked cars and the pavement, and on the skyline's roofs.
+- **Weather.** New York's own, live: what is over the city right now is
+  what is over the scene, looked at again every ten minutes. Clear, broken
+  cloud, overcast, drizzle, rain, a downpour, thunder, fog, flurries, snow.
+  The sky is as covered as the real one, so the sun, moon and stars show or
+  hide with it; rain and snow thin out the people on the street and call off
+  the barbecues. More under [Weather](#the-weather-is-new-yorks).
+- **Any day since 1 January 2025.** Set the scene to a past day and it shows
+  that day: its season, its sun and moon, and the weather New York had, hour
+  by hour, at the time of day your clock reads.
 - **Wear and tear, in real time.** The street ages at the speed a real one
   does. Each scene has some hundreds of small marks waiting (a streak under a
   window sill, a crack across the pavement, a patch in the road, a chipped
@@ -85,6 +90,45 @@ interface is see-through, over a pixel-art New York that keeps real time.
 - **More birds.** Besides the flock that crosses, ones, twos and small groups
   fly through while it is light.
 
+## The weather is New York's
+
+With the weather set to `New York, live` (it is, to begin with), ogchat's
+server asks [Open-Meteo](https://open-meteo.com), a public weather service
+that needs no account and no key, what the weather is at one fixed point in
+Brooklyn. It asks at most once every ten minutes while a window is open, and
+the scene shows the answer: the kind of weather, how hard it is coming down,
+how much of the sky is covered, whether snow is lying.
+
+Set the **day** in the look panel to any date back to 1 January 2025 and the
+scene shows that day instead, at the time of day your clock reads: its
+season, its sun and moon, and the weather New York had that hour. A past
+day is asked for once and then kept in `data/weather/`, so going back to it
+needs no network. It comes from the service's record of what its weather
+models had for that day, and failing that from its reanalysis archive; both
+are reconstructions on a grid of a few kilometres, good for "it snowed that
+morning", not a weather station's log.
+
+What this means for privacy, since it is the one thing besides your provider
+that ogchat reaches out to:
+
+- The request carries the coordinates of that point in Brooklyn and the list
+  of figures wanted. Nothing of yours is in it: no chats, no key, no name,
+  no location of your own. Like any request, it comes from your IP address.
+- It is made by ogchat's server on your machine, not by the page.
+- Set the weather to `made up (asks nobody)`, or hold it to one kind, and
+  nothing is asked at all. Made-up weather goes by the clock and the season,
+  so it still holds for hours and survives a reload.
+- If the service cannot be reached, the scene carries on with made-up
+  weather, says so in the look panel, and asks again later.
+
+Weather data by [Open-Meteo.com](https://open-meteo.com). Its free service
+is offered for non-commercial use and asks for that credit; its terms are on
+its site.
+
+For trials without the network, `node scripts/mock-weather.mjs` is a
+stand-in, used by starting ogchat with
+`OGCHAT_WEATHER_URL=http://127.0.0.1:8788`.
+
 ## The look panel
 
 Click the clock in the top-right corner. Everything applies as you move it and
@@ -94,8 +138,9 @@ is remembered in your browser.
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | People                  | `out` or `none`. `none` empties the streets and roofs.                                                                                                                                                                                                         |
 | Motion                  | `live` or `frozen`. Frozen holds the scene still, like a picture, while you work: nothing moves and nobody arrives. The light still follows the clock.                                                                                                         |
-| Season                  | `by the calendar`, or hold the scene to spring, summer, autumn or winter.                                                                                                                                                                                      |
-| Weather                 | `as it comes`, or hold it to clear, cloudy, rain, storm, fog or snow.                                                                                                                                                                                          |
+| Day                     | Today, or any day back to 1 January 2025. On a past day the scene keeps your time of day and shows that day's season, sky and weather. `today` brings it back.                                                                                                 |
+| Season                  | `by the calendar`, or hold the scene to spring, summer, autumn or winter, or to `winter, snowed in`.                                                                                                                                                           |
+| Weather                 | `New York, live` (on a past day, `New York, that day`), `made up (asks nobody)`, or hold it to one kind. Underneath it says what New York is doing: "light rain · 48°F (9°C) · wind 9 mph · as of 2:15 pm".                                                    |
 | Wear                    | How old your street is, and a slider to look ahead at the wear to come, up to twenty years. Looking ahead is not remembered: reload and the street is its real age again.                                                                                      |
 | Strength                | How strongly the scene shows, from full down to faint. Lower it when the picture competes with the text, above all with the wall hidden.                                                                                                                       |
 | Message box colour      | The colour of the box you type in: six to choose from, or pick any. What you type turns light on a dark box.                                                                                                                                                   |
@@ -124,7 +169,9 @@ More screens: [first run](docs/screens/01-first-run.png) ·
 [a chat in a project](docs/screens/15-project.png) ·
 [winter, snowing](docs/screens/16-winter-snow.png) ·
 [autumn rain](docs/screens/17-autumn-rain.png) ·
-[thinking, shown as it is written](docs/screens/18-thinking.png)
+[thinking, shown as it is written](docs/screens/18-thinking.png) ·
+[a past day: 6 January 2025, snowing](docs/screens/19-past-day.png) ·
+[rain under a grey sky](docs/screens/20-live-rain.png)
 
 ## Run it
 
@@ -344,6 +391,7 @@ Everything is plain JSON under `data/` (override with `OGCHAT_DATA_DIR`):
 data/
   settings.json            provider settings, including a key saved in the panel
   world.json               the day your street was first opened: what its wear is counted from
+  weather/<date>.json      a past day's weather, kept once it has been asked for
   sessions/<id>.json       one file per session: title, timestamps, messages, its project
   projects/<id>.json       one file per project: name, instructions, its files' details
   files/<owner>/<id>       attachments and project files: image bytes, or the text taken from a file
@@ -370,6 +418,7 @@ src/
     client/api.ts                  browser client for the routes above
 tests/                             vitest: persistence, adapter, route contract, attachments, the clock, the people
 scripts/mock-provider.mjs          stand-in provider for local trials
+scripts/mock-weather.mjs           stand-in weather service for local trials
 electron/                          the Mac app: a window and a launcher around this project (its own package)
 scripts/make-art.mjs, scripts/art/  generate the scenes, the sky, the people and the brick wall
 ```
@@ -444,8 +493,12 @@ Day to day, use the look panel (above). To change what it starts from:
   `SkyTraffic.tsx` the aircraft and the birds.
 - **Seasons and weather:** `FOLIAGE` in `brooklyn.mjs` holds each season's
   colours, and `snowfall` in `lib.mjs` lays the snow. `src/lib/weather.ts`
-  holds the season by month and the odds of each kind of weather in each
-  season (`ODDS`); `Weather.tsx` draws what falls.
+  holds the season by month, what each weather code from the service means
+  for the scene (`WMO`), how grey each kind makes the sky (`greyOf`), and the
+  odds used when the weather has to be made up (`ODDS`). `Weather.tsx` draws
+  what falls. `src/lib/server/weatherfeed.ts` is the only module that talks
+  to the weather service: the place asked about, how long a reading is kept,
+  and which records are tried for a past day are all at the top of it.
 - **The clock:** `src/lib/daylight.ts` works out where the sun and moon are
   over Brooklyn and which light the scene is in. `BROOKLYN` at the top holds
   the place; `skyBlend` holds the sun heights at which the light changes.
@@ -487,6 +540,8 @@ still, with a few figures standing in it.
 | `GET` / `PUT /api/settings`                      | Read (masked) / update provider settings: `baseUrl`, `model`, `apiKey`, `reasoning`, `systemPrompt`                                                                                                                             |
 | `POST /api/settings/test`                        | Try `{ baseUrl?, model?, apiKey? }` (or the current settings) against the provider without saving; returns `{ check }`                                                                                                          |
 | `GET /api/world`                                 | `{ world: { builtAt } }`: when this street was first opened                                                                                                                                                                     |
+| `GET /api/weather`                               | `{ now }`: New York's weather at this moment (code, cloud, temperature, wind, snow lying)                                                                                                                                       |
+| `GET /api/weather?date=2025-01-06`               | `{ day: { date, hours } }`: that day hour by hour; `400 bad_date` outside 1 January 2025 to today, `502 weather_unavailable` when the service cannot be reached                                                                 |
 | `GET` / `POST /api/projects`                     | List projects (with instructions, files and session counts) / create one `{ name }`                                                                                                                                             |
 | `GET` / `PATCH` / `DELETE /api/projects/:id`     | Read / update `{ name?, instructions? }` / delete a project. Its sessions are kept                                                                                                                                              |
 | `POST /api/projects/:id/files`                   | Add files (`multipart/form-data`, field `files`)                                                                                                                                                                                |

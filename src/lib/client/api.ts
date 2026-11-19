@@ -9,6 +9,7 @@ import type {
   SettingsCheck,
   StreamEvent,
 } from "@/lib/types";
+import type { DayRecord, Reading } from "@/lib/weather";
 
 /** Browser-side client for the ogchat API. The API key never passes through here in the clear, except on its way in from the settings form. */
 
@@ -59,6 +60,10 @@ export interface ChatApi {
   getSettings(): Promise<PublicSettings>;
   /** When this installation's street was first opened: what its wear is counted from. */
   getWorld(): Promise<{ builtAt: string }>;
+  /** New York's weather at this moment, from the public weather service. */
+  getWeatherNow(): Promise<Reading>;
+  /** New York's weather hour by hour on a past day ("2025-01-06"). */
+  getWeatherOn(date: string): Promise<DayRecord>;
   saveSettings(update: SettingsUpdate): Promise<PublicSettings>;
   /** Tests the settings as they would be with `update` applied, without saving it. */
   testSettings(update: SettingsUpdate): Promise<SettingsCheck>;
@@ -185,6 +190,12 @@ export function createApi(base = "/api"): ChatApi {
     },
     async getWorld() {
       return (await data<{ world: { builtAt: string } }>("/world")).world;
+    },
+    async getWeatherNow() {
+      return (await data<{ now: Reading }>("/weather")).now;
+    },
+    async getWeatherOn(date) {
+      return (await data<{ day: DayRecord }>(`/weather?date=${encodeURIComponent(date)}`)).day;
     },
     async getSettings() {
       return (await data<{ settings: PublicSettings }>("/settings")).settings;

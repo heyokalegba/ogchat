@@ -164,6 +164,20 @@
   color: var(--og-on-dark);
 }
 
+/* The day picker and its "today" button, side by side. */
+.lookDate {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.lookDate .lookSelect {
+  max-width: none;
+  color-scheme: dark;
+}
+
 .lookSelect:focus {
   border-color: var(--og-yellow);
 }
@@ -725,6 +739,11 @@
   font-size: 12px;
   line-height: 1.45;
   color: var(--og-on-dark-2);
+}
+
+/* A note between two rows keeps its distance from the row after it. */
+.lookNote + .lookRow {
+  margin-top: 10px;
 }
 
 .shell .lookAction {

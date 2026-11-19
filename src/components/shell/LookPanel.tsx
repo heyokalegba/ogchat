@@ -1,8 +1,15 @@
 "use client";
 
-import { SEASON_NAMES, WEATHERS, type SeasonName, type Weather } from "@/lib/weather";
+import {
+  describeReading,
+  SEASON_NAMES,
+  WEATHERS,
+  type Conditions,
+  type Reading,
+  type SeasonName,
+} from "@/lib/weather";
 import { useEffect, useRef } from "react";
-import { describeOffset, formatMinutes, type WallClock } from "@/lib/daylight";
+import { describeOffset, FIRST_DATE, formatMinutes, type WallClock } from "@/lib/daylight";
 import { CloseIcon } from "../chat/icons";
 import { SCENES, type SceneId } from "./art";
 import { WEAR_YEARS } from "./art/wear";
@@ -29,11 +36,24 @@ export interface LookPanelProps {
   onClose: () => void;
   /** The season and weather the scene is showing right now. */
   season: SeasonName;
-  weather: Weather;
+  conditions: Conditions;
+  /** The reading from New York behind that weather, when it is the real thing. */
+  reading: Reading | null;
+  /** Why there is no reading, when live weather was asked for and did not come. */
+  weatherProblem: string | null;
+  /** Today in Brooklyn, and the past day the scene is set to, if it is. Both "2025-01-06". */
+  today: string;
+  heldDate: string | null;
   /** How old the street is, in days, and a look ahead at its wear (in years; not remembered). */
   streetDays: number;
   peekYears: number;
   onPeek: (years: number) => void;
+}
+
+/** "10:15 am" from a reading's local time, "2026-11-19T10:15". */
+function timeOf(reading: Reading): string {
+  const [hour, minute] = reading.time.slice(11, 16).split(":").map(Number);
+  return formatMinutes((hour || 0) * 60 + (minute || 0));
 }
 
 /**
@@ -51,7 +71,11 @@ export function LookPanel({
   onSnapToNow,
   onClose,
   season,
-  weather,
+  conditions,
+  reading,
+  weatherProblem,
+  today,
+  heldDate,
   streetDays,
   peekYears,
   onPeek,
@@ -120,6 +144,37 @@ export function LookPanel({
           </div>
         </div>
         <div className={styles.lookRow}>
+          <label className={styles.lookLabel} htmlFor="ogchat-date">
+            day
+          </label>
+          <span className={styles.lookDate}>
+            {heldDate && (
+              <button
+                type="button"
+                className={styles.lookAction}
+                title="Back to today"
+                onClick={() => onChange({ date: "" })}
+              >
+                today
+              </button>
+            )}
+            <input
+              id="ogchat-date"
+              className={styles.lookSelect}
+              type="date"
+              min={FIRST_DATE}
+              max={today}
+              value={heldDate ?? today}
+              title="Set the scene to any day since 1 January 2025: its season, its sun and moon, and the weather New York had"
+              onChange={(event) => {
+                const picked = event.target.value;
+                if (!picked || picked >= today) onChange({ date: "" });
+                else if (picked >= FIRST_DATE) onChange({ date: picked });
+              }}
+            />
+          </span>
+        </div>
+        <div className={styles.lookRow}>
           <label className={styles.lookLabel} htmlFor="ogchat-season">
             season
           </label>
@@ -136,6 +191,7 @@ export function LookPanel({
                 {name}
               </option>
             ))}
+            <option value="snow">winter, snowed in</option>
           </select>
         </div>
         <div className={styles.lookRow}>
@@ -146,17 +202,29 @@ export function LookPanel({
             id="ogchat-weather"
             className={styles.lookSelect}
             value={look.weather}
-            title="Let the weather come and go, or hold it to one kind"
+            title="New York's real weather, made-up weather that asks nobody, or one kind held"
             onChange={(event) => onChange({ weather: event.target.value as Look["weather"] })}
           >
-            <option value="auto">as it comes ({weather})</option>
+            <option value="live">{heldDate ? "New York, that day" : "New York, live"}</option>
+            <option value="invented">made up (asks nobody)</option>
             {WEATHERS.map((name) => (
               <option key={name} value={name}>
-                {name}
+                always {name}
               </option>
             ))}
           </select>
         </div>
+        <p className={styles.lookNote} role="status">
+          {look.weather === "live"
+            ? reading
+              ? `${describeReading(reading)} · ${heldDate ? "at this hour that day" : `as of ${timeOf(reading)}`}. Weather data by Open-Meteo.com.`
+              : weatherProblem
+                ? `No word from the weather service (${weatherProblem.replace(/\.$/, "")}), so this ${conditions.kind} is made up. It will be asked again.`
+                : "Asking for the weather…"
+            : look.weather === "invented"
+              ? `Made up by the clock: ${conditions.kind}. Nothing is asked of the weather service.`
+              : `Held to ${conditions.kind}, whatever New York is doing.`}
+        </p>
         <div className={styles.lookRow}>
           <label className={styles.lookLabel} htmlFor="ogchat-wear">
             wear

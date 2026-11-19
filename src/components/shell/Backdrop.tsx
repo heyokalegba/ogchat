@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import { brooklynClock, type SkyView } from "@/lib/daylight";
-import { overcast, shelter, type SeasonName, type Weather } from "@/lib/weather";
+import { conditionsFor, greyOf, shelterOf, type Conditions, type SeasonName } from "@/lib/weather";
 import { SCENES, SKY, type SceneId } from "./art";
 import styles from "./backdrop.module.css";
 import { roofPartyAt } from "./life";
@@ -50,6 +50,9 @@ function Blend(props: {
   );
 }
 
+/** What the scene shows when it is told nothing about the weather. */
+const FAIR = conditionsFor("clear");
+
 export function Backdrop(props: {
   scene: SceneId;
   view: SkyView;
@@ -57,18 +60,22 @@ export function Backdrop(props: {
   now: number;
   /** How old the street is, in days: how much of its wear and tear shows. */
   age?: number;
-  /** The season the scene is drawn in, and the weather over it. */
+  /** The season, whether snow is lying (winter drawn white), and the weather over it all. */
   season?: SeasonName;
-  weather?: Weather;
+  snowy?: boolean;
+  conditions?: Conditions;
   people?: boolean;
   /** Frozen: nothing moves, nobody arrives. The light still follows the clock. */
   still?: boolean;
 }) {
   const { scene, view, now, people = true, still = false } = props;
-  const { season = "summer", weather = "clear" } = props;
+  const { season = "summer", snowy = false, conditions = FAIR } = props;
+  const weather = conditions.kind;
+  // The pictures to show: the season's, or the bare trees under snow.
+  const ground = snowy ? "snow" : season;
   // A covered sky hides the sun, the moon and the stars, and keeps people in.
-  const grey = overcast(weather);
-  const indoors = shelter(weather);
+  const grey = greyOf(conditions);
+  const indoors = shelterOf(conditions);
   const art = SCENES[scene];
   const config = art.config;
   const { blend, sun, moon } = view;
@@ -180,7 +187,7 @@ export function Backdrop(props: {
   const beaconGlow = Math.min(1, night * 1.8);
 
   const parked = art.parked && (
-    <Blend className={styles.layer} sources={art.parked[season]} view={view} />
+    <Blend className={styles.layer} sources={art.parked[ground]} view={view} />
   );
 
   return (
@@ -225,13 +232,28 @@ export function Backdrop(props: {
           </div>
         )}
 
+        {/*
+          A covered sky is grey, and that grey belongs to the sky alone: it sits
+          behind the city, so the street stays as sharp as on a clear day.
+        */}
+        {grey > 0.05 && (
+          <div
+            className={styles.overcast}
+            style={{
+              opacity: Math.min(0.85, grey * 0.9),
+              background: night > 0.5 ? "#1b202c" : blend.from === "day" ? "#8b939e" : "#7d7f8c",
+            }}
+          />
+        )}
+
         <div
           className={styles.clouds}
           style={{
             top: config.clouds.far.top,
             height: config.clouds.far.height,
             animationDuration: `${config.clouds.far.seconds}s`,
-            opacity: 0.9,
+            // As much cloud as the sky has: thin on a clear day, full under a covered one.
+            opacity: 0.3 + 0.6 * conditions.cover,
           }}
         >
           <Blend className={styles.cloudLayer} sources={SKY.cloudsFar} view={view} />
@@ -242,6 +264,7 @@ export function Backdrop(props: {
             top: config.clouds.near.top,
             height: config.clouds.near.height,
             animationDuration: `${config.clouds.near.seconds}s`,
+            opacity: 0.2 + 0.8 * conditions.cover,
           }}
         >
           <Blend className={styles.cloudLayer} sources={SKY.cloudsNear} view={view} />
@@ -257,7 +280,7 @@ export function Backdrop(props: {
 
         <SkyTraffic light={light} night={night} still={still || weather === "storm"} />
 
-        <Blend className={styles.layer} sources={art.city[season]} view={view} />
+        <Blend className={styles.layer} sources={art.city[ground]} view={view} />
         {art.glints && (
           <div className={styles.switches} style={{ opacity: switching }}>
             <div className={`${styles.layer} ${styles.glintsA}`} style={image(art.glints[0])} />
@@ -286,7 +309,7 @@ export function Backdrop(props: {
           </div>
         )}
 
-        <Blend className={styles.layer} sources={art.rooftops[season]} view={view} />
+        <Blend className={styles.layer} sources={art.rooftops[ground]} view={view} />
         <Wear scene={scene} days={props.age ?? 0} night={night} />
         <WindowSwitches windows={config.switches.front} strength={switching} still={still} />
         {glow(art.glow.front, "Front")}
@@ -309,9 +332,9 @@ export function Backdrop(props: {
         {smoke(true)}
         {lanes(true)}
         <WeatherLayer
-          weather={weather}
+          conditions={conditions}
           grey={grey}
-          leaves={season === "autumn" && scene === "brooklyn"}
+          leaves={season === "autumn" && !snowy && scene === "brooklyn"}
           night={night}
         />
       </div>

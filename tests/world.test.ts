@@ -4,10 +4,12 @@ import { describe, expect, it } from "vitest";
 import { GET as getWorld } from "@/app/api/world/route";
 import { WEAR, WEAR_YEARS } from "@/components/shell/art/wear";
 import {
-  overcast,
+  conditionsFor,
+  greyOf,
+  inventedAt,
   seasonAt,
   seasonOfMonth,
-  shelter,
+  shelterOf,
   weatherAt,
   WEATHERS,
   type SeasonName,
@@ -64,7 +66,8 @@ describe("the weather", () => {
     const winter = tally("winter");
     const summer = tally("summer");
     const autumn = tally("autumn");
-    expect(winter.snow).toBeGreaterThan(1200);
+    expect(winter.snow).toBeGreaterThan(400);
+    expect(winter.snow).toBeLessThan(winter.clear);
     expect(winter.storm).toBe(0);
     expect(summer.snow).toBe(0);
     expect(autumn.snow).toBe(0);
@@ -76,15 +79,40 @@ describe("the weather", () => {
     }
   });
 
-  it("keeps people in, and covers the sky, in proportion", () => {
-    expect(shelter("clear")).toBe(0);
-    expect(shelter("storm")).toBeGreaterThan(shelter("rain"));
-    expect(shelter("rain")).toBeGreaterThan(shelter("fog"));
-    expect(overcast("clear")).toBe(0);
-    for (const weather of WEATHERS) {
-      expect(shelter(weather)).toBeLessThan(1);
-      expect(overcast(weather)).toBeLessThan(1);
+  it("is seldom foggy", () => {
+    for (const season of ["spring", "summer", "autumn", "winter"] as const) {
+      const counts = tally(season);
+      const all = Object.values(counts).reduce((sum, n) => sum + n, 0);
+      expect(counts.fog / all).toBeLessThan(0.05);
     }
+  });
+
+  it("keeps people in, and covers the sky, in proportion", () => {
+    const of = (kind: Weather) => conditionsFor(kind);
+    expect(shelterOf(of("clear"))).toBe(0);
+    expect(shelterOf(of("storm"))).toBeGreaterThan(shelterOf(of("rain")));
+    expect(shelterOf(of("rain"))).toBeGreaterThan(shelterOf(of("fog")));
+    expect(greyOf(of("clear"))).toBeLessThan(0.1);
+    for (const weather of WEATHERS) {
+      expect(shelterOf(of(weather))).toBeLessThan(1);
+      expect(greyOf(of(weather))).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("leaves snow lying for a while after it falls, in winter only", () => {
+    let falling = 0;
+    let lying = 0;
+    for (let t = start; t < start + 200 * DAY; t += HOUR) {
+      const made = inventedAt(t, "winter");
+      if (made.kind === "snow") {
+        falling++;
+        expect(made.snowLying).toBe(true);
+      }
+      if (made.snowLying) lying++;
+      expect(inventedAt(t, "summer").snowLying).toBe(false);
+    }
+    expect(lying).toBeGreaterThan(falling);
+    expect(lying).toBeLessThan(200 * 24 * 0.7);
   });
 });
 

@@ -128,8 +128,12 @@ export function canvas(w, h) {
 /** The four lights a scene is drawn in. The backdrop crossfades between neighbours. */
 export const STATES = ["day", "golden", "dusk", "night"];
 
-/** The four seasons a scene is drawn in. */
-export const SEASONS = ["spring", "summer", "autumn", "winter"];
+/**
+ * The grounds a scene is drawn in: the four seasons, and winter under snow.
+ * Winter on its own is bare and dry, as most winter days in the city are;
+ * "snow" is the same day with snow lying.
+ */
+export const SEASONS = ["spring", "summer", "autumn", "winter", "snow"];
 
 /**
  * Snow, lying where snow lies: on the top of whatever is uppermost in each

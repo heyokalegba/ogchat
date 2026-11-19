@@ -199,3 +199,74 @@ export function describeOffset(offsetMs: number): string {
   const span = [h ? `${h} h` : "", m ? `${m} min` : ""].filter(Boolean).join(" ");
   return `${span} ${offsetMs > 0 ? "ahead" : "behind"}`;
 }
+
+const dateFormat = new Intl.DateTimeFormat("en-CA", {
+  timeZone: BROOKLYN.timeZone,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
+
+/** The Brooklyn calendar and clock at a moment, as numbers. */
+function wallParts(ms: number) {
+  const parts = Object.fromEntries(dateFormat.formatToParts(ms).map((p) => [p.type, p.value]));
+  return {
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day),
+    hour: Number(parts.hour) % 24,
+    minute: Number(parts.minute),
+    second: Number(parts.second),
+  };
+}
+
+const two = (n: number) => String(n).padStart(2, "0");
+
+/** The date in Brooklyn at a moment: "2026-11-19". */
+export function brooklynDate(ms: number): string {
+  const { year, month, day } = wallParts(ms);
+  return `${year}-${two(month)}-${two(day)}`;
+}
+
+/** The hour of the day in Brooklyn at a moment, 0 to 23. */
+export function brooklynHour(ms: number): number {
+  return wallParts(ms).hour;
+}
+
+/** The first day the scene can be set back to. */
+export const FIRST_DATE = "2025-01-01";
+
+/** Whether `date` is a real day ("YYYY-MM-DD") from the first one up to today in Brooklyn. */
+export function dateInRange(date: string, nowMs: number): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!match) return false;
+  const stamp = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  if (new Date(stamp).toISOString().slice(0, 10) !== date) return false; // no 30th of February
+  return date >= FIRST_DATE && date <= brooklynDate(nowMs);
+}
+
+/**
+ * The moment on another day when a clock in Brooklyn reads what it reads at
+ * `ms`: the same time of day, on `date`. Daylight saving is taken into
+ * account, so 3 pm stays 3 pm across the change.
+ */
+export function atBrooklynDate(ms: number, date: string): number {
+  const [year = 1970, month = 1, day = 1] = date.split("-").map(Number);
+  const wall = wallParts(ms);
+  // The wall time wanted, read as if it were UTC; then take off New York's offset there.
+  const wanted = Date.UTC(year, month - 1, day, wall.hour, wall.minute, wall.second);
+  const offsetAt = (at: number) => {
+    const w = wallParts(at);
+    return (
+      Date.UTC(w.year, w.month - 1, w.day, w.hour, w.minute, w.second) -
+      Math.floor(at / 1000) * 1000
+    );
+  };
+  let moment = wanted - offsetAt(wanted);
+  moment = wanted - offsetAt(moment);
+  return moment + (((ms % 1000) + 1000) % 1000);
+}

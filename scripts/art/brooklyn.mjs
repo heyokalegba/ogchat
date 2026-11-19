@@ -98,6 +98,14 @@ const FOLIAGE = {
     leaves: ["#2a221d", "#1f1915", "#3a2f28", "#3a2f28"],
     back: ["#3b3a3d", "#2f2e31", "#4a484a", "#55524f"],
     front: ["#2e2b2c", "#252223", "#3d393a", "#474342"],
+    floor: "#262320",
+  },
+  // Winter with snow lying: the same bare trees over a white park floor.
+  snow: {
+    bare: true,
+    leaves: ["#2a221d", "#1f1915", "#3a2f28", "#3a2f28"],
+    back: ["#3b3a3d", "#2f2e31", "#4a484a", "#55524f"],
+    front: ["#2e2b2c", "#252223", "#3d393a", "#474342"],
     floor: "#4a4d5a",
   },
 };
@@ -886,7 +894,7 @@ function block(season = "summer") {
       if (!rooftops.claimed(x, y)) rooftops.set(x, y, hex("#b99aa2"));
     }
   }
-  if (season === "winter") {
+  if (season === "snow") {
     // Snow on every level top: roofs and cornices, chimneys, steps, cars, the park.
     snowfall(skyline, SNOW, { from: 176 });
     snowfall(rooftops, SNOW);

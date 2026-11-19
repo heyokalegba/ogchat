@@ -165,7 +165,7 @@ ${names.map((name) => `import ${ident(name)} from "./${name}";`).join("\n")}
 export const SKY_STATES = ${JSON.stringify(STATES)} as const;
 export type SkyState = (typeof SKY_STATES)[number];
 
-/** The four seasons every scene comes in. */
+/** What every scene comes in: the four seasons, and winter with snow lying. */
 export const SEASONS = ${JSON.stringify(SEASONS)} as const;
 export type Season = (typeof SEASONS)[number];
 

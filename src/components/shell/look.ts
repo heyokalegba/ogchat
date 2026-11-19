@@ -1,3 +1,4 @@
+import { FIRST_DATE } from "@/lib/daylight";
 import { SEASON_NAMES, WEATHERS, type SeasonName, type Weather } from "@/lib/weather";
 import { SCENES, type SceneId } from "./art";
 
@@ -10,10 +11,19 @@ export interface Look {
   scene: SceneId;
   /** Milliseconds the scene's clock runs ahead of (or behind) the real one. 0 is real time. */
   clockOffsetMs: number;
-  /** The season the scene is in: the calendar's ("auto"), or one you hold it to. */
-  season: "auto" | SeasonName;
-  /** The weather: whatever is on today ("auto"), or one you hold it to. */
-  weather: "auto" | Weather;
+  /**
+   * The day the scene is set to, as "2025-01-06", or "" for today. On a past
+   * day the clock keeps its time of day and the weather is that day's.
+   */
+  date: string;
+  /** The season: the calendar's ("auto"), one you hold it to, or winter with snow lying ("snow"). */
+  season: "auto" | SeasonName | "snow";
+  /**
+   * The weather: New York's own ("live": now, or as it was on the day the
+   * scene is set to), made up without asking anyone ("invented"), or one
+   * kind you hold it to.
+   */
+  weather: "live" | "invented" | Weather;
   /** Whether people walk about in the scene. */
   people: boolean;
   /** Frozen: the scene holds still, like a picture. The light still follows the clock. */
@@ -41,8 +51,9 @@ export interface Look {
 export const DEFAULT_LOOK: Look = {
   scene: "skyline",
   clockOffsetMs: 0,
+  date: "",
   season: "auto",
-  weather: "auto",
+  weather: "live",
   people: true,
   still: false,
   sceneStrength: 100,
@@ -101,12 +112,18 @@ function clean(value: unknown): Look {
         ? (raw.scene as SceneId)
         : DEFAULT_LOOK.scene,
     clockOffsetMs: clamp(Math.round(number(raw.clockOffsetMs, 0)), -DAY_MS, DAY_MS),
-    season: (SEASON_NAMES as readonly unknown[]).includes(raw.season)
-      ? (raw.season as SeasonName)
-      : "auto",
-    weather: (WEATHERS as readonly unknown[]).includes(raw.weather)
-      ? (raw.weather as Weather)
-      : "auto",
+    date:
+      typeof raw.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw.date) && raw.date >= FIRST_DATE
+        ? raw.date
+        : "",
+    season:
+      raw.season === "snow" || (SEASON_NAMES as readonly unknown[]).includes(raw.season)
+        ? (raw.season as Look["season"])
+        : "auto",
+    weather:
+      raw.weather === "invented" || (WEATHERS as readonly unknown[]).includes(raw.weather)
+        ? (raw.weather as Look["weather"])
+        : "live",
     people: typeof raw.people === "boolean" ? raw.people : DEFAULT_LOOK.people,
     still: typeof raw.still === "boolean" ? raw.still : DEFAULT_LOOK.still,
     sceneStrength: clamp(

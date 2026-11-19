@@ -38,29 +38,29 @@ import skylineGlowFrontB from "./skyline/glow-front-b.png";
 import skylineTraffic from "./skyline/traffic.png";
 import skylineCitySpringDay from "./skyline/city-spring-day.png";
 import skylineRooftopsSpringDay from "./skyline/rooftops-spring-day.png";
-import skylineCityWinterDay from "./skyline/city-winter-day.png";
-import skylineRooftopsWinterDay from "./skyline/rooftops-winter-day.png";
+import skylineCitySnowDay from "./skyline/city-snow-day.png";
+import skylineRooftopsSnowDay from "./skyline/rooftops-snow-day.png";
 import skylinePeopleDay from "./skyline/people-day.png";
 import skylinePropsDay from "./skyline/props-day.png";
 import skylineWheelsDay from "./skyline/wheels-day.png";
 import skylineCitySpringGolden from "./skyline/city-spring-golden.png";
 import skylineRooftopsSpringGolden from "./skyline/rooftops-spring-golden.png";
-import skylineCityWinterGolden from "./skyline/city-winter-golden.png";
-import skylineRooftopsWinterGolden from "./skyline/rooftops-winter-golden.png";
+import skylineCitySnowGolden from "./skyline/city-snow-golden.png";
+import skylineRooftopsSnowGolden from "./skyline/rooftops-snow-golden.png";
 import skylinePeopleGolden from "./skyline/people-golden.png";
 import skylinePropsGolden from "./skyline/props-golden.png";
 import skylineWheelsGolden from "./skyline/wheels-golden.png";
 import skylineCitySpringDusk from "./skyline/city-spring-dusk.png";
 import skylineRooftopsSpringDusk from "./skyline/rooftops-spring-dusk.png";
-import skylineCityWinterDusk from "./skyline/city-winter-dusk.png";
-import skylineRooftopsWinterDusk from "./skyline/rooftops-winter-dusk.png";
+import skylineCitySnowDusk from "./skyline/city-snow-dusk.png";
+import skylineRooftopsSnowDusk from "./skyline/rooftops-snow-dusk.png";
 import skylinePeopleDusk from "./skyline/people-dusk.png";
 import skylinePropsDusk from "./skyline/props-dusk.png";
 import skylineWheelsDusk from "./skyline/wheels-dusk.png";
 import skylineCitySpringNight from "./skyline/city-spring-night.png";
 import skylineRooftopsSpringNight from "./skyline/rooftops-spring-night.png";
-import skylineCityWinterNight from "./skyline/city-winter-night.png";
-import skylineRooftopsWinterNight from "./skyline/rooftops-winter-night.png";
+import skylineCitySnowNight from "./skyline/city-snow-night.png";
+import skylineRooftopsSnowNight from "./skyline/rooftops-snow-night.png";
 import skylinePeopleNight from "./skyline/people-night.png";
 import skylinePropsNight from "./skyline/props-night.png";
 import skylineWheelsNight from "./skyline/wheels-night.png";
@@ -79,7 +79,9 @@ import brooklynCityAutumnDay from "./brooklyn/city-autumn-day.png";
 import brooklynRooftopsAutumnDay from "./brooklyn/rooftops-autumn-day.png";
 import brooklynCityWinterDay from "./brooklyn/city-winter-day.png";
 import brooklynRooftopsWinterDay from "./brooklyn/rooftops-winter-day.png";
-import brooklynParkedWinterDay from "./brooklyn/parked-winter-day.png";
+import brooklynCitySnowDay from "./brooklyn/city-snow-day.png";
+import brooklynRooftopsSnowDay from "./brooklyn/rooftops-snow-day.png";
+import brooklynParkedSnowDay from "./brooklyn/parked-snow-day.png";
 import brooklynPeopleDay from "./brooklyn/people-day.png";
 import brooklynPropsDay from "./brooklyn/props-day.png";
 import brooklynWheelsDay from "./brooklyn/wheels-day.png";
@@ -94,7 +96,9 @@ import brooklynCityAutumnGolden from "./brooklyn/city-autumn-golden.png";
 import brooklynRooftopsAutumnGolden from "./brooklyn/rooftops-autumn-golden.png";
 import brooklynCityWinterGolden from "./brooklyn/city-winter-golden.png";
 import brooklynRooftopsWinterGolden from "./brooklyn/rooftops-winter-golden.png";
-import brooklynParkedWinterGolden from "./brooklyn/parked-winter-golden.png";
+import brooklynCitySnowGolden from "./brooklyn/city-snow-golden.png";
+import brooklynRooftopsSnowGolden from "./brooklyn/rooftops-snow-golden.png";
+import brooklynParkedSnowGolden from "./brooklyn/parked-snow-golden.png";
 import brooklynPeopleGolden from "./brooklyn/people-golden.png";
 import brooklynPropsGolden from "./brooklyn/props-golden.png";
 import brooklynWheelsGolden from "./brooklyn/wheels-golden.png";
@@ -109,7 +113,9 @@ import brooklynCityAutumnDusk from "./brooklyn/city-autumn-dusk.png";
 import brooklynRooftopsAutumnDusk from "./brooklyn/rooftops-autumn-dusk.png";
 import brooklynCityWinterDusk from "./brooklyn/city-winter-dusk.png";
 import brooklynRooftopsWinterDusk from "./brooklyn/rooftops-winter-dusk.png";
-import brooklynParkedWinterDusk from "./brooklyn/parked-winter-dusk.png";
+import brooklynCitySnowDusk from "./brooklyn/city-snow-dusk.png";
+import brooklynRooftopsSnowDusk from "./brooklyn/rooftops-snow-dusk.png";
+import brooklynParkedSnowDusk from "./brooklyn/parked-snow-dusk.png";
 import brooklynPeopleDusk from "./brooklyn/people-dusk.png";
 import brooklynPropsDusk from "./brooklyn/props-dusk.png";
 import brooklynWheelsDusk from "./brooklyn/wheels-dusk.png";
@@ -124,7 +130,9 @@ import brooklynCityAutumnNight from "./brooklyn/city-autumn-night.png";
 import brooklynRooftopsAutumnNight from "./brooklyn/rooftops-autumn-night.png";
 import brooklynCityWinterNight from "./brooklyn/city-winter-night.png";
 import brooklynRooftopsWinterNight from "./brooklyn/rooftops-winter-night.png";
-import brooklynParkedWinterNight from "./brooklyn/parked-winter-night.png";
+import brooklynCitySnowNight from "./brooklyn/city-snow-night.png";
+import brooklynRooftopsSnowNight from "./brooklyn/rooftops-snow-night.png";
+import brooklynParkedSnowNight from "./brooklyn/parked-snow-night.png";
 import brooklynPeopleNight from "./brooklyn/people-night.png";
 import brooklynPropsNight from "./brooklyn/props-night.png";
 import brooklynWheelsNight from "./brooklyn/wheels-night.png";
@@ -133,8 +141,8 @@ import brooklynWheelsNight from "./brooklyn/wheels-night.png";
 export const SKY_STATES = ["day","golden","dusk","night"] as const;
 export type SkyState = (typeof SKY_STATES)[number];
 
-/** The four seasons every scene comes in. */
-export const SEASONS = ["spring","summer","autumn","winter"] as const;
+/** What every scene comes in: the four seasons, and winter with snow lying. */
+export const SEASONS = ["spring","summer","autumn","winter","snow"] as const;
 export type Season = (typeof SEASONS)[number];
 
 /** Overhead, shared by every scene. */
@@ -229,13 +237,15 @@ export const SCENES = {
       spring: { day: skylineCitySpringDay.src, golden: skylineCitySpringGolden.src, dusk: skylineCitySpringDusk.src, night: skylineCitySpringNight.src },
       summer: { day: skylineCitySpringDay.src, golden: skylineCitySpringGolden.src, dusk: skylineCitySpringDusk.src, night: skylineCitySpringNight.src },
       autumn: { day: skylineCitySpringDay.src, golden: skylineCitySpringGolden.src, dusk: skylineCitySpringDusk.src, night: skylineCitySpringNight.src },
-      winter: { day: skylineCityWinterDay.src, golden: skylineCityWinterGolden.src, dusk: skylineCityWinterDusk.src, night: skylineCityWinterNight.src },
+      winter: { day: skylineCitySpringDay.src, golden: skylineCitySpringGolden.src, dusk: skylineCitySpringDusk.src, night: skylineCitySpringNight.src },
+      snow: { day: skylineCitySnowDay.src, golden: skylineCitySnowGolden.src, dusk: skylineCitySnowDusk.src, night: skylineCitySnowNight.src },
     },
     rooftops: {
       spring: { day: skylineRooftopsSpringDay.src, golden: skylineRooftopsSpringGolden.src, dusk: skylineRooftopsSpringDusk.src, night: skylineRooftopsSpringNight.src },
       summer: { day: skylineRooftopsSpringDay.src, golden: skylineRooftopsSpringGolden.src, dusk: skylineRooftopsSpringDusk.src, night: skylineRooftopsSpringNight.src },
       autumn: { day: skylineRooftopsSpringDay.src, golden: skylineRooftopsSpringGolden.src, dusk: skylineRooftopsSpringDusk.src, night: skylineRooftopsSpringNight.src },
-      winter: { day: skylineRooftopsWinterDay.src, golden: skylineRooftopsWinterGolden.src, dusk: skylineRooftopsWinterDusk.src, night: skylineRooftopsWinterNight.src },
+      winter: { day: skylineRooftopsSpringDay.src, golden: skylineRooftopsSpringGolden.src, dusk: skylineRooftopsSpringDusk.src, night: skylineRooftopsSpringNight.src },
+      snow: { day: skylineRooftopsSnowDay.src, golden: skylineRooftopsSnowGolden.src, dusk: skylineRooftopsSnowDusk.src, night: skylineRooftopsSnowNight.src },
     },
     /** Cars at the kerb, drawn over the people on the pavement. Only some scenes have them. */
     parked: null,
@@ -1424,19 +1434,22 @@ export const SCENES = {
       summer: { day: brooklynCitySummerDay.src, golden: brooklynCitySummerGolden.src, dusk: brooklynCitySummerDusk.src, night: brooklynCitySummerNight.src },
       autumn: { day: brooklynCityAutumnDay.src, golden: brooklynCityAutumnGolden.src, dusk: brooklynCityAutumnDusk.src, night: brooklynCityAutumnNight.src },
       winter: { day: brooklynCityWinterDay.src, golden: brooklynCityWinterGolden.src, dusk: brooklynCityWinterDusk.src, night: brooklynCityWinterNight.src },
+      snow: { day: brooklynCitySnowDay.src, golden: brooklynCitySnowGolden.src, dusk: brooklynCitySnowDusk.src, night: brooklynCitySnowNight.src },
     },
     rooftops: {
       spring: { day: brooklynRooftopsSpringDay.src, golden: brooklynRooftopsSpringGolden.src, dusk: brooklynRooftopsSpringDusk.src, night: brooklynRooftopsSpringNight.src },
       summer: { day: brooklynRooftopsSummerDay.src, golden: brooklynRooftopsSummerGolden.src, dusk: brooklynRooftopsSummerDusk.src, night: brooklynRooftopsSummerNight.src },
       autumn: { day: brooklynRooftopsAutumnDay.src, golden: brooklynRooftopsAutumnGolden.src, dusk: brooklynRooftopsAutumnDusk.src, night: brooklynRooftopsAutumnNight.src },
       winter: { day: brooklynRooftopsWinterDay.src, golden: brooklynRooftopsWinterGolden.src, dusk: brooklynRooftopsWinterDusk.src, night: brooklynRooftopsWinterNight.src },
+      snow: { day: brooklynRooftopsSnowDay.src, golden: brooklynRooftopsSnowGolden.src, dusk: brooklynRooftopsSnowDusk.src, night: brooklynRooftopsSnowNight.src },
     },
     /** Cars at the kerb, drawn over the people on the pavement. Only some scenes have them. */
     parked: {
       spring: { day: brooklynParkedSpringDay.src, golden: brooklynParkedSpringGolden.src, dusk: brooklynParkedSpringDusk.src, night: brooklynParkedSpringNight.src },
       summer: { day: brooklynParkedSpringDay.src, golden: brooklynParkedSpringGolden.src, dusk: brooklynParkedSpringDusk.src, night: brooklynParkedSpringNight.src },
       autumn: { day: brooklynParkedSpringDay.src, golden: brooklynParkedSpringGolden.src, dusk: brooklynParkedSpringDusk.src, night: brooklynParkedSpringNight.src },
-      winter: { day: brooklynParkedWinterDay.src, golden: brooklynParkedWinterGolden.src, dusk: brooklynParkedWinterDusk.src, night: brooklynParkedWinterNight.src },
+      winter: { day: brooklynParkedSpringDay.src, golden: brooklynParkedSpringGolden.src, dusk: brooklynParkedSpringDusk.src, night: brooklynParkedSpringNight.src },
+      snow: { day: brooklynParkedSnowDay.src, golden: brooklynParkedSnowGolden.src, dusk: brooklynParkedSnowDusk.src, night: brooklynParkedSnowNight.src },
     },
     people: { day: brooklynPeopleDay.src, golden: brooklynPeopleGolden.src, dusk: brooklynPeopleDusk.src, night: brooklynPeopleNight.src },
     props: { day: brooklynPropsDay.src, golden: brooklynPropsGolden.src, dusk: brooklynPropsDusk.src, night: brooklynPropsNight.src },

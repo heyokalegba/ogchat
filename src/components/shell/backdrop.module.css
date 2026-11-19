@@ -454,9 +454,9 @@
   inset: 0;
   background: linear-gradient(
     to top,
-    rgba(196, 202, 208, 0.62),
-    rgba(196, 202, 208, 0.34) 45%,
-    transparent 85%
+    rgba(196, 202, 208, 0.46),
+    rgba(196, 202, 208, 0.22) 40%,
+    transparent 75%
   );
   animation: fog-breathe 14s ease-in-out infinite alternate;
 }
@@ -510,6 +510,10 @@
 
 .snowNear {
   animation-duration: 5.5s;
+}
+
+.snowHard {
+  animation-duration: 4s;
 }
 
 .leafFall {

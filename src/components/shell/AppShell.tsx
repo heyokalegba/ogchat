@@ -5,8 +5,24 @@ import { ChatSurface } from "@/components/chat";
 import { MenuIcon } from "@/components/chat/icons";
 import "@/components/chat/theme.css";
 import { createApi } from "@/lib/client/api";
-import { brooklynClock, offsetForClockTime, readSky } from "@/lib/daylight";
-import { seasonAt, weatherAt } from "@/lib/weather";
+import {
+  atBrooklynDate,
+  brooklynClock,
+  brooklynDate,
+  brooklynHour,
+  FIRST_DATE,
+  offsetForClockTime,
+  readSky,
+} from "@/lib/daylight";
+import {
+  conditionsFor,
+  conditionsOf,
+  inventedAt,
+  readingAtHour,
+  seasonAt,
+  type Reading,
+} from "@/lib/weather";
+import { useWeather } from "./useWeather";
 import type { Project, PublicSettings, ReasoningEffort, SessionMeta } from "@/lib/types";
 import { SCENES, type SceneId } from "./art";
 import { Backdrop } from "./Backdrop";
@@ -330,7 +346,17 @@ export function AppShell() {
       document.removeEventListener("visibilitychange", tick);
     };
   }, []);
-  const sceneNow = realNow === null ? null : realNow + look.clockOffsetMs;
+  // The day the scene is set to: a past one from the look panel, or none, which is today.
+  const today = realNow === null ? null : brooklynDate(realNow);
+  const heldDate =
+    today !== null && look.date >= FIRST_DATE && look.date < today ? look.date : null;
+  // On a past day the scene keeps the time of day it would have had today.
+  const sceneNow =
+    realNow === null
+      ? null
+      : heldDate
+        ? atBrooklynDate(realNow + look.clockOffsetMs, heldDate)
+        : realNow + look.clockOffsetMs;
   const view = useMemo(() => (sceneNow === null ? null : readSky(sceneNow)), [sceneNow]);
   const clock = useMemo(() => (sceneNow === null ? null : brooklynClock(sceneNow)), [sceneNow]);
 
@@ -357,13 +383,35 @@ export function AppShell() {
     projects.find((p) => p.id === (activeId ? activeSession?.projectId : projectId)) ?? null;
   const panelProject = projects.find((p) => p.id === editingProject) ?? null;
 
-  // How old the street is, in days, by the scene's clock: what its wear is counted from.
+  // How old the street is, in days, by the real clock: what its wear is counted from.
   const streetDays =
-    builtAt === null || sceneNow === null ? 0 : Math.max(0, (sceneNow - builtAt) / 86_400_000);
+    builtAt === null || realNow === null ? 0 : Math.max(0, (realNow - builtAt) / 86_400_000);
 
-  // The season and the weather: the calendar's and the day's, unless the look panel holds them.
-  const season = look.season === "auto" ? seasonAt(sceneNow ?? 0) : look.season;
-  const weather = look.weather === "auto" ? weatherAt(sceneNow ?? 0, season) : look.weather;
+  // The season: the calendar's on the scene's day, unless the look panel holds it.
+  const season =
+    look.season === "auto"
+      ? seasonAt(sceneNow ?? 0)
+      : look.season === "snow"
+        ? "winter"
+        : look.season;
+
+  // The weather: New York's own, now or on the scene's day; or one kind held; or,
+  // with live weather off or out of reach, made up by the clock.
+  const liveWanted = look.weather === "live";
+  const feed = useWeather(api, liveWanted && realNow !== null, heldDate);
+  const reading: Reading | null = heldDate
+    ? feed.day && readingAtHour(feed.day, brooklynHour(sceneNow ?? 0))
+    : feed.now;
+  const conditions =
+    look.weather !== "live" && look.weather !== "invented"
+      ? conditionsFor(look.weather, look.weather === "snow" && season === "winter")
+      : reading
+        ? conditionsOf(reading)
+        : inventedAt(sceneNow ?? 0, season);
+  // Winter is drawn white when it is held that way, or when snow is really lying.
+  const snowy =
+    look.season === "snow" ||
+    (conditions.snowLying && (look.season === "auto" || look.season === "winter"));
 
   const provider = useMemo(
     () => (settings ? { ready: settings.apiKey.set, model: settings.model } : null),
@@ -383,7 +431,8 @@ export function AppShell() {
           view={view}
           now={sceneNow ?? 0}
           season={season}
-          weather={weather}
+          snowy={snowy}
+          conditions={conditions}
           age={streetDays + peekYears * 365}
           people={look.people}
           still={look.still}
@@ -498,7 +547,11 @@ export function AppShell() {
           onSnapToNow={snapToNow}
           onClose={() => setLookOpen(false)}
           season={season}
-          weather={weather}
+          conditions={conditions}
+          reading={liveWanted ? reading : null}
+          weatherProblem={feed.problem}
+          today={today ?? ""}
+          heldDate={heldDate}
           streetDays={streetDays}
           peekYears={peekYears}
           onPeek={setPeekYears}
