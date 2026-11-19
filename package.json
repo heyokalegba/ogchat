@@ -2,6 +2,7 @@
   "name": "ogchat",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "A personal, local-only AI chat interface.",
   "scripts": {
     "dev": "next dev -H 127.0.0.1",

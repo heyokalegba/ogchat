@@ -576,3 +576,8 @@ Tests never touch the network: `fetch` is replaced with a stub provider, and
 every test runs against its own temporary data directory.
 
 Next.js' anonymous usage telemetry is switched off in `next.config.ts`.
+
+## Licence
+
+MIT: use it, change it, share it. See [LICENSE](LICENSE). The weather data is
+Open-Meteo's and comes under its own terms.
