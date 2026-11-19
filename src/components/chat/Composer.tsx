@@ -13,6 +13,7 @@ import {
 import { PASTE_AS_FILE_CHARS } from "@/lib/limits";
 import type { ReasoningEffort } from "@/lib/types";
 import { PendingFiles } from "./Attachments";
+import { BlockCaret } from "./BlockCaret";
 import styles from "./chat.module.css";
 import { GlobeIcon, PaperclipIcon, SendIcon, StopIcon } from "./icons";
 
@@ -131,6 +132,7 @@ export function Composer(props: ComposerProps) {
             onKeyDown={onKeyDown}
             onPaste={onPaste}
           />
+          <BlockCaret target={textarea} value={value} placeholder="Message" />
           <input
             ref={picker}
             type="file"

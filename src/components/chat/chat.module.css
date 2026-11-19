@@ -692,6 +692,7 @@ a.chip:hover {
 }
 
 .inputRow {
+  position: relative; /* the block cursor is placed against this */
   display: flex;
   align-items: flex-end;
   gap: 8px;
@@ -720,11 +721,78 @@ a.chip:hover {
   font-size: calc(17px * var(--og-type));
   line-height: calc(24px * var(--og-type));
   color: var(--og-input-ink, var(--og-ink));
-  caret-color: var(--og-input-accent, var(--og-accent));
+  /* The browser's thin cursor is hidden: BlockCaret draws a terminal's block instead. */
+  caret-color: transparent;
 }
 
 .surface .input:focus-visible {
   outline: none;
+}
+
+/*
+ * The block cursor. `.caretCopy` is the message box's text laid out a second
+ * time, unseen, exactly over the box (BlockCaret.tsx sets its place and
+ * size); it must wrap the way the box does, so it shares the box's type and
+ * padding. The one thing in it that shows is the block.
+ */
+.caretCopy {
+  position: absolute;
+  z-index: 1; /* its own layer, so the block stays above the box's background */
+  overflow: hidden;
+  padding: 4px 0;
+  font-size: calc(17px * var(--og-type));
+  line-height: calc(24px * var(--og-type));
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  color: transparent;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* On a character: the block behind it, the character in the box's own colour, reversed. */
+.blockCaret {
+  position: relative;
+  color: var(--og-input-bg, var(--og-blue-pale));
+  animation: og-blink 1100ms steps(1) infinite;
+}
+
+.blockCaret::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0.08em;
+  bottom: 0.06em;
+  left: 0;
+  width: 100%;
+  min-width: 0.52em; /* a block even on an "i" */
+  background: var(--og-input-accent, var(--og-accent));
+}
+
+/* At the end of a line there is no character to sit on: the block takes no room of its own. */
+.blockCaretEnd {
+  display: inline-block;
+  width: 0;
+  white-space: nowrap;
+  vertical-align: baseline;
+}
+
+.blockCaretEnd::before {
+  width: 0.52em;
+}
+
+.blockCaretEnd:empty::after {
+  content: "\200b"; /* gives the empty block a line's height */
+}
+
+/* The box is not where you are typing: an outline, and what is under it shows through. */
+.blockCaretIdle {
+  color: transparent;
+  animation: none;
+}
+
+.blockCaretIdle::before {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--og-input-accent, var(--og-accent));
 }
 
 .editorInput::placeholder {
