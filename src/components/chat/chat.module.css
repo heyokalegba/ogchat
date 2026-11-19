@@ -557,6 +557,7 @@ a.chip:hover {
 /* ---------------------------------------------------------------- inline edit */
 
 .editor {
+  position: relative; /* the block cursor is placed against this */
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -577,7 +578,8 @@ a.chip:hover {
   background: transparent;
   font-size: calc(17px * var(--og-type));
   line-height: 1.6;
-  caret-color: var(--og-accent);
+  /* As in the message box: BlockCaret draws the cursor. */
+  caret-color: transparent;
 }
 
 .surface .editorInput:focus-visible {
@@ -731,17 +733,17 @@ a.chip:hover {
 
 /*
  * The block cursor. `.caretCopy` is the message box's text laid out a second
- * time, unseen, exactly over the box (BlockCaret.tsx sets its place and
- * size); it must wrap the way the box does, so it shares the box's type and
- * padding. The one thing in it that shows is the block.
+ * time, unseen, exactly over the box. BlockCaret.tsx sets its place and
+ * size and gives it the box's own type and padding, so it wraps the way the
+ * box does. The one thing in it that shows is the block.
  */
 .caretCopy {
+  /* The block's colour, and the colour of the character reversed on it. */
+  --caret-block: var(--og-input-accent, var(--og-accent));
+  --caret-paper: var(--og-input-bg, var(--og-blue-pale));
   position: absolute;
   z-index: 1; /* its own layer, so the block stays above the box's background */
   overflow: hidden;
-  padding: 4px 0;
-  font-size: calc(17px * var(--og-type));
-  line-height: calc(24px * var(--og-type));
   white-space: pre-wrap;
   overflow-wrap: break-word;
   color: transparent;
@@ -749,10 +751,16 @@ a.chip:hover {
   user-select: none;
 }
 
+/* In the box for editing a sent message, which is white paper whatever the message box is. */
+.caretCopyPaper {
+  --caret-block: var(--og-accent);
+  --caret-paper: var(--og-white);
+}
+
 /* On a character: the block behind it, the character in the box's own colour, reversed. */
 .blockCaret {
   position: relative;
-  color: var(--og-input-bg, var(--og-blue-pale));
+  color: var(--caret-paper);
   animation: og-blink 1100ms steps(1) infinite;
 }
 
@@ -765,7 +773,7 @@ a.chip:hover {
   left: 0;
   width: 100%;
   min-width: 0.52em; /* a block even on an "i" */
-  background: var(--og-input-accent, var(--og-accent));
+  background: var(--caret-block);
 }
 
 /* At the end of a line there is no character to sit on: the block takes no room of its own. */
@@ -792,7 +800,7 @@ a.chip:hover {
 
 .blockCaretIdle::before {
   background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--og-input-accent, var(--og-accent));
+  box-shadow: inset 0 0 0 1.5px var(--caret-block);
 }
 
 .editorInput::placeholder {

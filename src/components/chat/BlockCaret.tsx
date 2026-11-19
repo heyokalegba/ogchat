@@ -11,29 +11,55 @@ import styles from "./chat.module.css";
  * A text box cannot be told to draw its cursor this way, so the box's own
  * cursor is made invisible (in CSS) and this draws one over it. It lays the
  * same text out again in an unseen copy placed exactly on top of the box,
- * same font, same width, same wrapping, with one element in it where the
- * cursor is; that element is the block. Because the copy wraps and scrolls
+ * with one element in it where the cursor is; that element is the block. The
+ * copy takes its type, spacing and padding from the box itself, so it works
+ * for any text box it is put beside (the box's parent must be positioned). Because the copy wraps and scrolls
  * like the box, the block is always where the next character will go.
  *
  * Out of focus the block is an outline, as in a terminal that is not the
  * active window. While text is selected there is no block: the selection
  * shows where you are.
  */
+/** What makes text wrap where it wraps: copied from the box to its unseen twin. */
+const TYPE = [
+  "fontFamily",
+  "fontSize",
+  "fontWeight",
+  "fontStyle",
+  "fontStretch",
+  "fontVariant",
+  "fontFeatureSettings",
+  "lineHeight",
+  "letterSpacing",
+  "wordSpacing",
+  "textIndent",
+  "textTransform",
+  "tabSize",
+  "paddingTop",
+  "paddingRight",
+  "paddingBottom",
+  "paddingLeft",
+] as const;
+
 export function BlockCaret(props: {
   target: RefObject<HTMLTextAreaElement | null>;
   value: string;
   /** Shown under the block when the box is empty, so the block sits on its first letter. */
   placeholder?: string;
+  /** The colours to draw in: the message box's own, or plain ink on white paper. */
+  tone?: "input" | "paper";
 }) {
-  const { target, value, placeholder = "" } = props;
+  const { target, value, placeholder = "", tone = "input" } = props;
   const copy = useRef<HTMLDivElement>(null);
   const [caret, setCaret] = useState({ at: 0, collapsed: true, focused: false });
 
-  // Keep the copy exactly over the box: same place, same size, scrolled as far.
+  // Keep the copy exactly over the box: same place, same size, same type, scrolled as far.
   const place = () => {
     const box = target.current;
     const over = copy.current;
     if (!box || !over) return;
+    const type = getComputedStyle(box);
+    for (const name of TYPE) over.style[name] = type[name];
     over.style.left = `${box.offsetLeft + box.clientLeft}px`;
     over.style.top = `${box.offsetTop + box.clientTop}px`;
     over.style.width = `${box.clientWidth}px`;
@@ -97,7 +123,11 @@ export function BlockCaret(props: {
   const beat = `${at}:${value.length}`;
 
   return (
-    <div ref={copy} className={styles.caretCopy} aria-hidden="true">
+    <div
+      ref={copy}
+      className={`${styles.caretCopy} ${tone === "paper" ? styles.caretCopyPaper : ""}`}
+      aria-hidden="true"
+    >
       {value.slice(0, at)}
       {caret.collapsed &&
         (under || ghost ? (

@@ -4,6 +4,7 @@ import { memo, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent 
 import { clockTime } from "@/lib/format";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import { MessageAttachments } from "./Attachments";
+import { BlockCaret } from "./BlockCaret";
 import styles from "./chat.module.css";
 import { CopyButton, Markdown } from "./Markdown";
 
@@ -99,6 +100,7 @@ function Editor(props: {
         onChange={(event) => setText(event.target.value)}
         onKeyDown={onKeyDown}
       />
+      <BlockCaret target={ref} value={text} tone="paper" />
       <div className={styles.editorActions}>
         <button type="button" className={styles.button} onClick={props.onCancel}>
           cancel

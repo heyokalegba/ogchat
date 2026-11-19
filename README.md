@@ -357,7 +357,8 @@ The provider must speak the OpenAI chat-completions shape:
   text file instead of filling the message box.
 - Code in a reply sits in a panel as wide as its longest line, at the left, and
   scrolls sideways once it reaches the full width.
-- The cursor in the message box is a terminal's: a solid block on the
+- The cursor in the message box, and in the box for editing a sent message, is
+  a terminal's: a solid block on the
   character it is at, that character shown in reverse, blinking in whole
   steps. Click away and it becomes an outline, as in a terminal window that
   is not the active one. `BlockCaret.tsx` draws it.
