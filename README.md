@@ -208,11 +208,16 @@ with its own Dock icon. Three ways, the first being the real thing:
   `dist-app/` and signs it for this Mac. Open it from there or drag it into
   Applications. The app is a thin shell around the project where it lives: on
   launch it builds the project if it has changed, starts ogchat's server on a
-  port of its own (3311) with the runtime inside the app, and shows it;
+  port of its own (3311), and shows it;
   quitting the app stops the server. Your chats, settings and key stay where
   they are, in the project's `data/` and `.env.local`, so the app and the
-  browser see the same conversations. Updating the project updates the app;
-  only moving the project folder means building the app again. The look
+  browser see the same conversations. Updating the project updates what the app shows, the next time it is
+  opened. The app itself (its icon, and the small launcher inside it) is only
+  remade by running `npm run mac` again and replacing the copy in
+  Applications; that is also what to do after moving the project folder. The
+  server runs under the Node the app was built with, so nothing extra shows in
+  the Dock while it runs; if that Node has since gone, the app falls back to
+  the runtime inside itself. The look
   panel's choices are kept per window: the app remembers its own, separately
   from your browser's. `npm run desktop` runs the same window without building
   an app.

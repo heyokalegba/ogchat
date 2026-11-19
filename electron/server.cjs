@@ -3,8 +3,7 @@
  *
  * The app is a window around the same local server the browser uses. This
  * file finds the project, makes sure it is built, starts `next start` on a
- * port of its own and says when it is answering. It uses whatever Node is
- * running it: Electron's own, so the Mac needs no separate Node at run time.
+ * port of its own and says when it is answering.
  * No Electron APIs in here, so it can be exercised with plain node.
  */
 const { spawn } = require("node:child_process");
@@ -16,11 +15,57 @@ const path = require("node:path");
 /** The desktop app's own port, so its saved look does not depend on what else is running. */
 const FIRST_PORT = 3311;
 
-/** Runs a Node script with the Node that is running us (Electron's, when inside the app). */
+function isFile(file) {
+  try {
+    return fs.statSync(file).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The program that runs the server, and what it needs in its environment.
+ *
+ * It must not be the app's own program. Electron can run as plain Node, but
+ * on a Mac a second copy of the app's program shows up in the Dock as an
+ * icon of its own, and since it never opens a window that icon bounces for
+ * as long as the server runs. So, in order:
+ *
+ *  1. A real Node: the one the app was built with (OGCHAT_NODE, noted at
+ *     build time), or the one npm is running under. Node is a command-line
+ *     program and never appears in the Dock.
+ *  2. Electron's helper program run as Node. The helper is the part of the
+ *     app that is marked as having no Dock icon.
+ *  3. The app's own program run as Node: the last resort, and all there is
+ *     outside a Mac.
+ */
+function runtime() {
+  for (const node of [process.env.OGCHAT_NODE, process.env.npm_node_execpath]) {
+    if (node && isFile(node)) return { command: node, env: {} };
+  }
+  const asNode = process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {};
+  if (process.platform === "darwin" && process.versions.electron) {
+    const name = path.basename(process.execPath);
+    const helper = path.join(
+      path.dirname(process.execPath),
+      "..",
+      "Frameworks",
+      `${name} Helper.app`,
+      "Contents",
+      "MacOS",
+      `${name} Helper`,
+    );
+    if (isFile(helper)) return { command: helper, env: asNode };
+  }
+  return { command: process.execPath, env: asNode };
+}
+
+/** Runs a Node script with the program `runtime` picks. */
 function runNode(args, cwd, onLine) {
-  const child = spawn(process.execPath, args, {
+  const { command, env } = runtime();
+  const child = spawn(command, args, {
     cwd,
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", NEXT_TELEMETRY_DISABLED: "1" },
+    env: { ...process.env, ...env, NEXT_TELEMETRY_DISABLED: "1" },
     stdio: ["ignore", "pipe", "pipe"],
   });
   const feed = (chunk) => {
@@ -139,6 +184,10 @@ async function startServer(projectDir, onLine) {
   );
   let exited = false;
   child.on("exit", () => (exited = true));
+  child.on("error", (error) => {
+    tail.push(String(error && error.message ? error.message : error));
+    exited = true;
+  });
   for (let n = 0; n < 120; n++) {
     if (exited) throw new Error(`The server stopped.\n\n${tail.join("\n")}`);
     if (await answers(url)) return { url, stop: () => child.kill() };
@@ -148,4 +197,4 @@ async function startServer(projectDir, onLine) {
   throw new Error(`The server did not start in time.\n\n${tail.join("\n")}`);
 }
 
-module.exports = { build, needsBuild, problemWith, startServer };
+module.exports = { build, needsBuild, problemWith, runtime, startServer };

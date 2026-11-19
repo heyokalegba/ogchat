@@ -2,7 +2,7 @@
  * Small things for the scenes' occasional events: who is seen moving behind
  * a lit window, and what goes up on a roof for a barbecue.
  */
-import { canvas, hex } from "./lib.mjs";
+import { canvas, hex, mix } from "./lib.mjs";
 
 /** One silhouette's cell. Rows: a person, a taller person, a cat, a dog. Two frames each. */
 export const SHADOW = { w: 6, h: 9, frames: 2, rows: 4, person: 0, tall: 1, cat: 2, dog: 3 };
@@ -115,23 +115,27 @@ export function grill() {
 }
 
 /**
- * The app's icon, for when ogchat is installed as an app of its own: a few
- * courses of brick with a prompt and a caret, drawn at 32 pixels and scaled
- * up with hard edges to `size`.
+ * The app's icon: a patch of the brick wall with the prompt on it, as a
+ * rounded square that fills the whole picture, edge to edge, with nothing
+ * but transparency outside its corners. That is the shape the Dock expects,
+ * drawn at full size so the icon is as large as an icon can be.
+ *
+ * The wall is pixel art (a 32 by 32 drawing scaled up); the outline is not:
+ * it is a smooth curve with softened edges, so the corners do not look
+ * chewed at small sizes.
  */
 export function appIcon(size) {
   const small = canvas(32, 32);
   const ink = hex("#0d0c0b");
   const brick = hex("#c9ad8a");
   const mortar = hex("#b59a78");
-  small.rect(0, 0, 32, 32, ink);
-  small.rect(2, 2, 28, 28, brick);
-  for (const y of [10, 20]) small.rect(2, y, 28, 2, mortar); // courses
+  small.rect(0, 0, 32, 32, brick);
+  for (const y of [10, 20]) small.rect(0, y, 32, 2, mortar); // courses
   for (const [x, y, h] of [
-    [15, 2, 8],
+    [15, 0, 10],
     [8, 12, 8],
     [22, 12, 8],
-    [15, 22, 8],
+    [15, 22, 10],
   ]) {
     small.rect(x, y, 2, h, mortar);
   }
@@ -141,12 +145,41 @@ export function appIcon(size) {
     small.rect(8 + i, 22 - i, 3, 1, ink);
   }
   small.rect(17, 20, 8, 3, hex("#7e2e20")); // the caret
-  const scale = Math.floor(size / 32);
+
+  // The outline: a superellipse, which is the rounded square macOS draws its
+  // icons in. `reach` is how far out a point is: 1 on the edge of the shape.
+  const reach = (x, y) => {
+    const u = Math.abs((x / size) * 2 - 1);
+    const v = Math.abs((y / size) * 2 - 1);
+    return (u ** 5 + v ** 5) ** (1 / 5);
+  };
+  const RIM = 0.945; // inside this the wall shows; between it and the edge is the dark rim
+  const SAMPLES = 4;
   const out = canvas(size, size);
+  const scale = size / 32;
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      const p = small.get(Math.min(31, Math.floor(x / scale)), Math.min(31, Math.floor(y / scale)));
-      if (p) out.set(x, y, p);
+      const wall = small.get(
+        Math.min(31, Math.floor(x / scale)),
+        Math.min(31, Math.floor(y / scale)),
+      );
+      // Sample the pixel a few times across, for soft edges on both curves.
+      let covered = 0;
+      let rim = 0;
+      for (let sy = 0; sy < SAMPLES; sy++) {
+        for (let sx = 0; sx < SAMPLES; sx++) {
+          const r = reach(x + (sx + 0.5) / SAMPLES, y + (sy + 0.5) / SAMPLES);
+          if (r <= 1) covered++;
+          if (r <= 1 && r > RIM) rim++;
+        }
+      }
+      if (covered === 0) continue;
+      const color = mix(wall, ink, rim / covered);
+      const at = (y * size + x) * 4;
+      out.data[at] = color[0];
+      out.data[at + 1] = color[1];
+      out.data[at + 2] = color[2];
+      out.data[at + 3] = Math.round((covered / (SAMPLES * SAMPLES)) * 255);
     }
   }
   return out;

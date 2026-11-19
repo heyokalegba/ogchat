@@ -11,19 +11,22 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { build, needsBuild, problemWith, startServer } = require("./server.cjs");
 
+/** What was written into the app when it was built: where the project is, and which Node built it. */
+function noted() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(process.resourcesPath, "ogchat.json"), "utf8"));
+  } catch {
+    return {}; // not packaged
+  }
+}
+
 /** The project this app runs: beside us in development, written down at build time otherwise. */
 function projectDir() {
-  if (process.env.OGCHAT_PROJECT_DIR) return process.env.OGCHAT_PROJECT_DIR;
-  try {
-    const noted = JSON.parse(
-      fs.readFileSync(path.join(process.resourcesPath, "ogchat.json"), "utf8"),
-    );
-    if (noted.projectDir) return noted.projectDir;
-  } catch {
-    // not packaged: fall through
-  }
-  return path.resolve(__dirname, "..");
+  return process.env.OGCHAT_PROJECT_DIR || noted().projectDir || path.resolve(__dirname, "..");
 }
+
+// The server runs under the Node the app was built with, when it is still there (see server.cjs).
+if (!process.env.OGCHAT_NODE && noted().node) process.env.OGCHAT_NODE = noted().node;
 
 let server = null;
 let quitting = false;

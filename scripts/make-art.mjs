@@ -74,7 +74,7 @@ fs.rmSync(SHELL_ART, { recursive: true, force: true });
 
 writePng(path.join(CHAT_ART, "bricks.png"), bricks());
 // The icons for running ogchat as an app of its own.
-for (const size of [192, 512]) {
+for (const size of [192, 512, 1024]) {
   writePng(path.join(ROOT, "public", `icon-${size}.png`), appIcon(size));
 }
 

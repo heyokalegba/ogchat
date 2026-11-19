@@ -17,8 +17,11 @@ const mac = process.platform === "darwin";
 
 /** The app's icon as .icns, made from the pixel icon with the tools every Mac has. */
 function icns() {
-  const source = path.join(project, "public", "icon-512.png");
-  if (!mac || !fs.existsSync(source)) return undefined;
+  // The icon is a rounded square that fills its picture, with clear corners, as the Dock expects.
+  const source = [1024, 512]
+    .map((size) => path.join(project, "public", `icon-${size}.png`))
+    .find(fs.existsSync);
+  if (!mac || !source) return undefined;
   const set = path.join(work, "ogchat.iconset");
   fs.mkdirSync(set);
   for (const size of [16, 32, 128, 256, 512]) {
@@ -37,9 +40,10 @@ function icns() {
 
 async function main() {
   const { packager } = require("@electron/packager");
-  // The app has to know where the project is. It is written into the app as it is built.
+  // The app has to know where the project is, and which Node to run its server
+  // with (this one: the Node running this build). Both are written into the app.
   const note = path.join(work, "ogchat.json");
-  fs.writeFileSync(note, JSON.stringify({ projectDir: project }, null, 2));
+  fs.writeFileSync(note, JSON.stringify({ projectDir: project, node: process.execPath }, null, 2));
 
   const [built] = await packager({
     dir: __dirname,
