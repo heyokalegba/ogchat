@@ -368,18 +368,12 @@ export function StreetLife(props: {
     // Now and then somebody flags down a cab. Only where there is a kerb to do it from.
     let nextCab = seconds() + 35 + rand() * 80;
 
-    let away = false;
+    // The street carries on whether or not anyone is looking. It used to stop
+    // while the window was hidden and fill up again in one go on the way back,
+    // and that was people appearing out of nowhere as you swiped to the window.
+    // Now there is nothing to catch up on: whoever is there walked there.
     const tick = () => {
-      if (document.hidden) {
-        away = true;
-        return;
-      }
       const now = seconds();
-      if (away) {
-        // Back from another tab: everyone has walked off meanwhile. Fill the street again.
-        away = false;
-        for (let n = 0; n < 6 && heads() < wanted; n++) add(one(wanted - heads(), true));
-      }
       if (now >= nextArrival && heads() < wanted) {
         add(one(Math.min(wanted + 1, MAX_HEADS) - heads()));
         nextArrival = now + 2 + rand() * 7;
@@ -469,7 +463,7 @@ export function StreetLife(props: {
     };
     invite(4 + Math.floor(rand() * 3));
     const timer = setInterval(() => {
-      if (!document.hidden && guests() < 4) invite(2 + Math.floor(rand() * 2));
+      if (guests() < 4) invite(2 + Math.floor(rand() * 2));
     }, 25_000);
     return () => {
       clearInterval(timer);

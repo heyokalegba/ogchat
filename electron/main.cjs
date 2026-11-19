@@ -50,7 +50,12 @@ async function open() {
     minHeight: 520,
     title: "ogchat",
     backgroundColor: "#151b2e",
-    webPreferences: { contextIsolation: true, sandbox: true },
+    // The scene keeps its own time. Left to itself, the app is put to sleep
+    // whenever its window is covered or on another desktop, and wakes up
+    // redrawing everything at once as you swipe back to it, which shows as
+    // things blinking in. So it is kept awake: what you come back to is
+    // what was there all along.
+    webPreferences: { contextIsolation: true, sandbox: true, backgroundThrottling: false },
   });
   // Links out of a chat open in the browser; the app's own pages (an attachment, say) may open here.
   window.webContents.setWindowOpenHandler(({ url }) => {
