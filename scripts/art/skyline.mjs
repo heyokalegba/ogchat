@@ -6,6 +6,7 @@
  * heights swell into two clusters, with slender towers, stepped crowns, spires
  * and masts breaking the roofline, so it reads as a skyline and not a band.
  */
+import { WARDROBES } from "./people.mjs";
 import { wearFor } from "./wear.mjs";
 import { chrysler, empireState, oneWorldTrade } from "./landmarks.mjs";
 import { billboard, FONTS } from "./street.mjs";
@@ -774,7 +775,11 @@ export function skylineScene(puff, cast) {
       images[`city-${season}-${state}.png`] = drawn.city;
       images[`rooftops-${season}-${state}.png`] = drawn.rooftops;
     }
-    images[`people-${state}.png`] = cast.people.graded(grit).graded(PEOPLE_GRADES[state]);
+    for (const wardrobe of WARDROBES) {
+      images[`people-${wardrobe}-${state}.png`] = cast.people[wardrobe]
+        .graded(grit)
+        .graded(PEOPLE_GRADES[state]);
+    }
     images[`props-${state}.png`] = cast.props.graded(grit).graded(PEOPLE_GRADES[state]);
     images[`wheels-${state}.png`] = cast.wheels.graded(grit).graded(PEOPLE_GRADES[state]);
   }

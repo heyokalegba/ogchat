@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  castErrand,
+  castMailCarrier,
   castPatrol,
   castRoofVisit,
   castSleeper,
   castStanding,
   castCabRide,
   castWalkers,
+  errandSeconds,
   HATCH_DEPTH,
   bustleAt,
   lateAt,
@@ -328,6 +331,68 @@ describe("the rest of the street", () => {
     expect(castSleeper(rand, full, roofs)).toBeNull(); // no doorsteps up there
   });
 
+  it("has couriers on electric bikes in the road, more of them when people are ordering in", () => {
+    const post: LifeMeta = { ...full, cast: { ...full.cast, postal: [44, 4], couriers: [3, 7] } };
+    const rand = seeded(23);
+    const one = castWalkers(rand, post, street, { only: "courier" });
+    expect(one.road).toBe(true);
+    expect([3, 7]).toContain(one.members[0]!.row);
+    expect(one.members[0]!.sheet).toBe("wheels");
+    const count = (hungry: number) => {
+      let n = 0;
+      for (let i = 0; i < 1500; i++) {
+        const party = castWalkers(rand, post, street, { hungry });
+        if (party.road && [3, 7].includes(party.members[0]!.row) && party.steps.length === 1) {
+          const speed = Math.abs(
+            party.steps[0]!.kind === "walk" ? party.steps[0]!.to - party.x : 0,
+          );
+          if (speed / party.steps[0]!.seconds > 37) n++;
+        }
+      }
+      return n;
+    };
+    expect(count(1)).toBeGreaterThan(count(0) * 2.5);
+  });
+
+  it("walks the letter carrier to every doorstep in turn and off the far end", () => {
+    const post: LifeMeta = { ...full, cast: { ...full.cast, postal: [44, 4] } };
+    const rand = seeded(29);
+    for (let n = 0; n < 20; n++) {
+      const party = castMailCarrier(rand, post, street)!;
+      expect(people(party)[0]!.row).toBeGreaterThanOrEqual(44);
+      const stops = party.steps.flatMap((s) => (s.kind === "walk" ? [s.to] : []));
+      const doors = stops.slice(0, -1);
+      expect([...doors].sort((a, b) => a - b)).toEqual(street.stoops.map((s) => s.x));
+      const rightward = stops.at(-1)! > party.x;
+      expect(doors).toEqual(
+        rightward ? [...doors].sort((a, b) => a - b) : [...doors].sort((a, b) => b - a),
+      );
+      expect(party.steps.filter((s) => s.kind === "wait")).toHaveLength(street.stoops.length);
+    }
+    expect(castMailCarrier(rand, post, roofs)).toBeNull();
+  });
+
+  it("sends somebody on an errand: there, a wait, and back or on", () => {
+    const rand = seeded(31);
+    const driver = castErrand(rand, full, street, { from: 300, to: 380, wait: 5, back: true });
+    expect(driver.x).toBe(300);
+    expect(driver.steps.map((s) => s.kind)).toEqual(["walk", "wait", "walk"]);
+    expect(driver.steps[2]).toMatchObject({ kind: "walk", to: 300 });
+    expect(errandSeconds(driver)).toBeCloseTo(
+      driver.steps.reduce((sum, step) => sum + step.seconds, 0),
+    );
+    const child = castErrand(rand, full, street, {
+      kind: "child",
+      from: 200,
+      to: 260,
+      wait: 8,
+      back: false,
+    });
+    expect(child.heads).toBe(2); // a child, and somebody with them
+    expect(child.steps.at(-1)).toMatchObject({ kind: "walk" });
+    expect((child.steps.at(-1) as { to: number }).to).toBeGreaterThan(street.to);
+  });
+
   it("sends a police car by slowly, and now and then in a hurry with its lights on", () => {
     const rand = seeded(19);
     const passes = Array.from({ length: 400 }, () => castPatrol(rand));
@@ -372,7 +437,7 @@ describe("walkers on the pavement", () => {
         expect(rightward ? step.to > at : step.to < at).toBe(true);
         const speed = Math.abs(step.to - at) / step.seconds;
         expect(speed).toBeGreaterThan(3.3); // a loaded cart is the slowest thing on the street
-        expect(speed).toBeLessThan(37);
+        expect(speed).toBeLessThan(49); // an electric bike is the quickest thing on it
         at = step.to;
       }
     }

@@ -41,7 +41,7 @@ import {
 } from "./art/lib.mjs";
 import { bricks } from "./art/bricks.mjs";
 import { brooklynScene } from "./art/brooklyn.mjs";
-import { PEOPLE_META, peopleSheet, propsSheet, wheelsSheet } from "./art/people.mjs";
+import { PEOPLE_META, peopleSheet, propsSheet, WARDROBES, wheelsSheet } from "./art/people.mjs";
 import { WEAR_YEARS } from "./art/wear.mjs";
 import {
   appIcon,
@@ -119,7 +119,12 @@ add("shadows.png", shadows());
 add("party-lights.png", partyLights());
 add("grill.png", grill());
 
-const cast = { people: peopleSheet(), props: propsSheet(), wheels: wheelsSheet() };
+const cast = {
+  // Everybody, in each of their wardrobes: the same people, dressed for the weather.
+  people: Object.fromEntries(WARDROBES.map((wardrobe) => [wardrobe, peopleSheet(wardrobe)])),
+  props: propsSheet(),
+  wheels: wheelsSheet(),
+};
 const scenes = { skyline: skylineScene(puff, cast), brooklyn: brooklynScene(puff, cast) };
 for (const [id, scene] of Object.entries(scenes)) {
   for (const [name, image] of Object.entries(scene.images)) add(`${id}/${name}`, image);
@@ -154,7 +159,27 @@ const sceneBlock = (id) => `{
     rooftops: ${perSeason((season, s) => `${id}/rooftops-${season}-${s}.png`)},
     /** Cars at the kerb, drawn over the people on the pavement. Only some scenes have them. */
     parked: ${known(`${id}/parked-summer-day.png`) ? perSeason((season, s) => `${id}/parked-${season}-${s}.png`) : "null"},
-    people: ${perState((s) => `${id}/people-${s}.png`)},
+    /** Everybody on foot, in each wardrobe: mild weather, cold, hot. */
+    people: {
+      ${WARDROBES.map((wardrobe) => `${wardrobe}: ${perState((s) => `${id}/people-${wardrobe}-${s}.png`)}`).join(",\n      ")},
+    },
+    /** The sheet of small things: umbrellas, rubbish, pumpkins, animals, the vehicles on business. */
+    things: ${known(`${id}/things-day.png`) ? perState((s) => `${id}/things-${s}.png`) : "null"},
+    /** Each shop with its shutters down, by the shop's name. */
+    shut: {${Object.keys(scenes[id].images)
+      .filter((name) => /^shut-.*-day\.png$/.test(name))
+      .map((name) => name.slice(5, -8))
+      .map(
+        (shop) =>
+          `\n      ${JSON.stringify(shop)}: ${perState((s) => `${id}/shut-${shop}-${s}.png`)},`,
+      )
+      .join("")}
+    } as Record<string, Record<SkyState, string>>,
+    /** Wet ground, and the banks of deep snow, to lay over the street. */
+    wet: ${known(`${id}/wet-day.png`) ? perState((s) => `${id}/wet-${s}.png`) : "null"},
+    banks: ${known(`${id}/banks-day.png`) ? perState((s) => `${id}/banks-${s}.png`) : "null"},
+    /** Christmas lights: two pictures that take turns. */
+    xmas: ${known(`${id}/xmas-a.png`) ? `[${src(`${id}/xmas-a.png`)}, ${src(`${id}/xmas-b.png`)}]` : "null"},
     props: ${perState((s) => `${id}/props-${s}.png`)},
     wheels: ${perState((s) => `${id}/wheels-${s}.png`)},
     /** The cab that answers a hail. Only where there is a street to hail one on. */

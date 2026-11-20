@@ -30,6 +30,7 @@ const reading = (code: number, more: Partial<Reading> = {}): Reading => ({
   snowCm: null,
   snowDepthM: null,
   windKph: null,
+  windFrom: null,
   visibilityM: null,
   tempC: null,
   ...more,

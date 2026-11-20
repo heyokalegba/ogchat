@@ -9,6 +9,7 @@
  * tower downtown catching the last light. The sun has just gone.
  */
 import { wearFor } from "./wear.mjs";
+import { christmasLights, shutters, snowBanks, streetThings, wetGround } from "./things.mjs";
 import { empireState, oneWorldTrade } from "./landmarks.mjs";
 import {
   FONTS,
@@ -21,6 +22,7 @@ import {
   text,
   textCentred,
 } from "./street.mjs";
+import { WARDROBES } from "./people.mjs";
 import { dealer, lamps, stamp, vehicle, VEHICLES } from "./vehicles.mjs";
 import {
   bayer,
@@ -726,6 +728,7 @@ function block(season = "summer") {
     houses
       .filter((house) => !house.shop && !house.taken && house.x > 0 && house.x + house.w < W)
       .sort((a, b) => Math.abs(a.x + a.w / 2 - spot) - Math.abs(b.x + b.w / 2 - spot))[0];
+  const fronts = [];
   const shops = [
     {
       at: 346,
@@ -764,7 +767,7 @@ function block(season = "summer") {
     const house = nearest(shop.at);
     if (!house) continue;
     house.taken = true;
-    storefront(rooftops, emit, {
+    const front = storefront(rooftops, emit, {
       ...shop,
       // a shorter word, or a smaller face, where the window is narrow
       ...(house.w - 16 >= 23
@@ -777,6 +780,9 @@ function block(season = "summer") {
       tone: hex("#e3bd72"),
       tint: dusk,
     });
+    // Remembered for when it shuts: what the shutters cover, and the moment it was built,
+    // so that anything put in front of the shop later stays in front of the shutters too.
+    fronts.push({ id: shop.name.toLowerCase(), ...front, then: rooftops.moment() });
   }
   // Their stoops went with the parlour floors.
   const seats = stoops.filter((stoop) => !houses.find((h) => h.x === stoop.house)?.taken);
@@ -1005,6 +1011,10 @@ function block(season = "summer") {
     switches,
     hail,
     site,
+    // For the pictures that are laid over this one: shut shops, Christmas lights.
+    canvases: { rooftops },
+    fronts,
+    houses: houses.filter((house) => house.x > -8 && house.x + house.w < W + 8),
   };
 }
 
@@ -1078,6 +1088,9 @@ function traffic(state, layout) {
   return c;
 }
 
+/** Snow in daylight colours, before the block's dusk and the hour are put on it. */
+const SNOW_DAY = hex("#e6e8ee");
+
 /** The cab that answers a hail: a yellow taxi, nose right, in one light. */
 const CAB = { w: 28, h: 12 };
 function cab(state) {
@@ -1117,6 +1130,40 @@ export function brooklynScene(puff, cast) {
     images[`homes-rooftops-${season}.png`] = seasons[season].homes.rooftops.lit;
   }
   const layout = trafficLayout();
+  // The small things of the street, on one sheet a light; and the pictures laid over the
+  // block when a shop is shut, the ground is wet, the snow is deep, or it is Christmas.
+  const things = streetThings();
+  christmasLights(W, H, scene.houses).forEach((picture, turn) => {
+    images[`xmas-${turn ? "b" : "a"}.png`] = picture;
+  });
+  for (const state of STATES) {
+    const tone = (c) => GRADES[state](dusk(c));
+    const lit = state === "dusk" || state === "night";
+    const sheet = things.sheet.graded(dusk).graded(GRADES[state]);
+    for (const kind of things.service) {
+      const at = things.map[kind];
+      lamps(sheet, at, at.x, at.y + at.h - 1, { on: lit });
+    }
+    images[`things-${state}.png`] = sheet;
+    for (const front of scene.fronts) {
+      images[`shut-${front.id}-${state}.png`] = shutters(
+        scene.canvases.rooftops,
+        front.openings,
+        front.then,
+        tone,
+      );
+    }
+    images[`wet-${state}.png`] = wetGround(scene.states[state].rooftops, {
+      pavement: SIDEWALK,
+      kerb: CURB,
+    });
+    images[`banks-${state}.png`] = snowBanks(
+      W,
+      H,
+      { pavement: SIDEWALK, kerb: CURB },
+      tone(SNOW_DAY),
+    );
+  }
   for (const state of STATES) {
     images[`traffic-${state}.png`] = traffic(state, layout);
     images[`cab-${state}.png`] = cab(state);
@@ -1129,7 +1176,11 @@ export function brooklynScene(puff, cast) {
     }
     // The cast is drawn in daylight colours; bring it into this block's dusk
     // palette first, then light it like everything else here.
-    images[`people-${state}.png`] = cast.people.graded(dusk).graded(GRADES[state]);
+    for (const wardrobe of WARDROBES) {
+      images[`people-${wardrobe}-${state}.png`] = cast.people[wardrobe]
+        .graded(dusk)
+        .graded(GRADES[state]);
+    }
     images[`props-${state}.png`] = cast.props.graded(dusk).graded(GRADES[state]);
     images[`wheels-${state}.png`] = cast.wheels.graded(dusk).graded(GRADES[state]);
   }
@@ -1196,6 +1247,23 @@ export function brooklynScene(puff, cast) {
         cab: { ...CAB, lane: LANES[0].base, kerb: PARKED_BASE + 2 },
         // A police car now and then: its size, the row it drives on, and where its lights are.
         patrol: { ...CRUISER, lane: LANES[0].base, bar: VEHICLES.police.bar },
+      },
+      // The rest of the street's furniture: where things are on the sheet of small
+      // things, where the shops are, where rubbish goes out, where steam comes up.
+      street: {
+        things: things.map,
+        sheet: { w: things.sheet.w, h: things.sheet.h },
+        pavement: SIDEWALK,
+        kerb: CURB,
+        lane: LANES[0].base,
+        shops: scene.fronts.map((front) => front.id),
+        // Rubbish goes out at the kerb, clear of the trees and the places a cab pulls in.
+        piles: [34, 118, 204, 282, 372, 458, 546, 612],
+        manholes: [
+          [150, 356],
+          [431, 352],
+        ],
+        trees: TREES,
       },
       // Lit windows in plain view, for the people and pets seen moving behind them.
       windows: scene.windows,

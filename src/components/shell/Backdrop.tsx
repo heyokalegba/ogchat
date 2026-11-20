@@ -1,6 +1,16 @@
-import type { CSSProperties } from "react";
+import { useRef, type CSSProperties } from "react";
 import { darkness } from "@/lib/citylights";
-import { brooklynClock, type SkyView } from "@/lib/daylight";
+import { brooklynClock, brooklynDay, type SkyView } from "@/lib/daylight";
+import {
+  calendarOf,
+  fireworksAt,
+  kerbClear,
+  mealtime,
+  shopOpen,
+  umbrellasFor,
+  wardrobeFor,
+  type Wind,
+} from "@/lib/nycday";
 import {
   conditionsFor,
   greyOf,
@@ -13,6 +23,7 @@ import { SCENES, SKY, type SceneId } from "./art";
 import styles from "./backdrop.module.css";
 import { bustleAt, lateAt, pastBedtime, placeOf, roofPartyAt, trafficAt } from "./life";
 import { SkyTraffic } from "./SkyTraffic";
+import { Fireworks } from "./Fireworks";
 import { StreetLife } from "./StreetLife";
 import { Vehicle } from "./Vehicle";
 import { Wear } from "./Wear";
@@ -77,12 +88,20 @@ export function Backdrop(props: {
   conditions?: Conditions;
   /** The temperature in °C, when New York's is known. Otherwise the season's usual is assumed. */
   tempC?: number | null;
+  /** The wind, and how deep the snow is lying in metres, when New York's are known. */
+  wind?: Wind;
+  snowDepthM?: number | null;
+  /** Told about each firework as it goes off, and each siren, for whoever makes the noise. */
+  onBang?: () => void;
+  onSiren?: () => void;
   people?: boolean;
   /** Frozen: nothing moves, nobody arrives. The light still follows the clock. */
   still?: boolean;
 }) {
   const { scene, view, now, people = true, still = false } = props;
   const { season = "summer", snowy = false, conditions = FAIR } = props;
+  /** When it last rained, by the scene's clock: the ground stays wet for a while after. */
+  const lastRain = useRef<number | null>(null);
   const weather = conditions.kind;
   // The pictures to show: the season's, or the bare trees under snow.
   const ground = snowy ? "snow" : season;
@@ -230,7 +249,24 @@ export function Backdrop(props: {
       : null;
   const beaconGlow = Math.min(1, night * 1.8);
 
-  const parked = art.parked && (
+  // The day on the block: what the calendar and the clock have on.
+  const today = brooklynDay(now);
+  const occasion = calendarOf(today);
+  const raining = weather === "rain" || weather === "storm";
+  const falling = raining || weather === "snow";
+  // Wet ground: while it rains, and for the better part of an hour after it stops.
+  if (raining) lastRain.current = now;
+  const drying =
+    lastRain.current === null ? 0 : 1 - Math.abs(now - lastRain.current) / (45 * 60_000);
+  const wetness = snowy
+    ? 0
+    : raining
+      ? conditions.force === "light"
+        ? 0.75
+        : 1
+      : Math.max(0, drying) * 0.8;
+  // Alternate side parking: on sweeping mornings the kerb is empty.
+  const parked = art.parked && !kerbClear(today) && (
     <Blend className={styles.layer} sources={art.parked[ground]} view={view} />
   );
 
@@ -322,6 +358,7 @@ export function Backdrop(props: {
           </div>
         )}
 
+        <Fireworks active={fireworksAt(today)} still={still} onBang={props.onBang} />
         <SkyTraffic light={light} night={night} still={still || weather === "storm"} late={late} />
 
         <Blend className={styles.layer} sources={art.city[ground]} view={view} />
@@ -368,6 +405,28 @@ export function Backdrop(props: {
           salt={2}
         />
         <Wear scene={scene} days={props.age ?? 0} night={night} />
+        {/* Shops with their shutters down, out of hours. */}
+        {Object.entries(art.shut).map(
+          ([shop, sources]) =>
+            !shopOpen(shop, hour, weekday) && (
+              <Blend key={shop} className={styles.layer} sources={sources} view={view} />
+            ),
+        )}
+        {/* Deep snow: the banks the ploughs leave, once there is more than a dusting. */}
+        {art.banks && snowy && (props.snowDepthM ?? 0) >= 0.1 && (
+          <Blend className={styles.layer} sources={art.banks} view={view} />
+        )}
+        {art.wet && wetness > 0.02 && (
+          <div className={styles.layer} style={{ opacity: wetness }}>
+            <Blend className={styles.layer} sources={art.wet} view={view} />
+          </div>
+        )}
+        {art.xmas && occasion.christmas && (
+          <div className={styles.layer} style={{ opacity: 0.3 + 0.7 * night }}>
+            <div className={`${styles.layer} ${styles.xmasA}`} style={image(art.xmas[0])} />
+            <div className={`${styles.layer} ${styles.xmasB}`} style={image(art.xmas[1])} />
+          </div>
+        )}
         {glow(art.glow.front, "Front")}
         {/* Cars at the kerb stand between the pavement and us; cyclists pass outside them. */}
         {/* Nobody is seen against a window until it is dark enough for the room to be lit. */}
@@ -380,6 +439,12 @@ export function Backdrop(props: {
             bustle={bustle}
             late={pastBedtime(hour)}
             noSitting={tooColdToSit}
+            wardrobe={wardrobeFor(tempC)}
+            umbrellas={umbrellasFor(weather, conditions.force)}
+            hungry={mealtime(hour)}
+            onSiren={props.onSiren}
+            tempC={tempC}
+            wet={falling}
             kerb={parked}
             party={party}
             now={now}
@@ -395,6 +460,7 @@ export function Backdrop(props: {
           grey={grey}
           leaves={season === "autumn" && !snowy && scene === "brooklyn"}
           night={night}
+          wind={props.wind}
         />
       </div>
     </div>

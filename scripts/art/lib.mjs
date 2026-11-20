@@ -56,6 +56,10 @@ export const desat = (c, t) => mix(c, Array(3).fill(Math.round(luma(c))), t);
 export function canvas(w, h) {
   const data = new Uint8Array(w * h * 4);
   const owner = new Uint32Array(w * h);
+  // When each pixel was last drawn, as a running count: lets something drawn
+  // early find out later which of its pixels have had things put in front.
+  const drawn = new Uint32Array(w * h);
+  let tick = 0;
   const inside = (x, y) => x >= 0 && y >= 0 && x < w && y < h;
   const set = (x, y, c) => {
     x = Math.round(x);
@@ -67,6 +71,7 @@ export function canvas(w, h) {
     data[i + 2] = c[2];
     data[i + 3] = 255;
     owner[y * w + x] = 0;
+    drawn[y * w + x] = ++tick;
   };
   /** A see-through pixel, for halos. Keeps the stronger of what is there and what is asked. */
   const setAlpha = (x, y, c, alpha) => {
@@ -122,7 +127,27 @@ export function canvas(w, h) {
     }
     return copy;
   };
-  return { w, h, data, set, setAlpha, get, tint, blend, rect, mark, owns, claimed, graded };
+  /** The count so far: keep it, and ask `since` later what has been drawn over. */
+  const moment = () => tick;
+  /** Whether a pixel has been drawn on after `then`. */
+  const since = (x, y, then) => inside(x, y) && drawn[y * w + x] > then;
+  return {
+    w,
+    h,
+    data,
+    set,
+    setAlpha,
+    get,
+    tint,
+    blend,
+    rect,
+    mark,
+    owns,
+    claimed,
+    graded,
+    moment,
+    since,
+  };
 }
 
 /** The four lights a scene is drawn in. The backdrop crossfades between neighbours. */

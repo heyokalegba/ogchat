@@ -107,6 +107,43 @@ interface is see-through, over a pixel-art New York that keeps real time.
   somebody walking up and down, stopping to hold forth to nobody. A police
   car comes down the block a couple of times an hour at most, and one time
   in five it is on a call, lights going, and gone in seconds.
+- **Dressed for the weather.** Everybody has three wardrobes and wears the
+  one the temperature calls for: coats, hats and scarves under 9°C, shorts
+  and bare arms from 24°C. When it rains the umbrellas go up, more of them
+  the harder it comes down. Whoever was out before the weather turned stays
+  as they were dressed.
+- **Shop hours.** The bodega never shuts. The bakery opens before dawn and
+  has its shutters down by seven; the pizza place opens for lunch and goes
+  on past midnight, till three on Friday and Saturday nights.
+- **Wet streets and deep snow.** While it rains, and for most of an hour
+  after, the pavement and the road are dark and show the lamps and shop
+  windows upside down in them. When the snow lying in New York is more than
+  about ten centimetres, there are ploughed banks along the kerb.
+- **The block's routine.** Rubbish goes out at the kerb on Monday and
+  Thursday evenings and the sanitation truck takes it, pile by pile, a
+  little after six the next morning. On those two mornings the kerb is
+  empty from nine to half past ten for the street sweeper, which comes
+  through. The school bus stops twice on a school day and lets children off
+  in the afternoon. The letter carrier walks the block door to door around
+  midday. A parcel van double-parks with its hazards on a few times a day,
+  more in December, while the driver goes up somebody's steps. On warm dry
+  summer afternoons the ice cream truck pulls up and children come to it.
+  At lunch and dinner there are couriers on electric bikes.
+- **The calendar.** Christmas lights along the cornices from the first of
+  December to Epiphany. Pumpkins on the steps for the three weeks to
+  Halloween, the carved ones lit after dark. Fireworks over the skyline at
+  half past nine on the Fourth of July, and at midnight on New Year's.
+- **The wind is New York's too.** Rain slants the way the real wind blows
+  and as hard; snow and leaves are carried further by it.
+- **The small things.** Pigeons on the pavement by day. A squirrel going
+  from tree to tree. A rat along the kerb at night. Steam through the
+  manholes when it is under 7°C.
+- **Sound, if you want it.** Off to begin with; the look panel turns it on.
+  A hum of traffic that follows the hour, cars going by, rain, wind, birds
+  in the morning, thunder in a storm, and every several minutes a siren a
+  long way off. A police car on a call can be heard, and so can fireworks.
+  All of it is made on the spot from noise and a few oscillators: there are
+  no recordings in ogchat.
 - **Weather.** New York's own, live: what is over the city right now is
   what is over the scene, looked at again every ten minutes. Clear, broken
   cloud, overcast, drizzle, rain, a downpour, thunder, fog, flurries, snow.
@@ -174,6 +211,7 @@ is remembered in your browser.
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | People                  | `out` or `none`. `none` empties the streets and roofs.                                                                                                                                                                                                         |
 | Motion                  | `live` or `frozen`. Frozen holds the scene still, like a picture, while you work: nothing moves and nobody arrives. The light still follows the clock.                                                                                                         |
+| Sound                   | `off`, or `on` with a volume: the street, heard. Made on the spot; nothing is played back. It starts on your click, as browsers require.                                                                                                                       |
 | Day                     | Today, or any day back to 1 January 2025. On a past day the scene keeps your time of day and shows that day's season, sky and weather. `today` brings it back.                                                                                                 |
 | Season                  | `by the calendar`, or hold the scene to spring, summer, autumn or winter, or to `winter, snowed in`.                                                                                                                                                           |
 | Weather                 | `New York, live` (on a past day, `New York, that day`), `made up (asks nobody)`, or hold it to one kind. Underneath it says what New York is doing: "light rain · 48°F (9°C) · wind 9 mph · as of 2:15 pm".                                                    |
@@ -556,8 +594,21 @@ Day to day, use the look panel (above). To change what it starts from:
   `STREET_MIX` with the rest; `castSleeper` and `castPatrol` have timers of
   their own in `StreetLife.tsx`. To see the rare things without waiting for
   them, set `localStorage["ogchat:preview"]` in the browser's console to any
-  of `patrol`, `call`, `sleeper`, `canner`, `pacer` (separated by commas)
-  and reload; remove it to go back.
+  of `patrol`, `call`, `sleeper`, `canner`, `pacer`, `courier`, `schoolbus`,
+  `garbage`, `parcel`, `icecream`, `sweeper`, `mail`, `squirrel`, `rat`
+  (separated by commas) and reload; remove it to go back. For the calendar,
+  set the day in the look panel: a day in December for the lights, late
+  October for pumpkins, 4 July at half past nine for fireworks.
+- **The block's day:** `src/lib/nycday.ts` is when everything happens that is
+  not people walking or lights going on: shop hours (`shopOpen`), collection
+  and sweeping days, who visits and when (`visitsOn`), what people wear
+  (`wardrobeFor`), the calendar, the wind. `StreetExtras.tsx` draws the
+  small things and the service vehicles; `scripts/art/things.mjs` is where
+  they are drawn, on one sheet, along with the pictures laid over the block
+  for shutters, wet ground, snow banks and Christmas lights.
+- **The sound:** `src/lib/ambience.ts`. Every sound is a few lines there:
+  `carPass`, `chirp`, `thunder`, `siren`. `soundscapeOf` turns the scene
+  into levels.
 - **The lit windows:** `src/lib/citylights.ts` is the whole of who has a
   light on: when offices empty, when the cleaners come, when flats go to
   bed. `CityLights.tsx` draws the result. Which windows there are comes

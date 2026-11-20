@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { LIGHT_AIR, type Wind } from "@/lib/nycday";
 import type { Conditions } from "@/lib/weather";
 import { SKY } from "./art";
 import styles from "./backdrop.module.css";
@@ -13,12 +14,14 @@ import styles from "./backdrop.module.css";
  */
 
 /** A tile repeated over the scene and a little beyond, so it can slide a tile's length. */
-function falling(tile: { src: string; size: number }, scale = 1): CSSProperties {
+function falling(tile: { src: string; size: number }, scale = 1, drift?: number): CSSProperties {
   const size = `calc(var(--u) * ${tile.size * scale})`;
   return {
     backgroundImage: `url(${tile.src})`,
     backgroundSize: `${size} ${size}`,
     "--tile": size,
+    // How far sideways it is carried for each tile it falls: the wind's doing.
+    ...(drift === undefined ? {} : { "--drift": drift.toFixed(2) }),
   } as CSSProperties;
 }
 
@@ -27,8 +30,14 @@ export function WeatherLayer(props: {
   grey: number;
   leaves: boolean;
   night: number;
+  /** The wind: which way it carries what is falling, and how hard. */
+  wind?: Wind;
 }) {
   const { conditions, grey, leaves, night } = props;
+  const wind = props.wind ?? LIGHT_AIR;
+  // Rain slants with the wind; snow and leaves are carried a good deal further by it.
+  const slant = wind.push * 1.3;
+  const carried = wind.push * 2.2;
   const { kind: weather, force } = conditions;
   const wet = weather === "rain" || weather === "storm";
   const hard = weather === "storm" || force === "heavy";
@@ -51,30 +60,51 @@ export function WeatherLayer(props: {
       {weather === "fog" && <div className={styles.fog} />}
       {wet && (
         <>
-          <div className={`${styles.fall} ${styles.rainFar}`} style={falling(SKY.rain, 0.75)} />
+          <div
+            className={`${styles.fall} ${styles.rainFar}`}
+            style={falling(SKY.rain, 0.75, slant)}
+          />
           {(hard || force !== "light") && (
-            <div className={`${styles.fall} ${styles.rainNear}`} style={falling(SKY.rain)} />
+            <div
+              className={`${styles.fall} ${styles.rainNear}`}
+              style={falling(SKY.rain, 1, slant)}
+            />
           )}
           {hard && (
-            <div className={`${styles.fall} ${styles.rainHard}`} style={falling(SKY.rain, 1.25)} />
+            <div
+              className={`${styles.fall} ${styles.rainHard}`}
+              style={falling(SKY.rain, 1.25, slant * 1.15)}
+            />
           )}
         </>
       )}
       {weather === "storm" && <div className={styles.lightning} />}
       {weather === "snow" && (
         <div className={styles.sway}>
-          <div className={`${styles.fall} ${styles.snowFar}`} style={falling(SKY.snow, 0.7)} />
+          <div
+            className={`${styles.fall} ${styles.snowFar}`}
+            style={falling(SKY.snow, 0.7, carried * 0.8)}
+          />
           {force !== "light" && (
-            <div className={`${styles.fall} ${styles.snowNear}`} style={falling(SKY.snow)} />
+            <div
+              className={`${styles.fall} ${styles.snowNear}`}
+              style={falling(SKY.snow, 1, carried)}
+            />
           )}
           {force === "heavy" && (
-            <div className={`${styles.fall} ${styles.snowHard}`} style={falling(SKY.snow, 1.3)} />
+            <div
+              className={`${styles.fall} ${styles.snowHard}`}
+              style={falling(SKY.snow, 1.3, carried * 1.1)}
+            />
           )}
         </div>
       )}
       {leaves && !wet && weather !== "snow" && (
         <div className={styles.sway}>
-          <div className={`${styles.fall} ${styles.leafFall}`} style={falling(SKY.leaves)} />
+          <div
+            className={`${styles.fall} ${styles.leafFall}`}
+            style={falling(SKY.leaves, 1, carried * 1.2 || -0.3)}
+          />
         </div>
       )}
     </>

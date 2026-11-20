@@ -270,3 +270,31 @@ export function atBrooklynDate(ms: number, date: string): number {
   moment = wanted - offsetAt(moment);
   return moment + (((ms % 1000) + 1000) % 1000);
 }
+
+/** The calendar and the clock in Brooklyn at a moment, as the street lives by them. */
+export interface BrooklynDay {
+  /** A count of days, the same all day long in Brooklyn. */
+  dayId: number;
+  /** 0 Sunday to 6 Saturday. */
+  weekday: number;
+  /** 1 to 12, and the day of the month. */
+  month: number;
+  day: number;
+  /** Hours since midnight, with the minutes as a fraction. */
+  hour: number;
+  /** Minutes since midnight, whole. */
+  minute: number;
+}
+
+export function brooklynDay(ms: number): BrooklynDay {
+  const w = wallParts(ms);
+  const dayId = Math.round(Date.UTC(w.year, w.month - 1, w.day) / 86_400_000);
+  return {
+    dayId,
+    weekday: (((dayId + 4) % 7) + 7) % 7, // 1 January 1970 was a Thursday
+    month: w.month,
+    day: w.day,
+    hour: w.hour + w.minute / 60 + w.second / 3600,
+    minute: w.hour * 60 + w.minute,
+  };
+}

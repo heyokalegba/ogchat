@@ -312,6 +312,13 @@ export function storefront(c, emit, spec) {
   emit.light(c, dx + 1, wy, 6, 12, shade(spec.tone, 0.94), "always");
   c.set(dx + 2, wy + 14, hex("#b99a5a"));
   emit.spill(c, x + w / 2, base - 2, 20, hex("#d9b061"), 0.5, "evening");
+  // What a shutter comes down over when the shop is shut: the window and the door's glass.
+  return {
+    openings: [
+      [x + 3, wy, ww, 14],
+      [dx + 1, wy, 6, 12],
+    ],
+  };
 }
 
 /** A street sign blade on a pole: white letters on green. */

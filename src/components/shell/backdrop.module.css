@@ -810,6 +810,164 @@
   }
 }
 
+/* Vehicles on business: the school bus, the sanitation truck, a parcel van, the sweeper. */
+.serviceCar {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+/* Hazard lights: on while it is stopped in the road, blinking in whole steps. */
+.hazard {
+  position: absolute;
+  width: calc(var(--u) * 1);
+  height: calc(var(--u) * 1);
+  background: #ffb238;
+  opacity: 0;
+}
+
+.serviceCar[data-stopped="yes"] .hazard {
+  animation: hazard 0.9s steps(1) infinite;
+}
+
+@keyframes hazard {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 calc(var(--u) * 3) calc(var(--u) * 1) rgba(255, 178, 56, 0.6);
+  }
+  50% {
+    opacity: 0;
+    box-shadow: none;
+  }
+}
+
+/* Steam through a manhole in the cold: the chimney smoke, thinner and closer. */
+.steam {
+  position: absolute;
+  overflow: hidden;
+  opacity: 0.55;
+}
+
+/* A carved pumpkin after dark has a candle in it. */
+.lantern {
+  box-shadow: 0 0 calc(var(--u) * 3) calc(var(--u) * 0.5) rgba(255, 150, 40, 0.55);
+}
+
+/* A pigeon: its two frames side by side, and now and then its head goes down. */
+.pigeon,
+.dash {
+  position: absolute;
+  overflow: hidden;
+}
+
+.peck {
+  animation: peck 3.4s steps(1) infinite;
+}
+
+@keyframes peck {
+  0%,
+  58%,
+  74%,
+  100% {
+    transform: translateX(0);
+  }
+  60%,
+  70%,
+  78%,
+  84% {
+    transform: translateX(-50%);
+  }
+}
+
+/* Something small in a hurry: a squirrel between trees, a rat along the kerb. */
+.dash {
+  left: 0;
+  animation: dash 3s linear 1 both;
+}
+
+@keyframes dash {
+  from {
+    transform: translateX(calc(var(--u) * var(--from)));
+  }
+  to {
+    transform: translateX(calc(var(--u) * var(--to)));
+  }
+}
+
+.scurry {
+  animation: scurry 0.24s steps(1) infinite;
+}
+
+@keyframes scurry {
+  0%,
+  100% {
+    margin-left: 0;
+  }
+  50% {
+    margin-left: -100%;
+  }
+}
+
+/* An umbrella over somebody's head, when it is coming down. */
+.umbrella {
+  position: absolute;
+  transition: transform 700ms steps(5);
+}
+
+.party[data-gait="sit"] .umbrella[data-seat] {
+  transform: translate(calc(var(--u) * var(--sx, 0)), calc(var(--u) * var(--sy, 0)));
+}
+
+/* Christmas lights along the cornices: two pictures, turn and turn about. */
+.xmasA {
+  animation: xmas 1.7s steps(1) infinite;
+}
+
+.xmasB {
+  animation: xmas 1.7s steps(1) infinite reverse;
+}
+
+@keyframes xmas {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Fireworks: a burst is a ring of sparks thrown out from one point, then gone. */
+.fireworks {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.spark {
+  position: absolute;
+  width: calc(var(--u) * 1);
+  height: calc(var(--u) * 1);
+  background: var(--tone);
+  box-shadow: 0 0 calc(var(--u) * 2) var(--tone);
+  animation: spark var(--life, 1.5s) steps(14) 1 both;
+}
+
+@keyframes spark {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--u) * var(--dx)), calc(var(--u) * var(--dy)));
+  }
+}
+
 /* Everybody is drawn facing right. Walking left, the whole formation is mirrored. */
 .party[data-facing="left"] .formation {
   transform: scaleX(-1);

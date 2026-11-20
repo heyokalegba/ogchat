@@ -28,6 +28,10 @@ export interface Look {
   people: boolean;
   /** Frozen: the scene holds still, like a picture. The light still follows the clock. */
   still: boolean;
+  /** Whether the street can be heard: traffic, rain, wind, the odd siren. Off to begin with. */
+  sound: boolean;
+  /** How loud, in percent. */
+  volume: number;
   /** How strongly the scene shows, in percent. Lower fades it into the dark, behind the text. */
   sceneStrength: number;
   /** Whether the chat is on screen at all. Hidden, there is only the scene to look at. */
@@ -56,6 +60,8 @@ export const DEFAULT_LOOK: Look = {
   weather: "live",
   people: true,
   still: false,
+  sound: false,
+  volume: 50,
   sceneStrength: 100,
   chatShown: true,
   sidebarWidth: 290,
@@ -126,6 +132,8 @@ function clean(value: unknown): Look {
         : "live",
     people: typeof raw.people === "boolean" ? raw.people : DEFAULT_LOOK.people,
     still: typeof raw.still === "boolean" ? raw.still : DEFAULT_LOOK.still,
+    sound: typeof raw.sound === "boolean" ? raw.sound : DEFAULT_LOOK.sound,
+    volume: clamp(Math.round(number(raw.volume, DEFAULT_LOOK.volume)), 0, 100),
     sceneStrength: clamp(
       Math.round(number(raw.sceneStrength, DEFAULT_LOOK.sceneStrength)),
       SCENE_STRENGTH.min,

@@ -122,6 +122,8 @@ export interface Reading {
   /** Snow lying on the ground, metres. */
   snowDepthM: number | null;
   windKph: number | null;
+  /** Where the wind is blowing from, in degrees: 270 is a west wind. */
+  windFrom: number | null;
   visibilityM: number | null;
   tempC: number | null;
 }

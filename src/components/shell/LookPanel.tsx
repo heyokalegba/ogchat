@@ -300,6 +300,49 @@ export function LookPanel({
           </div>
         </div>
         <div className={styles.lookRow}>
+          <span className={styles.lookLabel} id="ogchat-sound">
+            sound
+          </span>
+          <div className={styles.sceneSwitch} role="group" aria-labelledby="ogchat-sound">
+            <button
+              type="button"
+              className={`${styles.sceneButton} ${look.sound ? "" : styles.sceneActive}`}
+              aria-pressed={!look.sound}
+              onClick={() => onChange({ sound: false })}
+            >
+              off
+            </button>
+            <button
+              type="button"
+              className={`${styles.sceneButton} ${look.sound ? styles.sceneActive : ""}`}
+              aria-pressed={look.sound}
+              title="The street, heard: traffic by the hour, rain, wind, birds in the morning, a siren a long way off. Made on the spot; nothing is played back."
+              onClick={() => onChange({ sound: true })}
+            >
+              on
+            </button>
+          </div>
+        </div>
+        {look.sound && (
+          <>
+            <input
+              id="ogchat-volume"
+              className={styles.slider}
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={look.volume}
+              aria-label="Volume"
+              onChange={(event) => onChange({ volume: Number(event.target.value) })}
+            />
+            <div className={styles.ticks} aria-hidden="true">
+              <span>quiet</span>
+              <span>loud</span>
+            </div>
+          </>
+        )}
+        <div className={styles.lookRow}>
           <label className={styles.lookLabel} htmlFor="ogchat-scene-strength">
             strength
           </label>

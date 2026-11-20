@@ -180,7 +180,9 @@ function person(c, ox, oy, look, frame) {
   const leg = (xs, color, raised = 0) => {
     for (let r = 1; r <= legs + lift - sag - raised; r++) {
       const x = xs[Math.min(xs.length - 1, Math.floor(((r - 1) / (legs + lift)) * xs.length))];
-      px(x, hip + r, r === legs + lift - sag - raised ? shoes : color);
+      // In shorts the leg below the knee is bare.
+      const cloth = look.shorts && r > 2 ? (color === pants ? skin : far(skin)) : color;
+      px(x, hip + r, r === legs + lift - sag - raised ? shoes : cloth);
     }
   };
   if (!walking) {
@@ -211,6 +213,10 @@ function person(c, ox, oy, look, frame) {
   if (look.pack) {
     for (let y = shoulder; y <= shoulder + 2; y++) px(2, y, look.pack);
     px(1, shoulder + 1, shade(look.pack, 0.8));
+  }
+  if (look.scarf) {
+    for (let x = 3; x <= 5; x++) px(x, shoulder, look.scarf);
+    px(5, shoulder + 1, shade(look.scarf, 0.8)); // an end hanging down
   }
 
   // ---- head
@@ -302,7 +308,71 @@ function castPerson(d, kind, heritage) {
  * of any New York street, and are drawn like everybody else on it: the same
  * figures, in heavier and more worn clothes.
  */
-export const CAST = { adults: 28, children: 8, runners: 4, rough: 4 };
+export const CAST = { adults: 28, children: 8, runners: 4, rough: 4, postal: 4 };
+
+/** The wardrobes everybody has: what they put on by how cold or hot it is out. */
+export const WARDROBES = ["mild", "cold", "hot"];
+const SCARVES = ["#7a3328", "#b79a4c", "#34485e", "#566b4a", "#c9c2ae", "#5d4a70"].map(hex);
+const PUFFERS = ["#1c1c20", "#2b3340", "#3a2f2a", "#27384d", "#4a3b46", "#2f3a2f"].map(hex);
+
+/**
+ * The same person dressed for the weather. Nothing is rolled: what each
+ * person wears is worked out from which row they are, so the mild wardrobe
+ * is exactly the one there always was and the others are the same people.
+ */
+function dress(look, wardrobe, row, kind) {
+  if (wardrobe === "mild") return look;
+  if (wardrobe === "cold") {
+    // A proper coat on everybody (dark, as winter coats are), most heads covered, some scarves.
+    const coat = kind === "child" ? 1 : 2;
+    const hatless = !look.hatStyle && row % 5 !== 0;
+    return {
+      ...look,
+      coat: kind === "runner" ? 0 : Math.max(look.coat, coat),
+      bare: false,
+      top: kind === "runner" ? look.top : row % 3 === 0 ? look.top : PUFFERS[row % PUFFERS.length],
+      hat: hatless ? SCARVES[(row * 3) % SCARVES.length] : look.hat,
+      hatStyle: hatless ? "beanie" : look.hatStyle,
+      long: hatless ? false : look.long,
+      puff: hatless ? false : look.puff,
+      scarf: kind !== "runner" && row % 2 === 0 ? SCARVES[row % SCARVES.length] : null,
+    };
+  }
+  // Hot: no coats, bare arms, and shorts on most.
+  const beanie = look.hatStyle === "beanie";
+  return {
+    ...look,
+    coat: look.coat && row % 4 === 0 ? 1 : 0, // a skirt or a dress here and there
+    bare: true,
+    shorts: row % 3 !== 0,
+    hat: beanie ? null : look.hat,
+    hatStyle: beanie ? null : look.hatStyle,
+  };
+}
+
+/** A letter carrier: the postal blue, a satchel on the shoulder. */
+function castPostal(d, heritage) {
+  const { pick, chance } = d;
+  return {
+    legs: 5,
+    torso: 5,
+    stride: 1,
+    skin: pick(heritage.skin),
+    hair: pick(heritage.hair),
+    top: hex("#5f7fa6"),
+    pants: hex("#2b3a55"),
+    shoes: SHOES[0],
+    hat: chance(0.6) ? hex("#2b3a55") : null,
+    hatStyle: "cap",
+    long: false,
+    puff: false,
+    bare: false,
+    coat: 0,
+    pack: null,
+    bag: hex("#3d4f6e"), // the satchel
+    wait: "look",
+  };
+}
 
 /** What somebody living outdoors wears: layers, in colours that have seen weather. */
 const WORN = ["#3b3a36", "#4a4438", "#2f3438", "#514636", "#3d3a44", "#5a5248"].map(hex);
@@ -335,13 +405,13 @@ function castRough(d, heritage) {
 const standing = (pose) => (pose >= HAIL_FRAME ? pose - 4 : pose);
 
 /** Every person, one per row. Rows: adults, then children, then runners. */
-export function peopleSheet() {
+export function peopleSheet(wardrobe = "mild") {
   const kinds = [
     ...Array(CAST.adults).fill("adult"),
     ...Array(CAST.children).fill("child"),
     ...Array(CAST.runners).fill("runner"),
   ];
-  const c = canvas(PERSON.w * FRAMES, PERSON.h * (kinds.length + CAST.rough));
+  const c = canvas(PERSON.w * FRAMES, PERSON.h * (kinds.length + CAST.rough + CAST.postal));
   const d = dice(4242);
   // Equal shares within each kind, so the children and the runners are as mixed as the adults.
   const heritage = [
@@ -350,7 +420,7 @@ export function peopleSheet() {
     ...shares(d, CAST.runners),
   ];
   kinds.forEach((kind, row) => {
-    const look = castPerson(d, kind, heritage[row]);
+    const look = dress(castPerson(d, kind, heritage[row]), wardrobe, row, kind);
     for (let pose = 0; pose < FRAMES; pose++) {
       person(c, pose * PERSON.w, row * PERSON.h, look, pose);
     }
@@ -363,6 +433,18 @@ export function peopleSheet() {
       person(c, pose * PERSON.w, (kinds.length + n) * PERSON.h, look, pose);
     }
   });
+  // And the letter carriers, from dice of theirs, last of all.
+  const m = dice(4444);
+  shares(m, 4)
+    .slice(0, CAST.postal)
+    .forEach((part, n) => {
+      let look = castPostal(m, part);
+      if (wardrobe === "cold") look = { ...look, coat: 1, top: hex("#3d5578") };
+      if (wardrobe === "hot") look = { ...look, bare: true, shorts: true };
+      for (let pose = 0; pose < FRAMES; pose++) {
+        person(c, pose * PERSON.w, (kinds.length + CAST.rough + n) * PERSON.h, look, pose);
+      }
+    });
   return c;
 }
 
@@ -762,7 +844,10 @@ export function propsSheet() {
 export const PEOPLE_META = {
   frames: FRAMES,
   walkFrames: WALK_FRAMES,
-  person: { ...PERSON, rows: CAST.adults + CAST.children + CAST.runners + CAST.rough },
+  person: {
+    ...PERSON,
+    rows: CAST.adults + CAST.children + CAST.runners + CAST.rough + CAST.postal,
+  },
   prop: { ...PROP, rows: PROPS.rows },
   wheel: { ...WHEEL, rows: RIDERS.cyclists + RIDERS.skaters + RIDERS.ballers },
   cast: {
@@ -774,6 +859,10 @@ export const PEOPLE_META = {
     runners: [CAST.adults + CAST.children, CAST.runners],
     // people living rough, and what they have with them
     rough: [CAST.adults + CAST.children + CAST.runners, CAST.rough],
+    // the letter carriers
+    postal: [CAST.adults + CAST.children + CAST.runners + CAST.rough, CAST.postal],
+    // the cyclists out delivering: every fourth rider, with a box on the back
+    couriers: Array.from({ length: RIDERS.cyclists }, (_, row) => row).filter((r) => r % 4 === 3),
     cart: PROPS.cart,
     bundle: PROPS.bundle,
     // the first half of the dogs are small, the second half large

@@ -248,6 +248,127 @@ VEHICLES.police = {
   },
 };
 
+/** A school bus: the yellow, the black rails, a row of small windows, the stop arm folded in. */
+VEHICLES.schoolbus = {
+  w: 58,
+  h: 18,
+  draw(c) {
+    const yellow = hex("#d9a62a");
+    const black = hex("#17171a");
+    c.rect(0, 1, 48, 14, yellow);
+    c.rect(0, 1, 48, 1, shade(yellow, 1.15));
+    c.rect(48, 6, 10, 9, yellow); // the bonnet
+    c.rect(48, 5, 4, 1, yellow);
+    for (let x = 3; x < 44; x += 6) glazing(c, x, 3, 5, 4, []);
+    glazing(c, 44, 3, 4, 5, []); // the windscreen
+    c.rect(0, 9, 48, 1, black); // the rails
+    c.rect(0, 12, 58, 1, black);
+    c.rect(0, 14, 58, 1, shade(yellow, 0.6));
+    c.rect(1, 0, 3, 1, hex("#b0362b")); // the warning lamps, front and back
+    c.rect(44, 0, 3, 1, hex("#b0362b"));
+    c.rect(36, 6, 2, 3, hex("#b0362b")); // the stop arm
+    wheel(c, 8, 13, 2);
+    wheel(c, 40, 13, 2);
+  },
+};
+
+/** A sanitation truck: white cab, the green-striped packer body, the hopper at the back. */
+VEHICLES.garbage = {
+  w: 48,
+  h: 19,
+  draw(c) {
+    const white = hex("#d4d2c8");
+    const green = hex("#2f5a3a");
+    c.rect(4, 1, 28, 14, white); // the packer body
+    c.rect(4, 1, 28, 1, shade(white, 0.8));
+    c.rect(4, 8, 28, 2, green);
+    c.rect(0, 4, 5, 11, shade(white, 0.75)); // the hopper
+    c.rect(0, 4, 5, 1, hex("#17171a"));
+    c.rect(1, 9, 3, 4, hex("#1c1c20"));
+    for (let x = 9; x < 32; x += 6) c.rect(x, 2, 1, 12, shade(white, 0.88));
+    c.rect(34, 5, 9, 10, white); // the cab
+    c.rect(34, 5, 9, 1, shade(white, 1.1));
+    c.rect(43, 9, 5, 6, white);
+    glazing(c, 37, 6, 6, 4, []);
+    c.rect(32, 13, 16, 2, shade(white, 0.6));
+    c.rect(4, 14, 28, 1, hex("#1c1c20"));
+    wheel(c, 8, 14, 2);
+    wheel(c, 14, 14, 2);
+    wheel(c, 38, 14, 2);
+  },
+};
+
+/** A parcel van: the brown box on wheels that is double-parked on every block. */
+VEHICLES.parcel = {
+  w: 36,
+  h: 17,
+  draw(c) {
+    const brown = hex("#5a3d24");
+    c.rect(0, 0, 28, 14, brown);
+    c.rect(0, 0, 28, 1, shade(brown, 1.2));
+    c.rect(28, 3, 8, 11, brown); // the cab, snub-nosed
+    c.rect(28, 3, 8, 1, shade(brown, 1.2));
+    glazing(c, 29, 4, 6, 5, []);
+    c.rect(22, 3, 1, 10, shade(brown, 0.75)); // the side door
+    c.rect(6, 5, 9, 4, hex("#b79a4c")); // the shield
+    c.rect(8, 6, 5, 2, brown);
+    c.rect(0, 13, 36, 1, shade(brown, 0.6));
+    wheel(c, 5, 12, 2);
+    wheel(c, 27, 12, 2);
+  },
+};
+
+/** An ice cream truck: white, pink and blue, a serving window, a cone on the roof. */
+VEHICLES.icecream = {
+  w: 34,
+  h: 18,
+  draw(c) {
+    const white = hex("#e6e2d6");
+    const pink = hex("#d58aa0");
+    const blue = hex("#5f8fb8");
+    c.rect(0, 3, 27, 12, white);
+    c.rect(0, 3, 27, 1, blue);
+    c.rect(0, 11, 34, 2, pink);
+    c.rect(27, 7, 7, 8, white); // the cab
+    c.rect(27, 6, 3, 1, white);
+    glazing(c, 27, 7, 6, 4, []);
+    c.rect(6, 5, 12, 5, hex("#2a2c33")); // the serving window
+    c.rect(5, 4, 14, 1, pink); // its awning
+    c.rect(6, 10, 12, 1, shade(white, 0.7));
+    c.rect(21, 5, 4, 5, blue); // the menu
+    c.set(22, 6, white);
+    c.set(23, 8, pink);
+    c.rect(11, 0, 3, 1, hex("#f4eee0")); // a cone on the roof
+    c.rect(10, 1, 5, 1, hex("#f4eee0"));
+    c.rect(11, 2, 3, 1, hex("#c08c4a"));
+    c.rect(0, 14, 34, 1, shade(white, 0.6));
+    wheel(c, 5, 13, 2);
+    wheel(c, 25, 13, 2);
+  },
+};
+
+/** A street sweeper: small, white and orange, a brush under it and a beacon on top. */
+VEHICLES.sweeper = {
+  w: 26,
+  h: 15,
+  draw(c) {
+    const white = hex("#d4d2c8");
+    const orange = hex("#c9772c");
+    c.rect(0, 3, 15, 9, white); // the hopper
+    c.rect(0, 3, 15, 1, shade(white, 0.8));
+    c.rect(0, 8, 15, 1, orange);
+    c.rect(15, 2, 9, 10, white); // the cab
+    c.rect(24, 6, 2, 6, white);
+    glazing(c, 16, 3, 8, 5, [4]);
+    c.rect(18, 0, 2, 2, orange); // the beacon
+    c.rect(0, 11, 26, 1, shade(white, 0.6));
+    c.rect(8, 12, 9, 2, hex("#3b3a36")); // the brush
+    for (let x = 8; x < 17; x += 2) c.set(x, 14, hex("#6b6558"));
+    wheel(c, 2, 10, 2);
+    wheel(c, 19, 10, 2);
+  },
+};
+
 /** Sports cars come in louder colours than the rest of the street. */
 const HOT = ["#8f2a1f", "#b79a4c", "#1c1c20", "#c9c2ae", "#2f4f7a"].map(hex);
 

@@ -4,15 +4,23 @@ import {
   memo,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
   type ReactNode,
 } from "react";
+import { brooklynDay } from "@/lib/daylight";
+import { chance, rubbishOut, visitsOn, type VisitKind, type Wardrobe } from "@/lib/nycday";
 import { PEOPLE, SCENES, SKY, type SceneId, type SkyState } from "./art";
+import { thingStyle, type StreetConfig, type Thing } from "./sprites";
+import { ServiceCar, StreetExtras } from "./StreetExtras";
 import styles from "./backdrop.module.css";
 import {
   castCabRide,
+  castErrand,
+  castMailCarrier,
+  errandSeconds,
   castPatrol,
   castSleeper,
   castRoofVisit,
@@ -22,6 +30,7 @@ import {
   wantedHeads,
   type CabRide,
   type Patrol,
+  type ServiceRun,
   type LifeConfig,
   type Member,
   type Party,
@@ -43,13 +52,63 @@ const u = (n: number) => `calc(var(--u) * ${n})`;
 
 const ROOF_BOX = 22; // how much room above a roof line its people get
 
-function MemberView({ member, sheets }: { member: Member; sheets: Sheets }) {
+/** Whether a row of the people sheet is a child or a runner: nobody who carries an umbrella. */
+const CHILD_ROWS = (row: number) =>
+  row >= PEOPLE.cast.children[0] && row < PEOPLE.cast.runners[0] + PEOPLE.cast.runners[1];
+
+/** An umbrella to hold over somebody: which colour, and the sheet it is cut from. */
+interface Brolly {
+  src: string;
+  sheet: { w: number; h: number };
+  thing: Thing;
+}
+
+function MemberView(props: {
+  member: Member;
+  sheets: Sheets;
+  /** The colour of the umbrella this one has up, or null for none. */
+  umbrella: number | null;
+  brolly: Brolly | null;
+}) {
+  const { member, sheets, umbrella, brolly } = props;
   const cell =
     member.sheet === "people"
       ? PEOPLE.person
       : member.sheet === "props"
         ? PEOPLE.prop
         : PEOPLE.wheel;
+  return (
+    <>
+      {umbrella !== null && brolly && (
+        <div
+          className={styles.umbrella}
+          data-seat={member.seat ? "" : undefined}
+          style={
+            {
+              left: u(member.dx),
+              // The canopy clears the head; the handle comes down to the hand.
+              top: u(member.dy - cell.h + 1 - 2),
+              ...thingStyle(brolly.sheet, brolly.thing, brolly.src, umbrella),
+              "--sx": member.seat?.dx ?? 0,
+              "--sy": member.seat?.dy ?? 0,
+            } as CSSProperties
+          }
+        />
+      )}
+      <MemberSprite member={member} sheets={sheets} cell={cell} />
+    </>
+  );
+}
+
+function MemberSprite({
+  member,
+  sheets,
+  cell,
+}: {
+  member: Member;
+  sheets: Sheets;
+  cell: { w: number; h: number; rows: number };
+}) {
   return (
     <div
       className={styles.member}
@@ -94,6 +153,9 @@ interface Sheets {
 const PartyView = memo(function PartyView(props: {
   party: Party;
   sheets: Sheets;
+  /** How many of the grown-ups have an umbrella up, 0 to 1. */
+  umbrellas?: number;
+  brolly?: Brolly | null;
   onDone: (id: number) => void;
 }) {
   const { party, sheets, onDone } = props;
@@ -180,7 +242,20 @@ const PartyView = memo(function PartyView(props: {
     <div ref={element} className={styles.party} data-gait="idle" data-facing="right">
       <div className={styles.formation}>
         {party.members.map((member, index) => (
-          <MemberView key={index} member={member} sheets={sheets} />
+          <MemberView
+            key={index}
+            member={member}
+            sheets={sheets}
+            brolly={props.brolly ?? null}
+            umbrella={
+              // Grown-ups on foot, as many as the weather calls for; always the same ones.
+              member.sheet === "people" &&
+              !CHILD_ROWS(member.row) &&
+              chance(party.id, index) < (props.umbrellas ?? 0)
+                ? Math.floor(chance(party.id * 7 + index, 3) * (props.brolly?.thing.frames ?? 1))
+                : null
+            }
+          />
         ))}
       </div>
     </div>
@@ -375,10 +450,42 @@ export function StreetLife(props: {
   late?: boolean;
   /** Too cold or wet for anyone to sit out on a doorstep. */
   noSitting?: boolean;
+  /** What people are wearing for the temperature, and how many have an umbrella up. */
+  wardrobe?: Wardrobe;
+  umbrellas?: number;
+  /** How much the hour is one for ordering in, 0 to 1. */
+  hungry?: number;
+  /** The temperature, and whether it is raining or snowing. */
+  tempC?: number;
+  wet?: boolean;
+  /** Told when a police car comes through with its siren going. */
+  onSiren?: () => void;
 }) {
   const { scene, light } = props;
   const art = SCENES[scene];
   const life: LifeConfig = art.config.life;
+  // The street's furniture and the sheet of small things, where the scene has a street.
+  const street: StreetConfig | null =
+    "street" in art.config ? (art.config.street as StreetConfig) : null;
+  const thingsSrc = art.things ? art.things[light] : null;
+  /** Vehicles on business making their way down the block. */
+  const [runs, setRuns] = useState<ServiceRun[]>([]);
+  const onRunGone = useCallback(
+    (id: number) => setRuns((current) => current.filter((run) => run.id !== id)),
+    [],
+  );
+  /** Which rubbish piles the truck has taken this morning, by index. */
+  const [collected, setCollected] = useState<number[]>([]);
+  const pilesOf = useRef(new Map<number, number[]>());
+  const onRunStop = useCallback((run: ServiceRun, index: number) => {
+    const pile = pilesOf.current.get(run.id)?.[index];
+    if (pile !== undefined) setCollected((current) => [...current, pile]);
+  }, []);
+  const [previewed, setPreviewed] = useState<string[]>([]);
+  const siren = useRef(props.onSiren);
+  useEffect(() => {
+    siren.current = props.onSiren;
+  });
   const still = props.still ?? false;
   const [parties, setParties] = useState<Party[]>([]);
   const live = useRef<Party[]>([]);
@@ -395,14 +502,34 @@ export function StreetLife(props: {
     [],
   );
   // How the street is just now, for the spawner to read whenever it next looks.
-  const mood = useRef({ bustle: 1, late: false, noSitting: false });
+  const mood = useRef({
+    bustle: 1,
+    late: false,
+    noSitting: false,
+    wardrobe: "mild" as Wardrobe,
+    hungry: 0,
+    tempC: 15,
+    wet: false,
+  });
   useEffect(() => {
     mood.current = {
       bustle: props.bustle ?? 1,
       late: props.late ?? false,
       noSitting: props.noSitting ?? false,
+      wardrobe: props.wardrobe ?? "mild",
+      hungry: props.hungry ?? 0,
+      tempC: props.tempC ?? 15,
+      wet: props.wet ?? false,
     };
-  }, [props.bustle, props.late, props.noSitting]);
+  }, [
+    props.bustle,
+    props.late,
+    props.noSitting,
+    props.wardrobe,
+    props.hungry,
+    props.tempC,
+    props.wet,
+  ]);
 
   const commit = useCallback((next: Party[]) => {
     live.current = next;
@@ -420,6 +547,8 @@ export function StreetLife(props: {
       live.current.reduce((sum, party) => sum + (party.guest ? 0 : party.heads), 0);
     const add = (...cast: (Party | null)[]) => {
       const fresh = cast.filter((party): party is Party => party !== null);
+      // Dressed for the weather as it is when they come out, and they stay that way.
+      for (const party of fresh) party.wardrobe ??= mood.current.wardrobe;
       if (fresh.length) commit([...live.current, ...fresh]);
     };
     const onRoofs = life.kind === "roofs";
@@ -431,6 +560,7 @@ export function StreetLife(props: {
             midway,
             late: mood.current.late,
             noSitting: mood.current.noSitting,
+            hungry: mood.current.hungry,
           });
 
     // Frozen, or less motion asked for: a few people standing about, and nothing else.
@@ -470,19 +600,130 @@ export function StreetLife(props: {
     } catch {
       // no storage: nothing to preview
     }
-    const previews = setTimeout(() => {
+    const pending: ReturnType<typeof setTimeout>[] = [];
+    const later = (seconds: number, run: () => void) => {
+      pending.push(setTimeout(run, seconds * 1000));
+    };
+
+    // The vehicles and people that come down the block on business (see lib/nycday.ts
+    // for when). Each sets off from the left; some pull up; some have somebody get out.
+    let runId = 0;
+    const visit = (kind: VisitKind, afternoon = false) => {
+      if (onRoofs || !street || !art.things) return;
+      if (kind === "mail") return add(castMailCarrier(rand, PEOPLE, life));
+      const things = street.things;
+      const send = (run: Omit<ServiceRun, "id">) => {
+        const id = --runId; // counted down, so as never to meet a party's id
+        setRuns((current) => [...current, { id, ...run }]);
+        return id;
+      };
+      // Somewhere mid-block to pull up, clear of the ends.
+      const spot = Math.round(150 + rand() * 300);
+      const reach = (x: number, speed: number, w: number) => (x + w + 14) / speed;
+      if (kind === "sweeper") {
+        send({ kind, stops: [], speed: 13, kerbside: true });
+      } else if (kind === "garbage") {
+        const out = street.piles.map((x, index) => ({ x, index }));
+        const id = send({
+          kind,
+          // It stops with its hopper, which is at the back, level with each pile.
+          stops: out.map(({ x }) => ({ x: x - 2, stay: 3.2 })),
+          speed: 24,
+        });
+        pilesOf.current.set(
+          id,
+          out.map(({ index }) => index),
+        );
+      } else if (kind === "schoolbus") {
+        send({ kind, stops: [{ x: spot, stay: 9 }], speed: 30, hazards: true });
+        // In the afternoon it lets children off, and somebody is there to walk them home.
+        if (afternoon) {
+          const count = 1 + Math.floor(rand() * 3);
+          for (let n = 0; n < count; n++) {
+            later(reach(spot, 30, things.schoolbus?.w ?? 58) + 2 + n * 1.6, () =>
+              add(
+                castErrand(rand, PEOPLE, life, {
+                  kind: "child",
+                  from: spot + 30 + n * 5,
+                  to: spot + 30 + (rand() < 0.5 ? -1 : 1) * (30 + rand() * 60),
+                  wait: 1 + rand() * 2,
+                  back: false,
+                }),
+              ),
+            );
+          }
+        }
+      } else if (kind === "parcel") {
+        // Double-parked, hazards on, and the driver up somebody's steps with a box.
+        const door = [...life.stoops].sort(
+          (a, b) => Math.abs(a.x - spot) - Math.abs(b.x - spot),
+        )[0];
+        const driver = castErrand(rand, PEOPLE, life, {
+          from: spot + 30,
+          to: door?.x ?? spot + 60,
+          wait: 4 + rand() * 4,
+          back: true,
+        });
+        send({
+          kind,
+          stops: [{ x: spot, stay: errandSeconds(driver) + 3.5 }],
+          speed: 28,
+          hazards: true,
+        });
+        later(reach(spot, 28, things.parcel?.w ?? 36) + 1.2, () => add(driver));
+      } else if (kind === "icecream") {
+        send({ kind, stops: [{ x: spot, stay: 40 }], speed: 15 });
+        const count = 1 + Math.floor(rand() * 3);
+        for (let n = 0; n < count; n++) {
+          const side = rand() < 0.5 ? -1 : 1;
+          later(reach(spot, 15, things.icecream?.w ?? 34) + 2 + n * 4, () =>
+            add(
+              castErrand(rand, PEOPLE, life, {
+                kind: "child",
+                from: spot + 12 + side * (70 + rand() * 90),
+                to: spot + 12 + n * 4,
+                wait: 8 + rand() * 6,
+                back: false,
+              }),
+            ),
+          );
+        }
+      }
+    };
+    // What the day has down for this block, read off the scene's clock once a second.
+    let seen = -1;
+    const business = () => {
+      const day = brooklynDay(sceneNow.current);
+      const stamp = day.dayId * 1440 + day.minute;
+      // Only a minute that has just come round counts: setting the clock is not a day's traffic.
+      if (seen !== -1 && stamp > seen && stamp - seen <= 2) {
+        for (const due of visitsOn(day, mood.current.tempC, mood.current.wet)) {
+          const at = day.dayId * 1440 + due.minute;
+          if (at > seen && at <= stamp) visit(due.kind, due.minute > 12 * 60);
+        }
+      }
+      seen = stamp;
+    };
+
+    later(1.5, () => {
       if (onRoofs) return;
+      setPreviewed(preview);
       for (const name of preview) {
         if (name === "patrol" || name === "call") {
           if (life.patrol) {
+            if (name === "call") siren.current?.();
             setPatrols((current) => [...current, { ...castPatrol(rand), lights: name === "call" }]);
           }
         } else if (name === "sleeper") add(castSleeper(rand, PEOPLE, life));
-        else if (name === "canner" || name === "pacer") {
-          add(castWalkers(rand, PEOPLE, life, { only: name, midway: true }));
+        else if (name === "canner" || name === "pacer" || name === "courier") {
+          add(castWalkers(rand, PEOPLE, life, { only: name, midway: name !== "courier" }));
+        } else if (
+          ["schoolbus", "garbage", "parcel", "icecream", "sweeper", "mail"].includes(name)
+        ) {
+          visit(name as VisitKind, true);
         }
       }
-    }, 1500);
+    });
 
     // The street carries on whether or not anyone is looking. It used to stop
     // while the window was hidden and fill up again in one go on the way back,
@@ -490,6 +731,7 @@ export function StreetLife(props: {
     // Now there is nothing to catch up on: whoever is there walked there.
     const tick = () => {
       const now = seconds();
+      business();
       if (now >= nextArrival) {
         // Looked at afresh each time, so a street that emptied overnight fills again by morning.
         wanted = wantedHeads(rand, mood.current.bustle);
@@ -499,7 +741,11 @@ export function StreetLife(props: {
       }
       if (now >= nextPatrol) {
         nextPatrol = now + 1200 + rand() * 1800;
-        if (life.patrol) setPatrols((current) => [...current, castPatrol(rand)]);
+        if (life.patrol) {
+          const patrol = castPatrol(rand);
+          if (patrol.lights) siren.current?.();
+          setPatrols((current) => [...current, patrol]);
+        }
       }
       if (now >= nextSleeper) {
         nextSleeper = now + 300 + rand() * 480;
@@ -552,10 +798,11 @@ export function StreetLife(props: {
     const timer = setInterval(tick, 1000);
     return () => {
       clearInterval(timer);
-      clearTimeout(previews);
+      pending.forEach(clearTimeout);
       commit([]);
       setCabs([]);
       setPatrols([]);
+      setRuns([]);
     };
   }, [life, commit, still]);
 
@@ -603,12 +850,39 @@ export function StreetLife(props: {
     };
   }, [partyRoof, partyEnds, life, commit, still]);
 
-  const sheets: Sheets = {
-    people: art.people[light],
-    props: art.props[light],
-    wheels: art.wheels[light],
-  };
-  const street = parties.filter((party) => party.roof === null && !party.road);
+  // Everybody's sprites, in each wardrobe: a party keeps the one it came out in.
+  const sheetsBy = useMemo(() => {
+    const of = (wardrobe: Wardrobe): Sheets => ({
+      people: art.people[wardrobe][light],
+      props: art.props[light],
+      wheels: art.wheels[light],
+    });
+    return { mild: of("mild"), cold: of("cold"), hot: of("hot") };
+  }, [art, light]);
+  const brolly = useMemo<Brolly | null>(
+    () =>
+      street?.things.umbrella && thingsSrc
+        ? { src: thingsSrc, sheet: street.sheet, thing: street.things.umbrella }
+        : null,
+    [street, thingsSrc],
+  );
+  const view = (party: Party) => (
+    <PartyView
+      key={party.id}
+      party={party}
+      sheets={sheetsBy[party.wardrobe ?? "mild"]}
+      umbrellas={props.umbrellas ?? 0}
+      brolly={brolly}
+      onDone={onDone}
+    />
+  );
+  const day = brooklynDay(props.now ?? 0);
+  // Once the rubbish has gone in, the count of what the truck took starts again.
+  const out = rubbishOut(day);
+  useEffect(() => {
+    if (!out) setCollected([]);
+  }, [out]);
+  const onFoot = parties.filter((party) => party.roof === null && !party.road);
   const road = parties.filter((party) => party.road);
 
   return (
@@ -631,21 +905,43 @@ export function StreetLife(props: {
               {hosting && <RoofDecor width={roof.w} night={props.night} />}
               {/* Feet on the last row of the box, which is the row above the roof line. */}
               <div className={styles.roofLine} style={{ top: u(ROOF_BOX - 1) }}>
-                {here.map((party) => (
-                  <PartyView key={party.id} party={party} sheets={sheets} onDone={onDone} />
-                ))}
+                {here.map(view)}
               </div>
             </div>
           )
         );
       })}
       {/* Nearest last, so they pass in front. */}
-      {[...street]
-        .sort((a, b) => a.y - b.y || a.id - b.id)
-        .map((party) => (
-          <PartyView key={party.id} party={party} sheets={sheets} onDone={onDone} />
-        ))}
+      {street && thingsSrc && (
+        <StreetExtras
+          street={street}
+          life={life}
+          src={thingsSrc}
+          day={day}
+          night={props.night}
+          tempC={props.tempC ?? 15}
+          wet={props.wet ?? false}
+          still={still}
+          collected={collected}
+          preview={previewed}
+        />
+      )}
+      {[...onFoot].sort((a, b) => a.y - b.y || a.id - b.id).map(view)}
       {props.kerb}
+      {street &&
+        thingsSrc &&
+        runs.map((run) => (
+          <ServiceCar
+            key={run.id}
+            run={run}
+            street={street}
+            src={thingsSrc}
+            base={run.kerbside && life.cab ? life.cab.kerb : street.lane}
+            far={life.to}
+            onStop={onRunStop}
+            onGone={onRunGone}
+          />
+        ))}
       {life.patrol &&
         art.cruiser &&
         patrols.map((patrol) => (
@@ -671,9 +967,7 @@ export function StreetLife(props: {
             onGone={onCabGone}
           />
         ))}
-      {road.map((party) => (
-        <PartyView key={party.id} party={party} sheets={sheets} onDone={onDone} />
-      ))}
+      {road.map(view)}
     </div>
   );
 }

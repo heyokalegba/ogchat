@@ -34,6 +34,9 @@ export interface LifeMeta {
     rough?: readonly [number, number];
     cart?: number;
     bundle?: number;
+    /** The letter carriers, and which of the cyclists are out delivering. */
+    postal?: readonly [number, number];
+    couriers?: readonly number[];
   };
 }
 
@@ -112,6 +115,8 @@ export interface Party {
   guest?: boolean;
   /** Somebody sleeping out on a doorstep: there is never more than one. */
   sleeper?: boolean;
+  /** What they put on before they came out: decided when they turn up, kept till they go. */
+  wardrobe?: "mild" | "cold" | "hot";
   /** Where the party's middle starts; feet row; how far below the roof line it starts. */
   x: number;
   y: number;
@@ -356,7 +361,9 @@ type Kind =
   /** Somebody pushing a cart of cans and bottles to the redemption centre. */
   | "canner"
   /** Somebody walking up and down, stopping to hold forth to nobody. */
-  | "pacer";
+  | "pacer"
+  /** Somebody on an electric bike with a box on the back, bringing dinner. */
+  | "courier";
 
 /** How often each kind of party turns up on the street. */
 const STREET_MIX: readonly [Kind, number][] = [
@@ -373,6 +380,7 @@ const STREET_MIX: readonly [Kind, number][] = [
   // Part of any New York street, and not often.
   ["canner", 0.022],
   ["pacer", 0.014],
+  ["courier", 0.03],
 ];
 
 function pickKind(rand: Rand, mix: readonly [Kind, number][], room: number): Kind {
@@ -466,6 +474,18 @@ function form(rand: Rand, meta: LifeMeta, kind: Kind, size = 0): Formation {
       speed = between(rand, 27, 36);
       members[0]!.cadence = TEMPO.cyclist;
       break;
+    case "courier":
+      // An electric bike: quicker than anybody pedalling, and barely pedalling at all.
+      add(
+        "wheels",
+        cast.couriers?.length ? pick(rand, cast.couriers) : row(rand, cast.cyclists),
+        0,
+        0,
+        0,
+      );
+      speed = between(rand, 38, 48);
+      members[0]!.cadence = TEMPO.cyclist * 1.6;
+      break;
     case "skater":
       add("wheels", row(rand, cast.skaters), 0, 0, 0);
       speed = between(rand, 13, 17);
@@ -553,6 +573,8 @@ export interface CastOptions {
   noSitting?: boolean;
   /** Send exactly this kind of party, whatever the mix says. For previews and tests. */
   only?: string;
+  /** How much more than usual people are ordering in, 0 to 1: brings the couriers out. */
+  hungry?: number;
 }
 
 /** Places on a doorstep, from its middle: how far across, and how many steps up. */
@@ -617,10 +639,12 @@ export function castWalkers(
 ): Party {
   const room = options.room ?? MAX_HEADS;
   let kind: Kind = options.group ? "friends" : pickKind(rand, STREET_MIX, room);
+  // At lunch and at dinner a good many of the people coming along are bringing somebody's.
+  if (!options.group && !options.seated && rand() < (options.hungry ?? 0) * 0.16) kind = "courier";
   if (options.only && STREET_MIX.some(([name]) => name === options.only)) {
     kind = options.only as Kind;
   }
-  if (kind === "cyclist" && !life.road) kind = "solo";
+  if ((kind === "cyclist" || kind === "courier") && !life.road) kind = "solo";
   if (options.late && ["child", "pram", "baller", "skater"].includes(kind)) kind = "solo";
   // The ones found sitting on a doorstep are neighbours, alone or in company.
   if (options.seated) {
@@ -666,7 +690,8 @@ export function castWalkers(
 
   // Stops along the way, in the order they will be reached.
   const stops: number[] = [];
-  const hurried = kind === "runner" || kind === "cyclist" || kind === "skater";
+  const riding = kind === "cyclist" || kind === "courier";
+  const hurried = kind === "runner" || riding || kind === "skater";
   const pauses = hurried
     ? 0
     : shape.dog || kind === "baller" || kind === "canner"
@@ -688,8 +713,7 @@ export function castWalkers(
   }
 
   // The party's line: its nearest member's feet. Cyclists keep to the road instead.
-  const y =
-    kind === "cyclist" ? life.road + whole(rand, -1, 1) : whole(rand, life.far + 3, life.near);
+  const y = riding ? life.road + whole(rand, -1, 1) : whole(rand, life.far + 3, life.near);
 
   const steps: Step[] = [];
   let at = x;
@@ -724,7 +748,7 @@ export function castWalkers(
     id: nextId(),
     heads: shape.heads,
     roof: null,
-    road: kind === "cyclist",
+    road: riding,
     x: startX,
     y,
     lift: 0,
@@ -798,6 +822,106 @@ export function castSleeper(rand: Rand, meta: LifeMeta, life: LifeConfig): Party
       { kind: "walk", to: end, seconds: Math.abs(end - stoop.x) / speed },
     ],
   };
+}
+
+/**
+ * Somebody with something to do at one spot: they start at `from`, walk to
+ * `to`, stop there for `wait` seconds, and then either go back where they
+ * came from (a driver returning to the van) or carry on off the end of the
+ * street. `kind` is who: "driver" and "postal" are one adult; "child" is a
+ * child with a grown-up.
+ */
+export function castErrand(
+  rand: Rand,
+  meta: LifeMeta,
+  life: LifeConfig,
+  errand: { from: number; to: number; wait: number; back: boolean; kind?: "adult" | "child" },
+): Party {
+  const shape = form(rand, meta, errand.kind === "child" ? "child" : "solo");
+  const steps: Step[] = [];
+  let at = errand.from;
+  const walk = (to: number) => {
+    if (to === at) return;
+    steps.push({ kind: "walk", to, seconds: Math.abs(to - at) / shape.speed });
+    at = to;
+  };
+  walk(errand.to);
+  steps.push({ kind: "wait", seconds: errand.wait });
+  if (errand.back) walk(errand.from);
+  else walk(errand.to >= errand.from ? life.to + shape.reach : life.from - shape.reach);
+  return {
+    id: nextId(),
+    heads: shape.heads,
+    roof: null,
+    road: false,
+    x: errand.from,
+    y: errand.back ? life.near : whole(rand, life.far + 3, life.near),
+    lift: 0,
+    members: shape.members,
+    steps,
+  };
+}
+
+/** How long an errand takes from start to finish, in seconds. */
+export function errandSeconds(party: Party): number {
+  return party.steps.reduce((sum, step) => sum + step.seconds, 0);
+}
+
+/**
+ * The letter carrier's round: in at one end of the block, a stop at every
+ * doorstep, and out at the other.
+ */
+export function castMailCarrier(rand: Rand, meta: LifeMeta, life: LifeConfig): Party | null {
+  if (life.stoops.length === 0) return null;
+  const { cast, person } = meta;
+  const speed = between(rand, 7, 8.5);
+  const rightward = rand() < 0.5;
+  const doors = [...life.stoops].sort((a, b) => (rightward ? a.x - b.x : b.x - a.x));
+  const start = rightward ? life.from - 8 : life.to + 8;
+  const steps: Step[] = [];
+  let at = start;
+  for (const door of doors) {
+    steps.push({ kind: "walk", to: door.x, seconds: Math.abs(door.x - at) / speed });
+    steps.push({ kind: "wait", seconds: between(rand, 1.8, 3.2) });
+    at = door.x;
+  }
+  const end = rightward ? life.to + 8 : life.from - 8;
+  steps.push({ kind: "walk", to: end, seconds: Math.abs(end - at) / speed });
+  return {
+    id: nextId(),
+    heads: 1,
+    roof: null,
+    road: false,
+    x: start,
+    y: life.far + 3, // close in to the railings: this is door to door
+    lift: 0,
+    members: [
+      {
+        sheet: "people",
+        row: row(rand, cast.postal ?? cast.adults),
+        dx: -Math.floor(person.w / 2),
+        dy: 0,
+        cadence: Math.round((STRIDE.adult / speed) * 100) / 100,
+        phase: rand(),
+        idle: between(rand, 1.4, 2.2),
+      },
+    ],
+    steps,
+  };
+}
+
+/** Something on wheels that comes down the block on business. */
+export interface ServiceRun {
+  id: number;
+  kind: string;
+  /** Where it pulls up, in order, and for how long each time. None: it drives straight through. */
+  stops: { x: number; stay: number }[];
+  /** Scene pixels a second while it is moving. */
+  speed: number;
+  /** Double-parked with its hazard lights going while it is stopped. */
+  hazards?: boolean;
+  /** At the kerb, where the parked cars usually are, rather than out in the lane. */
+  kerbside?: boolean;
 }
 
 /** A police car going by: when it sets off is up to the street; this is how it goes. */

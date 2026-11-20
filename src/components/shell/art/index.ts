@@ -41,28 +41,36 @@ import skylineCitySpringDay from "./skyline/city-spring-day.png";
 import skylineRooftopsSpringDay from "./skyline/rooftops-spring-day.png";
 import skylineCitySnowDay from "./skyline/city-snow-day.png";
 import skylineRooftopsSnowDay from "./skyline/rooftops-snow-day.png";
-import skylinePeopleDay from "./skyline/people-day.png";
+import skylinePeopleMildDay from "./skyline/people-mild-day.png";
+import skylinePeopleColdDay from "./skyline/people-cold-day.png";
+import skylinePeopleHotDay from "./skyline/people-hot-day.png";
 import skylinePropsDay from "./skyline/props-day.png";
 import skylineWheelsDay from "./skyline/wheels-day.png";
 import skylineCitySpringGolden from "./skyline/city-spring-golden.png";
 import skylineRooftopsSpringGolden from "./skyline/rooftops-spring-golden.png";
 import skylineCitySnowGolden from "./skyline/city-snow-golden.png";
 import skylineRooftopsSnowGolden from "./skyline/rooftops-snow-golden.png";
-import skylinePeopleGolden from "./skyline/people-golden.png";
+import skylinePeopleMildGolden from "./skyline/people-mild-golden.png";
+import skylinePeopleColdGolden from "./skyline/people-cold-golden.png";
+import skylinePeopleHotGolden from "./skyline/people-hot-golden.png";
 import skylinePropsGolden from "./skyline/props-golden.png";
 import skylineWheelsGolden from "./skyline/wheels-golden.png";
 import skylineCitySpringDusk from "./skyline/city-spring-dusk.png";
 import skylineRooftopsSpringDusk from "./skyline/rooftops-spring-dusk.png";
 import skylineCitySnowDusk from "./skyline/city-snow-dusk.png";
 import skylineRooftopsSnowDusk from "./skyline/rooftops-snow-dusk.png";
-import skylinePeopleDusk from "./skyline/people-dusk.png";
+import skylinePeopleMildDusk from "./skyline/people-mild-dusk.png";
+import skylinePeopleColdDusk from "./skyline/people-cold-dusk.png";
+import skylinePeopleHotDusk from "./skyline/people-hot-dusk.png";
 import skylinePropsDusk from "./skyline/props-dusk.png";
 import skylineWheelsDusk from "./skyline/wheels-dusk.png";
 import skylineCitySpringNight from "./skyline/city-spring-night.png";
 import skylineRooftopsSpringNight from "./skyline/rooftops-spring-night.png";
 import skylineCitySnowNight from "./skyline/city-snow-night.png";
 import skylineRooftopsSnowNight from "./skyline/rooftops-snow-night.png";
-import skylinePeopleNight from "./skyline/people-night.png";
+import skylinePeopleMildNight from "./skyline/people-mild-night.png";
+import skylinePeopleColdNight from "./skyline/people-cold-night.png";
+import skylinePeopleHotNight from "./skyline/people-hot-night.png";
 import skylinePropsNight from "./skyline/props-night.png";
 import skylineWheelsNight from "./skyline/wheels-night.png";
 import brooklynGlowBackA from "./brooklyn/glow-back-a.png";
@@ -73,6 +81,28 @@ import brooklynHomesCitySpring from "./brooklyn/homes-city-spring.png";
 import brooklynHomesRooftopsSpring from "./brooklyn/homes-rooftops-spring.png";
 import brooklynHomesCityWinter from "./brooklyn/homes-city-winter.png";
 import brooklynHomesRooftopsWinter from "./brooklyn/homes-rooftops-winter.png";
+import brooklynXmasA from "./brooklyn/xmas-a.png";
+import brooklynXmasB from "./brooklyn/xmas-b.png";
+import brooklynThingsDay from "./brooklyn/things-day.png";
+import brooklynShutBakeryDay from "./brooklyn/shut-bakery-day.png";
+import brooklynShutPizzaDay from "./brooklyn/shut-pizza-day.png";
+import brooklynWetDay from "./brooklyn/wet-day.png";
+import brooklynBanksDay from "./brooklyn/banks-day.png";
+import brooklynThingsGolden from "./brooklyn/things-golden.png";
+import brooklynShutBakeryGolden from "./brooklyn/shut-bakery-golden.png";
+import brooklynShutPizzaGolden from "./brooklyn/shut-pizza-golden.png";
+import brooklynWetGolden from "./brooklyn/wet-golden.png";
+import brooklynBanksGolden from "./brooklyn/banks-golden.png";
+import brooklynThingsDusk from "./brooklyn/things-dusk.png";
+import brooklynShutBakeryDusk from "./brooklyn/shut-bakery-dusk.png";
+import brooklynShutPizzaDusk from "./brooklyn/shut-pizza-dusk.png";
+import brooklynWetDusk from "./brooklyn/wet-dusk.png";
+import brooklynBanksDusk from "./brooklyn/banks-dusk.png";
+import brooklynThingsNight from "./brooklyn/things-night.png";
+import brooklynShutBakeryNight from "./brooklyn/shut-bakery-night.png";
+import brooklynShutPizzaNight from "./brooklyn/shut-pizza-night.png";
+import brooklynWetNight from "./brooklyn/wet-night.png";
+import brooklynBanksNight from "./brooklyn/banks-night.png";
 import brooklynTrafficDay from "./brooklyn/traffic-day.png";
 import brooklynCabDay from "./brooklyn/cab-day.png";
 import brooklynCruiserDay from "./brooklyn/cruiser-day.png";
@@ -88,7 +118,9 @@ import brooklynRooftopsWinterDay from "./brooklyn/rooftops-winter-day.png";
 import brooklynCitySnowDay from "./brooklyn/city-snow-day.png";
 import brooklynRooftopsSnowDay from "./brooklyn/rooftops-snow-day.png";
 import brooklynParkedSnowDay from "./brooklyn/parked-snow-day.png";
-import brooklynPeopleDay from "./brooklyn/people-day.png";
+import brooklynPeopleMildDay from "./brooklyn/people-mild-day.png";
+import brooklynPeopleColdDay from "./brooklyn/people-cold-day.png";
+import brooklynPeopleHotDay from "./brooklyn/people-hot-day.png";
 import brooklynPropsDay from "./brooklyn/props-day.png";
 import brooklynWheelsDay from "./brooklyn/wheels-day.png";
 import brooklynTrafficGolden from "./brooklyn/traffic-golden.png";
@@ -106,7 +138,9 @@ import brooklynRooftopsWinterGolden from "./brooklyn/rooftops-winter-golden.png"
 import brooklynCitySnowGolden from "./brooklyn/city-snow-golden.png";
 import brooklynRooftopsSnowGolden from "./brooklyn/rooftops-snow-golden.png";
 import brooklynParkedSnowGolden from "./brooklyn/parked-snow-golden.png";
-import brooklynPeopleGolden from "./brooklyn/people-golden.png";
+import brooklynPeopleMildGolden from "./brooklyn/people-mild-golden.png";
+import brooklynPeopleColdGolden from "./brooklyn/people-cold-golden.png";
+import brooklynPeopleHotGolden from "./brooklyn/people-hot-golden.png";
 import brooklynPropsGolden from "./brooklyn/props-golden.png";
 import brooklynWheelsGolden from "./brooklyn/wheels-golden.png";
 import brooklynTrafficDusk from "./brooklyn/traffic-dusk.png";
@@ -124,7 +158,9 @@ import brooklynRooftopsWinterDusk from "./brooklyn/rooftops-winter-dusk.png";
 import brooklynCitySnowDusk from "./brooklyn/city-snow-dusk.png";
 import brooklynRooftopsSnowDusk from "./brooklyn/rooftops-snow-dusk.png";
 import brooklynParkedSnowDusk from "./brooklyn/parked-snow-dusk.png";
-import brooklynPeopleDusk from "./brooklyn/people-dusk.png";
+import brooklynPeopleMildDusk from "./brooklyn/people-mild-dusk.png";
+import brooklynPeopleColdDusk from "./brooklyn/people-cold-dusk.png";
+import brooklynPeopleHotDusk from "./brooklyn/people-hot-dusk.png";
 import brooklynPropsDusk from "./brooklyn/props-dusk.png";
 import brooklynWheelsDusk from "./brooklyn/wheels-dusk.png";
 import brooklynTrafficNight from "./brooklyn/traffic-night.png";
@@ -142,7 +178,9 @@ import brooklynRooftopsWinterNight from "./brooklyn/rooftops-winter-night.png";
 import brooklynCitySnowNight from "./brooklyn/city-snow-night.png";
 import brooklynRooftopsSnowNight from "./brooklyn/rooftops-snow-night.png";
 import brooklynParkedSnowNight from "./brooklyn/parked-snow-night.png";
-import brooklynPeopleNight from "./brooklyn/people-night.png";
+import brooklynPeopleMildNight from "./brooklyn/people-mild-night.png";
+import brooklynPeopleColdNight from "./brooklyn/people-cold-night.png";
+import brooklynPeopleHotNight from "./brooklyn/people-hot-night.png";
 import brooklynPropsNight from "./brooklyn/props-night.png";
 import brooklynWheelsNight from "./brooklyn/wheels-night.png";
 
@@ -194,7 +232,7 @@ export const PEOPLE = {
   "person": {
     "w": 9,
     "h": 15,
-    "rows": 44
+    "rows": 48
   },
   "prop": {
     "w": 12,
@@ -235,6 +273,14 @@ export const PEOPLE = {
       40,
       4
     ],
+    "postal": [
+      44,
+      4
+    ],
+    "couriers": [
+      3,
+      7
+    ],
     "cart": 10,
     "bundle": 11,
     "dogs": [
@@ -272,7 +318,22 @@ export const SCENES = {
     },
     /** Cars at the kerb, drawn over the people on the pavement. Only some scenes have them. */
     parked: null,
-    people: { day: skylinePeopleDay.src, golden: skylinePeopleGolden.src, dusk: skylinePeopleDusk.src, night: skylinePeopleNight.src },
+    /** Everybody on foot, in each wardrobe: mild weather, cold, hot. */
+    people: {
+      mild: { day: skylinePeopleMildDay.src, golden: skylinePeopleMildGolden.src, dusk: skylinePeopleMildDusk.src, night: skylinePeopleMildNight.src },
+      cold: { day: skylinePeopleColdDay.src, golden: skylinePeopleColdGolden.src, dusk: skylinePeopleColdDusk.src, night: skylinePeopleColdNight.src },
+      hot: { day: skylinePeopleHotDay.src, golden: skylinePeopleHotGolden.src, dusk: skylinePeopleHotDusk.src, night: skylinePeopleHotNight.src },
+    },
+    /** The sheet of small things: umbrellas, rubbish, pumpkins, animals, the vehicles on business. */
+    things: null,
+    /** Each shop with its shutters down, by the shop's name. */
+    shut: {
+    } as Record<string, Record<SkyState, string>>,
+    /** Wet ground, and the banks of deep snow, to lay over the street. */
+    wet: null,
+    banks: null,
+    /** Christmas lights: two pictures that take turns. */
+    xmas: null,
     props: { day: skylinePropsDay.src, golden: skylinePropsGolden.src, dusk: skylinePropsDusk.src, night: skylinePropsNight.src },
     wheels: { day: skylineWheelsDay.src, golden: skylineWheelsGolden.src, dusk: skylineWheelsDusk.src, night: skylineWheelsNight.src },
     /** The cab that answers a hail. Only where there is a street to hail one on. */
@@ -1181,7 +1242,24 @@ export const SCENES = {
       winter: { day: brooklynParkedSpringDay.src, golden: brooklynParkedSpringGolden.src, dusk: brooklynParkedSpringDusk.src, night: brooklynParkedSpringNight.src },
       snow: { day: brooklynParkedSnowDay.src, golden: brooklynParkedSnowGolden.src, dusk: brooklynParkedSnowDusk.src, night: brooklynParkedSnowNight.src },
     },
-    people: { day: brooklynPeopleDay.src, golden: brooklynPeopleGolden.src, dusk: brooklynPeopleDusk.src, night: brooklynPeopleNight.src },
+    /** Everybody on foot, in each wardrobe: mild weather, cold, hot. */
+    people: {
+      mild: { day: brooklynPeopleMildDay.src, golden: brooklynPeopleMildGolden.src, dusk: brooklynPeopleMildDusk.src, night: brooklynPeopleMildNight.src },
+      cold: { day: brooklynPeopleColdDay.src, golden: brooklynPeopleColdGolden.src, dusk: brooklynPeopleColdDusk.src, night: brooklynPeopleColdNight.src },
+      hot: { day: brooklynPeopleHotDay.src, golden: brooklynPeopleHotGolden.src, dusk: brooklynPeopleHotDusk.src, night: brooklynPeopleHotNight.src },
+    },
+    /** The sheet of small things: umbrellas, rubbish, pumpkins, animals, the vehicles on business. */
+    things: { day: brooklynThingsDay.src, golden: brooklynThingsGolden.src, dusk: brooklynThingsDusk.src, night: brooklynThingsNight.src },
+    /** Each shop with its shutters down, by the shop's name. */
+    shut: {
+      "bakery": { day: brooklynShutBakeryDay.src, golden: brooklynShutBakeryGolden.src, dusk: brooklynShutBakeryDusk.src, night: brooklynShutBakeryNight.src },
+      "pizza": { day: brooklynShutPizzaDay.src, golden: brooklynShutPizzaGolden.src, dusk: brooklynShutPizzaDusk.src, night: brooklynShutPizzaNight.src },
+    } as Record<string, Record<SkyState, string>>,
+    /** Wet ground, and the banks of deep snow, to lay over the street. */
+    wet: { day: brooklynWetDay.src, golden: brooklynWetGolden.src, dusk: brooklynWetDusk.src, night: brooklynWetNight.src },
+    banks: { day: brooklynBanksDay.src, golden: brooklynBanksGolden.src, dusk: brooklynBanksDusk.src, night: brooklynBanksNight.src },
+    /** Christmas lights: two pictures that take turns. */
+    xmas: [brooklynXmasA.src, brooklynXmasB.src],
     props: { day: brooklynPropsDay.src, golden: brooklynPropsGolden.src, dusk: brooklynPropsDusk.src, night: brooklynPropsNight.src },
     wheels: { day: brooklynWheelsDay.src, golden: brooklynWheelsGolden.src, dusk: brooklynWheelsDusk.src, night: brooklynWheelsNight.src },
     /** The cab that answers a hail. Only where there is a street to hail one on. */
@@ -1514,6 +1592,127 @@ export const SCENES = {
             "h": 1
           }
         }
+      },
+      "street": {
+        "things": {
+          "schoolbus": {
+            "x": 0,
+            "y": 2,
+            "w": 58,
+            "h": 18,
+            "frames": 1
+          },
+          "garbage": {
+            "x": 60,
+            "y": 1,
+            "w": 48,
+            "h": 19,
+            "frames": 1
+          },
+          "parcel": {
+            "x": 110,
+            "y": 3,
+            "w": 36,
+            "h": 17,
+            "frames": 1
+          },
+          "icecream": {
+            "x": 148,
+            "y": 2,
+            "w": 34,
+            "h": 18,
+            "frames": 1
+          },
+          "sweeper": {
+            "x": 184,
+            "y": 5,
+            "w": 26,
+            "h": 15,
+            "frames": 1
+          },
+          "umbrella": {
+            "x": 0,
+            "y": 24,
+            "w": 9,
+            "h": 5,
+            "frames": 6
+          },
+          "rubbish": {
+            "x": 56,
+            "y": 24,
+            "w": 16,
+            "h": 7,
+            "frames": 1
+          },
+          "pumpkin": {
+            "x": 74,
+            "y": 24,
+            "w": 4,
+            "h": 4,
+            "frames": 2
+          },
+          "pigeon": {
+            "x": 84,
+            "y": 24,
+            "w": 5,
+            "h": 4,
+            "frames": 2
+          },
+          "squirrel": {
+            "x": 96,
+            "y": 24,
+            "w": 8,
+            "h": 5,
+            "frames": 2
+          },
+          "rat": {
+            "x": 114,
+            "y": 24,
+            "w": 7,
+            "h": 3,
+            "frames": 2
+          }
+        },
+        "sheet": {
+          "w": 256,
+          "h": 48
+        },
+        "pavement": 334,
+        "kerb": 342,
+        "lane": 353,
+        "shops": [
+          "bakery",
+          "pizza"
+        ],
+        "piles": [
+          34,
+          118,
+          204,
+          282,
+          372,
+          458,
+          546,
+          612
+        ],
+        "manholes": [
+          [
+            150,
+            356
+          ],
+          [
+            431,
+            352
+          ]
+        ],
+        "trees": [
+          58,
+          132,
+          236,
+          318,
+          398,
+          474,
+          590
+        ]
       },
       "windows": [
         {

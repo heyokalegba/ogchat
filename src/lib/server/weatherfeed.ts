@@ -35,7 +35,8 @@ const DAY_MS = 86_400_000;
 const PLACE =
   `latitude=${BROOKLYN.latitude.toFixed(2)}&longitude=${BROOKLYN.longitude.toFixed(2)}` +
   `&timezone=${encodeURIComponent(BROOKLYN.timeZone)}`;
-const CURRENT = "weather_code,cloud_cover,precipitation,snowfall,wind_speed_10m,temperature_2m";
+const CURRENT =
+  "weather_code,cloud_cover,precipitation,snowfall,wind_speed_10m,wind_direction_10m,temperature_2m";
 const HOURLY = `${CURRENT},snow_depth`;
 /** The least that makes weather. Asked for alone if the service refuses the full list. */
 const BARE = "weather_code,cloud_cover,temperature_2m";
@@ -85,6 +86,7 @@ function reading(time: unknown, at: (name: string) => unknown): Reading | null {
     snowCm: numberOr(at("snowfall")),
     snowDepthM: numberOr(at("snow_depth")),
     windKph: numberOr(at("wind_speed_10m")),
+    windFrom: numberOr(at("wind_direction_10m")),
     visibilityM: numberOr(at("visibility")),
     tempC: numberOr(at("temperature_2m")),
   };

@@ -9,6 +9,7 @@ import {
   atBrooklynDate,
   brooklynClock,
   brooklynDate,
+  brooklynDay,
   brooklynHour,
   FIRST_DATE,
   offsetForClockTime,
@@ -22,6 +23,11 @@ import {
   seasonAt,
   type Reading,
 } from "@/lib/weather";
+import { soundscapeOf } from "@/lib/ambience";
+import { LIGHT_AIR, windOf } from "@/lib/nycday";
+import { shelterOf } from "@/lib/weather";
+import { trafficAt } from "./life";
+import { useAmbience } from "./useAmbience";
 import { useWeather } from "./useWeather";
 import type { Project, PublicSettings, ReasoningEffort, SessionMeta } from "@/lib/types";
 import { SCENES, type SceneId } from "./art";
@@ -413,6 +419,23 @@ export function AppShell() {
     look.season === "snow" ||
     (conditions.snowLying && (look.season === "auto" || look.season === "winter"));
 
+  // The wind, and what the street sounds like: only heard if sound is on in the look panel.
+  const wind = liveWanted && reading ? windOf(reading.windKph, reading.windFrom) : LIGHT_AIR;
+  const block = brooklynDay(sceneNow ?? 0);
+  const ambience = useAmbience(
+    look.sound && !look.still,
+    look.volume / 100,
+    soundscapeOf({
+      traffic: trafficAt(block.hour, block.weekday, shelterOf(conditions)),
+      weather: conditions.kind,
+      force: conditions.force,
+      wind: wind.strength,
+      night: view?.blend.night ?? 0,
+      season,
+      wet: conditions.kind === "rain" || conditions.kind === "storm" || conditions.kind === "snow",
+    }),
+  );
+
   const provider = useMemo(
     () => (settings ? { ready: settings.apiKey.set, model: settings.model } : null),
     [settings],
@@ -434,6 +457,12 @@ export function AppShell() {
           snowy={snowy}
           conditions={conditions}
           tempC={liveWanted ? (reading?.tempC ?? null) : null}
+          wind={wind}
+          onBang={ambience.bang}
+          onSiren={ambience.whoop}
+          snowDepthM={
+            liveWanted ? (reading?.snowDepthM ?? null) : look.season === "snow" ? 0.2 : null
+          }
           age={streetDays + peekYears * 365}
           people={look.people}
           still={look.still}
