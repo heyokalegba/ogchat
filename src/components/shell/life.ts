@@ -116,10 +116,107 @@ const pick = <T>(rand: Rand, list: readonly T[]): T => list[Math.floor(rand() * 
 const row = (rand: Rand, [first, count]: readonly [number, number]) =>
   first + Math.floor(rand() * count);
 
-/** How many people it takes to make the street feel lived in, by how dark it is. */
-export function wantedHeads(rand: Rand, night: number): number {
-  const byDay = whole(rand, 3, 5);
-  return Math.max(1, Math.round(byDay * (1 - 0.55 * Math.min(1, Math.max(0, night)))));
+/** A value read off a line drawn through points [x, y], x ascending. Flat beyond the ends. */
+function along(points: readonly (readonly [number, number])[], x: number): number {
+  const first = points[0]!;
+  const last = points.at(-1)!;
+  if (x <= first[0]) return first[1];
+  if (x >= last[0]) return last[1];
+  for (let i = 1; i < points.length; i++) {
+    const [x1, y1] = points[i]!;
+    const [x0, y0] = points[i - 1]!;
+    if (x <= x1) return y0 + ((y1 - y0) * (x - x0)) / (x1 - x0);
+  }
+  return last[1];
+}
+
+/**
+ * How busy a residential block in Brooklyn is through a working day, by the
+ * hour: 1 is an ordinary busy pavement. Dead in the small hours, a rush to
+ * school and the subway, a lull while everyone is at work, lunch, school
+ * letting out, the walk home (the busiest it gets), and a slow evening.
+ */
+const WORKDAY: readonly (readonly [number, number])[] = [
+  [0, 0.14],
+  [2, 0.06],
+  [4.5, 0.05],
+  [5.5, 0.22],
+  [7, 0.8],
+  [8.5, 1.05],
+  [9.5, 0.6],
+  [11.5, 0.5],
+  [12.5, 0.8],
+  [14, 0.6],
+  [15.25, 0.95],
+  [16.5, 0.9],
+  [18, 1.25],
+  [19.5, 1.0],
+  [21, 0.7],
+  [22.5, 0.4],
+  [24, 0.14],
+];
+
+/** The same block on a day off: a late start, a long full afternoon, a later night. */
+const DAY_OFF: readonly (readonly [number, number])[] = [
+  [0, 0.4],
+  [2, 0.18],
+  [4.5, 0.06],
+  [7, 0.2],
+  [9, 0.6],
+  [11, 1.05],
+  [15, 1.2],
+  [18, 1.05],
+  [21, 0.8],
+  [24, 0.4],
+];
+
+/** What the cold and the heat do to it: full between a mild day and a warm one. */
+const BY_TEMPERATURE: readonly (readonly [number, number])[] = [
+  [-12, 0.3],
+  [-4, 0.45],
+  [3, 0.65],
+  [10, 0.88],
+  [16, 1],
+  [28, 1],
+  [33, 0.8],
+  [38, 0.55],
+];
+
+/**
+ * How busy the pavement should be, as New York does it: by the hour and the
+ * day of the week, by how cold or hot it is, and by the weather.
+ *
+ * `hour` is the time of day in Brooklyn, 0 to 24, fractions and all;
+ * `weekday` counts from Sunday as 0; `tempC` is the temperature, or null when
+ * it is not known; `shelter` is how much the weather keeps people in (0 to 1).
+ * The answer is around 1 for an ordinary busy hour and near 0 at four in the
+ * morning in January.
+ */
+export function bustleAt(hour: number, weekday: number, tempC: number | null, shelter = 0): number {
+  const h = ((hour % 24) + 24) % 24;
+  const off = weekday === 0 || weekday === 6;
+  let level = along(off ? DAY_OFF : WORKDAY, h);
+  // Friday night runs late, like the night before any day off; Sunday night does not.
+  if (weekday === 5 && h >= 19) level = Math.max(level, along(DAY_OFF, h));
+  if (weekday === 0 && h >= 19) level = Math.min(level, along(WORKDAY, h));
+  const weather = 1 - 0.8 * Math.min(1, Math.max(0, shelter));
+  return level * (tempC === null ? 1 : along(BY_TEMPERATURE, tempC)) * weather;
+}
+
+/** Whether it is an hour at which children, prams and ball games are off the street. */
+export function pastBedtime(hour: number): boolean {
+  const h = ((hour % 24) + 24) % 24;
+  return h >= 21.5 || h < 6.5;
+}
+
+/**
+ * How many people the street should have on it just now: three to five on an
+ * ordinary busy pavement, scaled by how busy it is. A fraction of a person
+ * is a chance of one, so a quiet street is sometimes empty and sometimes not.
+ */
+export function wantedHeads(rand: Rand, bustle: number): number {
+  const exact = whole(rand, 3, 5) * Math.max(0, bustle);
+  return Math.floor(exact) + (rand() < exact - Math.floor(exact) ? 1 : 0);
 }
 
 // ---------------------------------------------------------------- formations
@@ -310,6 +407,10 @@ export interface CastOptions {
   room?: number;
   /** Already sitting on a doorstep when first seen. */
   seated?: boolean;
+  /** Past bedtime: no children, prams or ball games; whoever would have been is somebody alone. */
+  late?: boolean;
+  /** Too cold or too wet to sit out: nobody stops on a doorstep. */
+  noSitting?: boolean;
 }
 
 /** Places on a doorstep, from its middle: how far across, and how many steps up. */
@@ -375,6 +476,7 @@ export function castWalkers(
   const room = options.room ?? MAX_HEADS;
   let kind: Kind = options.group ? "friends" : pickKind(rand, STREET_MIX, room);
   if (kind === "cyclist" && !life.road) kind = "solo";
+  if (options.late && ["child", "pram", "baller", "skater"].includes(kind)) kind = "solo";
   // The ones found sitting on a doorstep are neighbours, alone or in company.
   if (options.seated) {
     kind = pick(rand, room >= 3 ? ["solo", "couple", "solo", "friends"] : ["solo"]);
@@ -422,7 +524,8 @@ export function castWalkers(
   const ahead = life.stoops.filter((stoop) =>
     rightward ? stoop.x > x + 16 && stoop.x < end - 30 : stoop.x < x - 16 && stoop.x > end + 30,
   );
-  const sitting = options.seated ? life.stoops : rand() < (SITS[kind] ?? 0) ? ahead : [];
+  const sits = options.noSitting ? 0 : (SITS[kind] ?? 0);
+  const sitting = options.seated ? life.stoops : rand() < sits ? ahead : [];
   if (sitting.length > 0) {
     const stoop = pick(rand, sitting);
     seatMembers(shape.members, meta, stoop, y);

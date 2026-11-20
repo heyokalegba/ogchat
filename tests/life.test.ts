@@ -5,7 +5,9 @@ import {
   castCabRide,
   castWalkers,
   HATCH_DEPTH,
+  bustleAt,
   MAX_HEADS,
+  pastBedtime,
   roofPartyAt,
   wantedHeads,
   type LifeConfig,
@@ -91,13 +93,93 @@ function many<T>(count: number, make: (rand: () => number) => T): T[] {
 const people = (party: Party) => party.members.filter((m) => m.sheet === "people");
 
 describe("how many people the street wants", () => {
-  it("is three to five by day, fewer at night, and never nobody", () => {
-    const day = many(300, (rand) => wantedHeads(rand, 0));
-    expect(Math.min(...day)).toBe(3);
-    expect(Math.max(...day)).toBe(5);
-    const night = many(300, (rand) => wantedHeads(rand, 1));
-    expect(Math.min(...night)).toBeGreaterThanOrEqual(1);
-    expect(Math.max(...night)).toBeLessThanOrEqual(2);
+  const mean = (list: number[]) => list.reduce((sum, n) => sum + n, 0) / list.length;
+
+  it("is three to five on an ordinary busy pavement, and scales with how busy it is", () => {
+    const busy = many(300, (rand) => wantedHeads(rand, 1));
+    expect(Math.min(...busy)).toBe(3);
+    expect(Math.max(...busy)).toBe(5);
+    const quiet = many(600, (rand) => wantedHeads(rand, 0.1));
+    expect(Math.min(...quiet)).toBe(0); // a quiet street is sometimes empty
+    expect(Math.max(...quiet)).toBe(1); // and sometimes has somebody on it
+    expect(mean(quiet)).toBeGreaterThan(0.25);
+    expect(mean(quiet)).toBeLessThan(0.55);
+    expect(many(50, (rand) => wantedHeads(rand, 0)).every((n) => n === 0)).toBe(true);
+  });
+});
+
+describe("how busy the street is, the way New York does it", () => {
+  const WED = 3;
+  const FRI = 5;
+  const SAT = 6;
+  const SUN = 0;
+  const mild = 18;
+
+  it("is dead in the small hours and busiest on the walk home", () => {
+    const day = Array.from({ length: 96 }, (_, i) => bustleAt(i / 4, WED, mild));
+    expect(Math.max(...day)).toBe(bustleAt(18, WED, mild));
+    expect(bustleAt(4, WED, mild)).toBeLessThan(0.1);
+    expect(bustleAt(3, WED, mild)).toBeLessThan(bustleAt(23, WED, mild));
+    expect(bustleAt(23, WED, mild)).toBeLessThan(bustleAt(20, WED, mild));
+  });
+
+  it("has a lull while everyone is at work, between the morning rush and lunch", () => {
+    expect(bustleAt(10.5, WED, mild)).toBeLessThan(bustleAt(8.5, WED, mild) * 0.65);
+    expect(bustleAt(10.5, WED, mild)).toBeLessThan(bustleAt(12.5, WED, mild));
+    expect(bustleAt(14, WED, mild)).toBeLessThan(bustleAt(18, WED, mild) * 0.6);
+  });
+
+  it("knows a day off: a late start, a full afternoon, a later night", () => {
+    expect(bustleAt(8, SAT, mild)).toBeLessThan(bustleAt(8, WED, mild));
+    expect(bustleAt(14, SAT, mild)).toBeGreaterThan(bustleAt(14, WED, mild) * 1.6);
+    expect(bustleAt(23.5, SAT, mild)).toBeGreaterThan(bustleAt(23.5, WED, mild));
+    expect(bustleAt(23, FRI, mild)).toBeGreaterThan(bustleAt(23, WED, mild)); // Friday night
+    expect(bustleAt(23, SUN, mild)).toBeLessThan(bustleAt(23, SAT, mild)); // work tomorrow
+  });
+
+  it("thins out in the cold, in the heat, and in bad weather", () => {
+    const at = (temp: number | null, shelter = 0) => bustleAt(18, WED, temp, shelter);
+    expect(at(-8)).toBeLessThan(at(2));
+    expect(at(2)).toBeLessThan(at(12));
+    expect(at(12)).toBeLessThan(at(20));
+    expect(at(20)).toBe(at(26));
+    expect(at(36)).toBeLessThan(at(26));
+    expect(at(-8)).toBeLessThan(at(20) * 0.45);
+    expect(at(null)).toBe(at(20)); // not known: assume a fair day
+    expect(at(20, 0.5)).toBeLessThan(at(20) * 0.7);
+    expect(at(20, 0.85)).toBeLessThan(at(20, 0.5));
+  });
+
+  it("is never negative and moves smoothly through the day", () => {
+    for (const weekday of [SUN, WED, FRI, SAT]) {
+      let last = bustleAt(0, weekday, mild);
+      for (let h = 0; h <= 24; h += 0.05) {
+        const now = bustleAt(h, weekday, mild);
+        expect(now).toBeGreaterThanOrEqual(0);
+        expect(Math.abs(now - last)).toBeLessThan(0.08);
+        last = now;
+      }
+    }
+  });
+
+  it("sends the children home at night", () => {
+    expect([22, 23.5, 0, 3, 6].every(pastBedtime)).toBe(true);
+    expect([7, 12, 16, 20, 21].some(pastBedtime)).toBe(false);
+    const rand = seeded(7);
+    const [first, count] = meta.cast.children;
+    for (let n = 0; n < 400; n++) {
+      const party = castWalkers(rand, meta, street, { late: true });
+      const child = people(party).some((m) => m.row >= first && m.row < first + count);
+      expect(child).toBe(false);
+    }
+  });
+
+  it("keeps people off the doorsteps when it is too cold to sit", () => {
+    const rand = seeded(11);
+    for (let n = 0; n < 400; n++) {
+      const party = castWalkers(rand, meta, street, { noSitting: true });
+      expect(party.steps.some((step) => step.kind === "sit")).toBe(false);
+    }
   });
 });
 

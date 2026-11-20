@@ -302,8 +302,12 @@ export function StreetLife(props: {
   now?: number;
   /** Frozen: a few people standing where they are, and nothing else. */
   still?: boolean;
-  /** How much the weather keeps people in: 0 not at all, 1 nobody about. */
-  shelter?: number;
+  /** How busy the street should be: about 1 on an ordinary busy pavement, near 0 when deserted. */
+  bustle?: number;
+  /** Past the hour for children and ball games. */
+  late?: boolean;
+  /** Too cold or wet for anyone to sit out on a doorstep. */
+  noSitting?: boolean;
 }) {
   const { scene, light } = props;
   const art = SCENES[scene];
@@ -317,11 +321,15 @@ export function StreetLife(props: {
     (id: number) => setCabs((current) => current.filter((ride) => ride.id !== id)),
     [],
   );
-  const night = useRef(props.night);
+  // How the street is just now, for the spawner to read whenever it next looks.
+  const mood = useRef({ bustle: 1, late: false, noSitting: false });
   useEffect(() => {
-    // Bad weather empties the street the way the small hours do.
-    night.current = Math.max(props.night, props.shelter ?? 0);
-  }, [props.night, props.shelter]);
+    mood.current = {
+      bustle: props.bustle ?? 1,
+      late: props.late ?? false,
+      noSitting: props.noSitting ?? false,
+    };
+  }, [props.bustle, props.late, props.noSitting]);
 
   const commit = useCallback((next: Party[]) => {
     live.current = next;
@@ -345,7 +353,12 @@ export function StreetLife(props: {
     const one = (room: number, midway = false) =>
       onRoofs
         ? castRoofVisit(rand, PEOPLE, life, { room, delay: midway ? rand() * 6 : 0 })
-        : castWalkers(rand, PEOPLE, life, { room, midway });
+        : castWalkers(rand, PEOPLE, life, {
+            room,
+            midway,
+            late: mood.current.late,
+            noSitting: mood.current.noSitting,
+          });
 
     // Frozen, or less motion asked for: a few people standing about, and nothing else.
     if (still || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -355,9 +368,13 @@ export function StreetLife(props: {
     }
 
     // Open on a street that is already lived in, not an empty one filling up.
-    let wanted = wantedHeads(rand, night.current);
-    // Often somebody is already out on a doorstep.
-    if (life.stoops.length > 0 && rand() < 0.75) {
+    let wanted = wantedHeads(rand, mood.current.bustle);
+    // Often somebody is already out on a doorstep, when it is a time and a day for it.
+    if (
+      life.stoops.length > 0 &&
+      !mood.current.noSitting &&
+      rand() < 0.75 * Math.min(1, mood.current.bustle)
+    ) {
       add(castWalkers(rand, PEOPLE, life, { seated: true, room: 3 }));
     }
     for (let n = 0; n < 6 && heads() < wanted; n++) add(one(wanted - heads(), true));
@@ -374,10 +391,12 @@ export function StreetLife(props: {
     // Now there is nothing to catch up on: whoever is there walked there.
     const tick = () => {
       const now = seconds();
-      if (now >= nextArrival && heads() < wanted) {
-        add(one(Math.min(wanted + 1, MAX_HEADS) - heads()));
-        nextArrival = now + 2 + rand() * 7;
-        wanted = wantedHeads(rand, night.current);
+      if (now >= nextArrival) {
+        // Looked at afresh each time, so a street that emptied overnight fills again by morning.
+        wanted = wantedHeads(rand, mood.current.bustle);
+        if (heads() < wanted) add(one(Math.min(wanted + 1, MAX_HEADS) - heads()));
+        // People come along more slowly when there are fewer of them about.
+        nextArrival = now + (2 + rand() * 7) / Math.max(0.3, Math.min(1.3, mood.current.bustle));
       }
       if (now >= nextCab) {
         nextCab = now + 150 + rand() * 270;
@@ -389,8 +408,8 @@ export function StreetLife(props: {
       }
       if (now >= nextGroup) {
         nextGroup = now + 150 + rand() * 250;
-        // Groups are a daytime and evening thing; late at night most are skipped.
-        if (rand() < night.current * 0.6) return;
+        // Groups come by when the street is busy; on a quiet one most are skipped.
+        if (rand() > mood.current.bustle) return;
         const room = MAX_HEADS - heads();
         const size = Math.min(
           room,

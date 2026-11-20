@@ -913,6 +913,168 @@ a.chip:hover {
   color: inherit;
 }
 
+/*
+ * The context meter: how full the model's window is, a thin bar of it, and
+ * the button that compresses. It takes the middle of the footer and gives
+ * way first when the footer is short of room.
+ */
+.surface .meter + .copyChat {
+  margin-left: 0;
+}
+
+.meter {
+  margin-left: auto;
+  gap: 8px;
+  /* The key hints give way before the meter does: they are the least needed. */
+  flex-shrink: 0;
+}
+
+.hintKeys {
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.meterText {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.meterBar {
+  flex: none;
+  width: 54px;
+  height: 7px;
+  border: 1px solid var(--og-ink);
+  background: rgba(13, 12, 11, 0.08);
+}
+
+.meterFill {
+  display: block;
+  height: 100%;
+  min-width: 1px;
+  background: var(--og-green);
+}
+
+.meterCount {
+  color: var(--og-text-3, var(--og-text-2));
+}
+
+.meterAdvice {
+  font-weight: 700;
+}
+
+.meter[data-level="soon"] .meterFill {
+  background: #b8862b;
+}
+
+.meter[data-level="soon"] .meterAdvice {
+  color: #7a5412;
+}
+
+.meter[data-level="now"] .meterFill,
+.meter[data-level="full"] .meterFill {
+  background: var(--og-accent);
+}
+
+.meter[data-level="now"] .meterAdvice,
+.meter[data-level="full"] .meterAdvice {
+  color: var(--og-accent);
+}
+
+.meter[data-level="full"] .meterAdvice {
+  animation: og-pulse 1600ms ease-in-out infinite;
+}
+
+.surface .meterButton {
+  padding: 0 6px;
+  border: 1px solid var(--og-ink);
+  font: inherit;
+  color: var(--og-ink);
+  background: var(--og-white);
+}
+
+.surface .meterButton:hover:not(:disabled) {
+  color: var(--og-white);
+  background: var(--og-ink);
+}
+
+.surface .meterButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Where a conversation was compressed: a ruled line across the transcript. */
+.summaryMark {
+  margin: 4px 0 2px;
+  font-family: var(--og-font-mono);
+  font-size: calc(12px * var(--og-type));
+  font-weight: 600;
+  text-shadow: none;
+}
+
+.summaryLine {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.summaryRule {
+  flex: 1;
+  height: 0;
+  border-top: var(--og-line) dashed var(--og-ink);
+  opacity: 0.55;
+}
+
+.summaryLabel,
+.summaryNote {
+  padding: 2px 6px;
+  color: var(--og-ink);
+  background: rgba(235, 228, 212, 0.86);
+}
+
+.summaryLabel {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.surface .summaryButton {
+  padding: 1px 6px;
+  border: 1px solid var(--og-ink);
+  font: inherit;
+  color: var(--og-ink);
+  background: var(--og-white);
+}
+
+.surface .summaryButton:hover:not(:disabled) {
+  color: var(--og-white);
+  background: var(--og-ink);
+}
+
+.surface .summaryButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.summaryNote {
+  width: fit-content;
+  margin: 6px auto 0;
+  font-weight: 500;
+  color: var(--og-text-2);
+}
+
+.summaryBody {
+  margin-top: 8px;
+  padding: 10px 14px;
+  border: var(--og-line) solid var(--og-ink);
+  font-family: var(--og-font-sans, inherit);
+  font-size: calc(15px * var(--og-type));
+  font-weight: 400;
+  color: var(--og-ink);
+  background: rgba(235, 228, 212, 0.92);
+}
+
 .hintKeys {
   white-space: nowrap;
   overflow: hidden;
@@ -975,6 +1137,10 @@ a.chip:hover {
     padding: 6px 12px 10px;
   }
   .hintKeys {
+    display: none;
+  }
+  .meterBar,
+  .meterCount {
     display: none;
   }
   .hints {

@@ -433,6 +433,7 @@ export function AppShell() {
           season={season}
           snowy={snowy}
           conditions={conditions}
+          tempC={liveWanted ? (reading?.tempC ?? null) : null}
           age={streetDays + peekYears * 365}
           people={look.people}
           still={look.still}

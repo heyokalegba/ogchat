@@ -22,6 +22,9 @@ import { settingsFile } from "./paths";
 export const DEFAULT_BASE_URL = "https://api.abliteration.ai/v1";
 export const DEFAULT_MODEL = "abliterated-model-large-v2";
 export const MAX_SYSTEM_PROMPT_CHARS = 20_000;
+/** abliterated-model-large-v2 is listed with a context window of a million tokens. */
+export const DEFAULT_CONTEXT_WINDOW = 1_000_000;
+export const CONTEXT_WINDOW_RANGE = { min: 1_000, max: 20_000_000 };
 
 export interface ResolvedSettings {
   baseUrl: string;
@@ -30,6 +33,7 @@ export interface ResolvedSettings {
   keySource: KeySource | null;
   reasoning: ReasoningEffort;
   systemPrompt: string;
+  contextWindow: number;
 }
 
 interface StoredSettings {
@@ -38,6 +42,7 @@ interface StoredSettings {
   apiKey?: string;
   reasoning?: ReasoningEffort;
   systemPrompt?: string;
+  contextWindow?: number;
 }
 
 export interface SettingsPatch {
@@ -47,6 +52,8 @@ export interface SettingsPatch {
   reasoning?: unknown;
   /** Text sent as the system message of every conversation; "" for none. */
   systemPrompt?: unknown;
+  /** The model's context window in tokens; null or 0 goes back to the default. */
+  contextWindow?: unknown;
   /** A string replaces the saved key; null or "" removes it; undefined leaves it alone. */
   apiKey?: unknown;
 }
@@ -83,6 +90,12 @@ function readStored(): StoredSettings {
     systemPrompt:
       typeof s.systemPrompt === "string" && s.systemPrompt.trim()
         ? s.systemPrompt.slice(0, MAX_SYSTEM_PROMPT_CHARS)
+        : undefined,
+    contextWindow:
+      typeof s.contextWindow === "number" &&
+      s.contextWindow >= CONTEXT_WINDOW_RANGE.min &&
+      s.contextWindow <= CONTEXT_WINDOW_RANGE.max
+        ? Math.round(s.contextWindow)
         : undefined,
   };
 }
@@ -123,6 +136,7 @@ export function resolveSettings(): ResolvedSettings {
     keySource: stored.apiKey ? "settings" : envKey ? "env" : null,
     reasoning: stored.reasoning ?? "default",
     systemPrompt: stored.systemPrompt ?? "",
+    contextWindow: stored.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
   };
 }
 
@@ -139,6 +153,7 @@ export function publicSettings(): PublicSettings {
     defaults: { baseUrl: DEFAULT_BASE_URL, model: DEFAULT_MODEL },
     reasoning: s.reasoning,
     systemPrompt: s.systemPrompt,
+    contextWindow: s.contextWindow,
   };
 }
 
@@ -223,6 +238,18 @@ export function updateSettings(patch: SettingsPatch): PublicSettings {
     }
     if (patch.systemPrompt.trim()) stored.systemPrompt = patch.systemPrompt.trim();
     else delete stored.systemPrompt;
+  }
+
+  if (patch.contextWindow !== undefined) {
+    const { min, max } = CONTEXT_WINDOW_RANGE;
+    const asked = patch.contextWindow === null ? 0 : Number(patch.contextWindow);
+    if (!Number.isFinite(asked) || (asked !== 0 && (asked < min || asked > max))) {
+      throw new SettingsValidationError(
+        `Context window must be between ${min.toLocaleString("en-US")} and ${max.toLocaleString("en-US")} tokens.`,
+      );
+    }
+    if (asked === 0 || Math.round(asked) === DEFAULT_CONTEXT_WINDOW) delete stored.contextWindow;
+    else stored.contextWindow = Math.round(asked);
   }
 
   writeStored(stored);

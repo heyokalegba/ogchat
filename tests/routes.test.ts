@@ -18,6 +18,10 @@ import {
   PATCH as patchSession,
 } from "@/app/api/sessions/[id]/route";
 import { POST as stopSession } from "@/app/api/sessions/[id]/stop/route";
+import {
+  DELETE as expandRoute,
+  POST as compressRoute,
+} from "@/app/api/sessions/[id]/compress/route";
 import { GET as listSessions, POST as createSession } from "@/app/api/sessions/route";
 import {
   DELETE as deleteProjectFile,
@@ -146,6 +150,7 @@ describe("sessions API", () => {
       generating: false,
       partial: "",
       thinking: "",
+      context: { tokens: 4, limit: 1_000_000 },
     });
   });
 
@@ -836,6 +841,7 @@ describe("settings API", () => {
       },
       reasoning: "default",
       systemPrompt: "",
+      contextWindow: 1_000_000,
     });
   });
 
@@ -1219,5 +1225,195 @@ describe("local-only guard", () => {
         200,
       );
     }
+  });
+});
+
+describe("the context window", () => {
+  type Compressed = { session: Session; context: { tokens: number; limit: number } };
+  type Sent = { role: string; content: string };
+  async function settings(): Promise<PublicSettings> {
+    const res = await getSettings(req("GET", "/api/settings"));
+    return ((await res.json()) as { settings: PublicSettings }).settings;
+  }
+  const compress = (id: string) =>
+    compressRoute(req("POST", `/api/sessions/${id}/compress`, {}), ctx(id));
+  const expand = (id: string) =>
+    expandRoute(req("DELETE", `/api/sessions/${id}/compress`), ctx(id));
+
+  it("measures a session against the window in settings, and grows with what is said", async () => {
+    await useKey();
+    stubProvider(() => sseResponse(["A".repeat(3600)]));
+    const session = await create();
+    const empty = (await detail(session.id)).context;
+    expect(empty.limit).toBe(1_000_000);
+    await send(session.id, { content: "B".repeat(7200) });
+    const after = (await detail(session.id)).context;
+    // 10,800 characters at about 3.6 to the token, and a little for the wrapping
+    expect(after.tokens).toBeGreaterThan(3000);
+    expect(after.tokens).toBeLessThan(3050);
+
+    await putSettings(req("PUT", "/api/settings", { contextWindow: 8000 }));
+    expect((await detail(session.id)).context).toEqual({ tokens: after.tokens, limit: 8000 });
+    await putSettings(req("PUT", "/api/settings", { systemPrompt: "S".repeat(360) }));
+    expect((await detail(session.id)).context.tokens).toBe(after.tokens + 100);
+  });
+
+  it("accepts a sensible window only, and 0 for the default", async () => {
+    for (const bad of [5, -1, 50_000_000, "lots"]) {
+      const res = await putSettings(req("PUT", "/api/settings", { contextWindow: bad }));
+      expect(res.status).toBe(400);
+    }
+    await putSettings(req("PUT", "/api/settings", { contextWindow: 200_000 }));
+    expect(await settings()).toMatchObject({ contextWindow: 200_000 });
+    await putSettings(req("PUT", "/api/settings", { contextWindow: 0 }));
+    expect(await settings()).toMatchObject({ contextWindow: 1_000_000 });
+  });
+
+  it("compresses: the model summarises, and the summary is sent in place of what it covers", async () => {
+    await useKey();
+    let turn = 0;
+    const provider = stubProvider((call) => {
+      const last = (call.body.messages as Sent[]).at(-1)!.content;
+      return sseResponse([
+        last.startsWith("Stop here.") ? "SUMMARY: they greeted each other." : `reply ${++turn}`,
+      ]);
+    });
+    const session = await create();
+    await send(session.id, { content: "first " + "x".repeat(4000) });
+    await send(session.id, { content: "second" });
+    const before = (await detail(session.id)).context.tokens;
+
+    const res = await compress(session.id);
+    expect(res.status).toBe(200);
+    const done = (await res.json()) as Compressed;
+    // the request to summarise carried the whole conversation, then the instruction
+    const asked = provider.calls.at(-1)!.body.messages;
+    expect(asked.map((m: { role: string }) => m.role)).toEqual([
+      "user",
+      "assistant",
+      "user",
+      "assistant",
+      "user",
+    ]);
+    expect((asked as Sent[]).at(-1)!.content).toMatch(
+      /^Stop here\. Do not reply to the conversation: summarise it\./,
+    );
+    expect(provider.calls.at(-1)!.body.web_search_options).toBeUndefined();
+    // nothing is thrown away: the messages are all still there, and the summary beside them
+    expect(done.session.messages).toHaveLength(4);
+    expect(done.session.summary).toMatchObject({
+      text: "SUMMARY: they greeted each other.",
+      upTo: done.session.messages[3]!.id,
+    });
+    expect(done.context.tokens).toBeLessThan(before / 10);
+    expect((await detail(session.id)).session.summary?.text).toBe(
+      "SUMMARY: they greeted each other.",
+    );
+
+    // the next turn goes out as the summary and the new message only
+    await send(session.id, { content: "third" });
+    const next = provider.calls.at(-1)!.body.messages as Sent[];
+    expect(next).toHaveLength(2);
+    expect(next[0]!.role).toBe("system");
+    expect(next[0]!.content).toContain("<summary>\nSUMMARY: they greeted each other.\n</summary>");
+    expect(next[1]).toEqual({ role: "user", content: "third" });
+    expect(JSON.stringify(next)).not.toContain("xxxx");
+
+    // compressing again folds the old summary and the new messages into a new one
+    await compress(session.id);
+    const again = provider.calls.at(-1)!.body.messages as Sent[];
+    expect(again[0]!.content).toContain("SUMMARY: they greeted each other.");
+    expect(again.map((m: { role: string }) => m.role)).toEqual([
+      "system",
+      "user",
+      "assistant",
+      "user",
+    ]);
+  });
+
+  it("keeps the system prompt ahead of the summary", async () => {
+    await useKey();
+    await putSettings(req("PUT", "/api/settings", { systemPrompt: "Be brief." }));
+    const provider = stubProvider(() => sseResponse(["ok"]));
+    const session = await create();
+    await send(session.id, { content: "one" });
+    await compress(session.id);
+    await send(session.id, { content: "two" });
+    const system = (provider.calls.at(-1)!.body.messages as Sent[])[0]!;
+    expect(system.role).toBe("system");
+    expect(system.content.startsWith("Be brief.")).toBe(true);
+    expect(system.content).toContain("<summary>\nok\n</summary>");
+  });
+
+  it("can be undone: the whole conversation is sent again", async () => {
+    await useKey();
+    const provider = stubProvider(() => sseResponse(["ok"]));
+    const session = await create();
+    await send(session.id, { content: "one" });
+    await compress(session.id);
+    const res = await expand(session.id);
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as Compressed).session.summary).toBeUndefined();
+    await send(session.id, { content: "two" });
+    expect(provider.calls.at(-1)!.body.messages).toEqual([
+      { role: "user", content: "one" },
+      { role: "assistant", content: "ok" },
+      { role: "user", content: "two" },
+    ]);
+  });
+
+  it("drops the summary when the message it reaches is deleted", async () => {
+    await useKey();
+    stubProvider(() => sseResponse(["ok"]));
+    const session = await create();
+    await send(session.id, { content: "one" });
+    const { session: compressed } = (await (await compress(session.id)).json()) as Compressed;
+    // deleting a message takes everything after it too, the summary's last message included
+    const last = compressed.messages[0]!;
+    await deleteMessage(req("DELETE", `/api/sessions/${session.id}/messages/${last.id}`), {
+      params: Promise.resolve({ id: session.id, messageId: last.id }),
+    });
+    expect((await detail(session.id)).session.summary).toBeUndefined();
+  });
+
+  it("leaves the oldest messages out of the request when the conversation is over the window", async () => {
+    await useKey();
+    const provider = stubProvider(() => sseResponse(["r".repeat(3000)]));
+    const session = await create();
+    for (const word of ["alpha", "beta", "gamma", "delta"]) {
+      await send(session.id, { content: `${word} ${"w".repeat(3000)}` });
+    }
+    await putSettings(req("PUT", "/api/settings", { contextWindow: 3000 }));
+    expect((await detail(session.id)).context.tokens).toBeGreaterThan(3000);
+    const res = await compress(session.id);
+    expect(res.status).toBe(200);
+    const asked = provider.calls.at(-1)!.body.messages as { content: string }[];
+    expect(asked[0]!.content).toMatch(/earliest messages of this conversation are not shown/);
+    expect(JSON.stringify(asked)).not.toContain("alpha");
+    expect(JSON.stringify(asked)).toContain("delta");
+    // the session itself still has every message
+    expect((await detail(session.id)).session.messages).toHaveLength(8);
+  });
+
+  it("says no plainly: nothing to compress, an unknown session, a busy one, a failed request", async () => {
+    await useKey();
+    const empty = await create();
+    expect(await errorOf(await compress(empty.id))).toMatchObject({ code: "nothing_to_compress" });
+    expect((await compress("00000000-0000-4000-8000-000000000000")).status).toBe(404);
+    expect((await expand("00000000-0000-4000-8000-000000000000")).status).toBe(404);
+
+    stubProvider(() => sseResponse(["ok"]));
+    const session = await create();
+    await send(session.id, { content: "one" });
+    stubProvider(() => Response.json({ error: { message: "too long" } }, { status: 400 }));
+    const failed = await compress(session.id);
+    expect(failed.status).toBe(502);
+    expect((await detail(session.id)).session.summary).toBeUndefined();
+    expect((await detail(session.id)).generating).toBe(false);
+
+    stubProvider(() => sseResponse([""]));
+    const hollow = await compress(session.id);
+    expect(hollow.status).toBe(502);
+    expect((await detail(session.id)).session.summary).toBeUndefined();
   });
 });

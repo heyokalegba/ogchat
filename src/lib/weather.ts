@@ -33,6 +33,14 @@ const monthInNewYork = new Intl.DateTimeFormat("en-US", {
   month: "numeric",
 });
 
+/** About how warm an afternoon is in each season, in °C: used when the real figure is not known. */
+export const USUAL_TEMP_C: Record<SeasonName, number> = {
+  spring: 13,
+  summer: 27,
+  autumn: 14,
+  winter: 2,
+};
+
 /** The season in Brooklyn at a moment. */
 export function seasonAt(ms: number): SeasonName {
   return seasonOfMonth(Number(monthInNewYork.format(new Date(ms))) - 1);

@@ -33,6 +33,7 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
   const [apiKey, setApiKey] = useState("");
   const [reasoning, setReasoning] = useState<ReasoningEffort>(settings.reasoning);
   const [systemPrompt, setSystemPrompt] = useState(settings.systemPrompt);
+  const [contextWindow, setContextWindow] = useState(String(settings.contextWindow));
   const [removeKey, setRemoveKey] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -107,6 +108,7 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
         model,
         reasoning,
         systemPrompt,
+        contextWindow: Number(contextWindow.replace(/[,_\s]/g, "")) || 0,
         ...(typed ? { apiKey: typed } : removeKey ? { apiKey: null } : {}),
       });
       setApiKey("");
@@ -306,6 +308,26 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
             />
             <p className={styles.help}>
               Sent ahead of every conversation, old and new, from the next message on.
+            </p>
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="ogchat-context-window">
+              Context window
+            </label>
+            <input
+              id="ogchat-context-window"
+              className={styles.textInput}
+              inputMode="numeric"
+              value={contextWindow}
+              placeholder="1000000"
+              autoComplete="off"
+              onChange={(event) => setContextWindow(event.target.value)}
+            />
+            <p className={styles.help}>
+              How many tokens the model can take in at once: the meter under the message box
+              measures each conversation against it. <code>abliterated-model-large-v2</code> is
+              listed at 1,000,000. Leave empty for that.
             </p>
           </div>
 

@@ -73,8 +73,33 @@ export interface Project {
   sessionCount: number;
 }
 
+/**
+ * What stands in for the early part of a long conversation once it has been
+ * compressed: the model's own summary of everything up to one message. The
+ * messages themselves stay in the session to read; only the summary and what
+ * came after it are sent to the provider.
+ */
+export interface SessionSummary {
+  text: string;
+  /** The last message the summary covers. */
+  upTo: string;
+  /** When it was made, as an ISO timestamp. */
+  at: string;
+}
+
 export interface Session extends SessionMeta {
   messages: ChatMessage[];
+  summary?: SessionSummary;
+}
+
+/**
+ * How much of the model's context window a session takes up, in tokens. The
+ * count is an estimate from the length of the text (providers count a little
+ * differently); the limit is the context window from settings.
+ */
+export interface ContextUse {
+  tokens: number;
+  limit: number;
 }
 
 export type KeySource = "settings" | "env";
@@ -93,6 +118,8 @@ export interface PublicSettings {
   reasoning: ReasoningEffort;
   /** Instructions sent ahead of every conversation. Empty for none. */
   systemPrompt: string;
+  /** How many tokens the model can take in at once: what the context meter measures against. */
+  contextWindow: number;
 }
 
 /** One line of a settings test: what was checked and what was found. */
@@ -145,4 +172,6 @@ export interface SessionDetail {
   partial: string;
   /** Reasoning produced so far when `generating` is true. */
   thinking: string;
+  /** How full the model's context window is with this session as it stands. */
+  context: ContextUse;
 }

@@ -6,9 +6,11 @@ import { formatBytes, MAX_FILE_BYTES, MAX_FILES_PER_MESSAGE } from "@/lib/limits
 import type {
   Attachment,
   ChatMessage,
+  ContextUse,
   SendBody,
   Session,
   SessionMeta,
+  SessionSummary,
   StreamEvent,
 } from "@/lib/types";
 
@@ -103,6 +105,11 @@ export function useChat(options: UseChatOptions) {
   const [thinkingText, setThinkingText] = useState("");
   const thinkingRef = useRef("");
   const [error, setError] = useState<ChatErrorState | null>(null);
+  /** How full the model's context window is with this conversation. */
+  const [context, setContext] = useState<ContextUse | null>(null);
+  /** The summary standing in for the early part of the conversation, once compressed. */
+  const [summary, setSummary] = useState<SessionSummary | null>(null);
+  const [compressing, setCompressing] = useState(false);
   const [draft, setDraft] = useState("");
   /** Files waiting in the composer to go out with the next message. */
   const [files, setFilesState] = useState<File[]>([]);
@@ -135,6 +142,7 @@ export function useChat(options: UseChatOptions) {
   /** Counts session opens; drives the boot line and composer focus. */
   const [openCount, setOpenCount] = useState(0);
 
+  const compressingRef = useRef(false);
   const activeIdRef = useRef<string | null>(sessionId);
   const phaseRef = useRef<ChatPhase>(phase);
   /** Bumped whenever a different session is opened; stale async work checks it and bails. */
@@ -170,6 +178,8 @@ export function useChat(options: UseChatOptions) {
         const detail = await api.getSession(id);
         if (epochRef.current !== epoch) return false;
         setMessages(detail.session.messages);
+        setContext(detail.context ?? null);
+        setSummary(detail.session.summary ?? null);
         callbacks.current.onSessionUpdated?.(metaOf(detail.session));
         if (detail.generating) {
           bufferRef.current = detail.partial;
@@ -220,6 +230,9 @@ export function useChat(options: UseChatOptions) {
     setActiveId(sessionId);
     setMessages([]);
     setError(null);
+    setContext(null);
+    setSummary(null);
+    setCompressing(false);
     setDraft("");
     setFiles([]);
     resetStream();
@@ -250,6 +263,21 @@ export function useChat(options: UseChatOptions) {
       openedRef.current = null;
     },
     [],
+  );
+
+  /** Reads the context meter and the summary again, after the conversation has changed. */
+  const remeasure = useCallback(
+    async (id: string, epoch: number) => {
+      try {
+        const detail = await api.getSession(id);
+        if (epochRef.current !== epoch) return;
+        setContext(detail.context ?? null);
+        setSummary(detail.session.summary ?? null);
+      } catch {
+        // the meter keeps its last reading; the next change reads it again
+      }
+    },
+    [api],
   );
 
   const submit = useCallback(
@@ -340,6 +368,7 @@ export function useChat(options: UseChatOptions) {
             }
             setPhase("idle");
             callbacks.current.onSessionUpdated?.(event.session);
+            void remeasure(event.session.id, epoch);
             break;
           }
         }
@@ -391,7 +420,7 @@ export function useChat(options: UseChatOptions) {
         if (abortRef.current === controller) abortRef.current = null;
       }
     },
-    [api, load, resetStream, setFiles, setPhase],
+    [api, load, remeasure, resetStream, setFiles, setPhase],
   );
 
   const send = useCallback(
@@ -533,9 +562,40 @@ export function useChat(options: UseChatOptions) {
         setMessages(session.messages);
         setError(null);
         callbacks.current.onSessionUpdated?.(metaOf(session));
+        void remeasure(id, epoch);
       } catch (err) {
         if (epochRef.current !== epoch) return;
         setError({ ...describe(err), retry: null });
+      }
+    },
+    [api, remeasure],
+  );
+
+  /**
+   * Compresses the conversation: the model writes a summary of it, and from
+   * then on the summary is sent in place of the messages it covers. With
+   * `undo`, the summary is dropped and the whole conversation is sent again.
+   */
+  const compress = useCallback(
+    async (undo = false) => {
+      const id = activeIdRef.current;
+      if (!id || phaseRef.current !== "idle" || compressingRef.current) return;
+      const epoch = epochRef.current;
+      compressingRef.current = true;
+      setCompressing(true);
+      setError(null);
+      try {
+        const result = undo ? await api.expand(id) : await api.compress(id);
+        if (epochRef.current !== epoch) return;
+        setMessages(result.session.messages);
+        setSummary(result.session.summary ?? null);
+        setContext(result.context);
+      } catch (err) {
+        if (epochRef.current !== epoch) return;
+        setError({ ...describe(err), retry: null });
+      } finally {
+        compressingRef.current = false;
+        if (epochRef.current === epoch) setCompressing(false);
       }
     },
     [api],
@@ -553,6 +613,10 @@ export function useChat(options: UseChatOptions) {
     web,
     setWeb,
     error,
+    context,
+    summary,
+    compressing,
+    compress,
     draft,
     setDraft,
     files,

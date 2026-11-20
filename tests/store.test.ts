@@ -170,6 +170,7 @@ describe("settings persistence", () => {
       keySource: null,
       reasoning: "default",
       systemPrompt: "",
+      contextWindow: 1_000_000,
     });
   });
 
@@ -189,6 +190,7 @@ describe("settings persistence", () => {
       keySource: "settings",
       reasoning: "default",
       systemPrompt: "",
+      contextWindow: 1_000_000,
     });
     const file = path.join(data.dir(), "settings.json");
     expect(fs.statSync(file).mode & 0o777).toBe(0o600);
@@ -214,6 +216,7 @@ describe("settings persistence", () => {
       keySource: "env",
       reasoning: "default",
       systemPrompt: "",
+      contextWindow: 1_000_000,
     });
     expect(settings.publicSettings().apiKey).toEqual({
       set: true,

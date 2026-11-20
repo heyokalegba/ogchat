@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -15,6 +16,7 @@ import type { ChatMessage, ReasoningEffort, SessionMeta } from "@/lib/types";
 import { BootLine } from "./BootLine";
 import styles from "./chat.module.css";
 import { Composer } from "./Composer";
+import { ContextMeter, SummaryMark } from "./ContextMeter";
 import { copyText } from "./Markdown";
 import { MessageView, StreamingMessage } from "./Message";
 import "./theme.css";
@@ -106,7 +108,8 @@ export function ChatSurface(props: ChatSurfaceProps) {
   const stick = useRef(true);
 
   const busy = phase === "streaming" || phase === "following";
-  const idle = phase === "idle";
+  // Compressing waits on the model like a reply does: nothing else can be sent meanwhile.
+  const idle = phase === "idle" && !chat.compressing;
   const lastMessage = messages.at(-1);
   const lastUserId = useMemo(
     () => messages.findLast((m) => m.role === "user")?.id ?? null,
@@ -115,6 +118,9 @@ export function ChatSurface(props: ChatSurfaceProps) {
   const pending = lastMessage?.id.startsWith("pending-") ?? false;
   const unanswered = idle && !error && !pending && lastMessage?.role === "user";
   const empty = messages.length === 0 && !busy && phase !== "loading";
+  // How many messages have been said since the conversation was last compressed.
+  const summaryAt = chat.summary ? messages.findIndex((m) => m.id === chat.summary?.upTo) : -1;
+  const sinceSummary = messages.length - (summaryAt + 1);
 
   // Opening a session: pin to the bottom and put the cursor in the composer.
   useEffect(() => {
@@ -260,18 +266,30 @@ export function ChatSurface(props: ChatSurfaceProps) {
 
             <div className={styles.messages} role="log" aria-label="Conversation">
               {messages.map((message) => (
-                <MessageView
-                  key={message.id}
-                  message={message}
-                  canEdit={idle && message.id === lastUserId && !message.id.startsWith("pending-")}
-                  canRegenerate={idle && message === lastMessage && message.role === "assistant"}
-                  onEdit={onEdit}
-                  onDelete={onDelete}
-                  onRegenerate={regenerate}
-                  canReplay={idle && message.role === "user" && !message.id.startsWith("pending-")}
-                  onReplay={onReplay}
-                  fileUrl={chat.fileUrl}
-                />
+                <Fragment key={message.id}>
+                  <MessageView
+                    message={message}
+                    canEdit={
+                      idle && message.id === lastUserId && !message.id.startsWith("pending-")
+                    }
+                    canRegenerate={idle && message === lastMessage && message.role === "assistant"}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
+                    onRegenerate={regenerate}
+                    canReplay={
+                      idle && message.role === "user" && !message.id.startsWith("pending-")
+                    }
+                    onReplay={onReplay}
+                    fileUrl={chat.fileUrl}
+                  />
+                  {chat.summary?.upTo === message.id && (
+                    <SummaryMark
+                      summary={chat.summary}
+                      canUndo={idle}
+                      onUndo={() => void chat.compress(true)}
+                    />
+                  )}
+                </Fragment>
               ))}
               {busy && (
                 <StreamingMessage text={streamText} thinking={thinking} thought={thinkingText} />
@@ -351,6 +369,14 @@ export function ChatSurface(props: ChatSurfaceProps) {
             <span className={styles.hintKeys}>
               {busy ? "esc to stop" : "enter to send · shift+enter for a newline"}
             </span>
+            {chat.context && messages.length > 0 && (
+              <ContextMeter
+                use={chat.context}
+                compressing={chat.compressing}
+                canCompress={idle && sinceSummary >= 2}
+                onCompress={() => void chat.compress()}
+              />
+            )}
             {messages.length > 0 && (
               <button
                 type="button"

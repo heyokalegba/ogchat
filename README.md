@@ -71,6 +71,16 @@ interface is see-through, over a pixel-art New York that keeps real time.
   and a few come down on the wind; in winter they are bare. Snow lies only
   when it is lying in New York: then it is on the roofs and cornices, the
   stoops, the parked cars and the pavement, and on the skyline's roofs.
+- **A street that keeps New York's hours.** How many people are out follows
+  the clock and the calendar: almost nobody at four in the morning, a rush
+  to school and the subway, a lull while everyone is at work, lunch, school
+  letting out, and the walk home, which is the busiest it gets. Days off
+  start late, fill the afternoon and run later at night; Friday night runs
+  late and Sunday night does not. The cold thins it out (it goes by New
+  York's real temperature when the weather is live), and so do heat, rain
+  and snow. After half past nine at night there are no children, prams or
+  ball games; below about 9°C nobody sits out on a doorstep, and nobody
+  barbecues in a coat.
 - **Weather.** New York's own, live: what is over the city right now is
   what is over the scene, looked at again every ten minutes. Clear, broken
   cloud, overcast, drizzle, rain, a downpour, thunder, fog, flurries, snow.
@@ -357,6 +367,22 @@ The provider must speak the OpenAI chat-completions shape:
   text file instead of filling the message box.
 - Code in a reply sits in a panel as wide as its longest line, at the left, and
   scrolls sideways once it reaches the full width.
+- **The context meter.** Under the message box: how much of the model's
+  context window this conversation takes up, as a percentage, a bar and a
+  count ("context 42% · 420k / 1M"). It turns amber at 70% (`compress soon`)
+  and red at 90% (`compress now`); at 100% it reads `full: compress to
+continue`. The count is an estimate from the length of the text, near
+  enough to say when to compress. The window's size is set in settings.
+- **Compress.** The button beside the meter has the model write a summary of
+  the conversation so far. From then on the summary is sent in place of the
+  messages it covers, which frees most of the window, and the conversation
+  carries on. Nothing is deleted: the messages stay to read, a ruled line
+  marks where the conversation was compressed, `show summary` shows what the
+  model is working from, and `undo` sends the whole conversation again. It
+  can be done as often as needed; each time folds the last summary and what
+  has been said since into a new one. A conversation already over the window
+  can still be compressed: the oldest messages are left out of that one
+  request.
 - The cursor in the message box, and in the box for editing a sent message, is
   a terminal's: a solid block on the
   character it is at, that character shown in reverse, blinking in whole
@@ -496,8 +522,10 @@ Day to day, use the look panel (above). To change what it starts from:
     lights for a barbecue.
 - **The people:** `src/components/shell/life.ts` decides who turns up and what
   they do. `STREET_MIX` is how often each kind of party appears, `wantedHeads`
-  how many people the street aims for (three to five by day), `MAX_HEADS` the
-  ceiling (20). `StreetLife.tsx` holds how often groups come by. `SITS` is how
+  how many people the street aims for (three to five at an ordinary busy
+  hour), `MAX_HEADS` the ceiling (20). `bustleAt` is how busy it is by the
+  hour, the day of the week, the temperature and the weather: `WORKDAY`,
+  `DAY_OFF` and `BY_TEMPERATURE` are the curves it reads. `StreetLife.tsx` holds how often groups come by. `SITS` is how
   likely each kind of party is to sit on a doorstep; `roofPartyAt` decides when
   there is a barbecue. `WindowLife.tsx` is who shows in the windows and
   `SkyTraffic.tsx` the aircraft and the birds.
@@ -540,7 +568,7 @@ still, with a few figures standing in it.
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /api/sessions?q=&project=`                  | List sessions, optionally filtered by text and by project (`project` is an id, or `none`)                                                                                                                                       |
 | `POST /api/sessions`                             | Create a session, optionally in a project `{ projectId? }`                                                                                                                                                                      |
-| `GET /api/sessions/:id`                          | Session with messages, plus `generating` / `partial`                                                                                                                                                                            |
+| `GET /api/sessions/:id`                          | Session with messages (and its `summary` once compressed), plus `generating` / `partial` and `context: { tokens, limit }`                                                                                                       |
 | `PATCH /api/sessions/:id`                        | Rename `{ title }`, or file under a project `{ projectId }` (null takes it out)                                                                                                                                                 |
 | `DELETE /api/sessions/:id`                       | Delete                                                                                                                                                                                                                          |
 | `POST /api/sessions/:id/messages`                | Send `{ content, replaceFromMessageId?, web? }` or `{ regenerate: true }`; streams NDJSON events `start`, `thinking`, `delta`, `done` / `error`. With attachments, send `multipart/form-data` with the same fields plus `files` |
@@ -550,6 +578,8 @@ still, with a few figures standing in it.
 | `GET` / `PUT /api/settings`                      | Read (masked) / update provider settings: `baseUrl`, `model`, `apiKey`, `reasoning`, `systemPrompt`                                                                                                                             |
 | `POST /api/settings/test`                        | Try `{ baseUrl?, model?, apiKey? }` (or the current settings) against the provider without saving; returns `{ check }`                                                                                                          |
 | `GET /api/world`                                 | `{ world: { builtAt } }`: when this street was first opened                                                                                                                                                                     |
+| `POST /api/sessions/:id/compress`                | `{ session, context }`: has the model summarise the conversation and keeps the summary with the session; waits for the model. `400 nothing_to_compress`, `409 busy`, `502` when the provider fails                              |
+| `DELETE /api/sessions/:id/compress`              | `{ session, context }`: drops the summary, so the whole conversation is sent again                                                                                                                                              |
 | `GET /api/weather`                               | `{ now }`: New York's weather at this moment (code, cloud, temperature, wind, snow lying)                                                                                                                                       |
 | `GET /api/weather?date=2025-01-06`               | `{ day: { date, hours } }`: that day hour by hour; `400 bad_date` outside 1 January 2025 to today, `502 weather_unavailable` when the service cannot be reached                                                                 |
 | `GET` / `POST /api/projects`                     | List projects (with instructions, files and session counts) / create one `{ name }`                                                                                                                                             |

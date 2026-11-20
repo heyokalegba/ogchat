@@ -1,7 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { Attachment, ChatMessage, Role, Session, SessionMeta } from "@/lib/types";
+import type {
+  Attachment,
+  ChatMessage,
+  Role,
+  Session,
+  SessionMeta,
+  SessionSummary,
+} from "@/lib/types";
 import { titleFromMessage } from "@/lib/title";
 import { pruneFiles, removeSessionFiles } from "./files";
 import { readJson, writeJsonAtomic } from "./fsjson";
@@ -29,6 +36,8 @@ interface SessionFile {
   createdAt: string;
   updatedAt: string;
   messages: ChatMessage[];
+  /** Set once the early part of the conversation has been compressed. */
+  summary?: SessionSummary;
 }
 
 export function isValidId(id: unknown): id is string {
@@ -72,7 +81,14 @@ function parseFile(value: unknown, id: string): SessionFile | null {
     createdAt: f.createdAt,
     updatedAt: f.updatedAt,
     messages: f.messages,
+    ...(isSummary(f.summary) ? { summary: f.summary } : {}),
   };
+}
+
+function isSummary(value: unknown): value is SessionSummary {
+  if (!value || typeof value !== "object") return false;
+  const s = value as Record<string, unknown>;
+  return typeof s.text === "string" && typeof s.upTo === "string" && typeof s.at === "string";
 }
 
 function load(id: string): SessionFile | null {
@@ -86,6 +102,12 @@ function load(id: string): SessionFile | null {
 }
 
 function save(file: SessionFile): void {
+  // A summary stands for the messages up to one of them. If that message has
+  // gone (deleted, or cut off by an edit further back), the summary describes a
+  // conversation that no longer happened, and goes with it.
+  if (file.summary && !file.messages.some((m) => m.id === file.summary?.upTo)) {
+    delete file.summary;
+  }
   writeJsonAtomic(fileFor(file.id), file);
 }
 
@@ -98,6 +120,7 @@ function toSession(file: SessionFile): Session {
     messageCount: file.messages.length,
     projectId: file.projectId ?? null,
     messages: file.messages,
+    ...(file.summary ? { summary: file.summary } : {}),
   };
 }
 
@@ -242,6 +265,22 @@ export function appendMessage(
   file.updatedAt = now;
   save(file);
   return { session: toSession(file), message };
+}
+
+/**
+ * Records a summary that stands for the conversation up to `upTo`, or with
+ * null removes the one there is, so the whole conversation is sent again.
+ */
+export function setSummary(
+  id: string,
+  summary: { text: string; upTo: string } | null,
+): Session | null {
+  const file = load(id);
+  if (!file) return null;
+  if (summary) file.summary = { text: summary.text, upTo: summary.upTo, at: stamp() };
+  else delete file.summary;
+  save(file);
+  return toSession(file);
 }
 
 /**

@@ -1,4 +1,5 @@
 import type {
+  ContextUse,
   Project,
   PublicSettings,
   ReasoningEffort,
@@ -33,6 +34,8 @@ export interface SettingsUpdate {
   apiKey?: string | null;
   reasoning?: ReasoningEffort;
   systemPrompt?: string;
+  /** The model's context window in tokens; 0 for the default. */
+  contextWindow?: number;
 }
 
 export interface ChatApi {
@@ -56,6 +59,10 @@ export interface ChatApi {
   renameSession(id: string, title: string): Promise<SessionMeta>;
   deleteSession(id: string): Promise<void>;
   deleteMessage(id: string, messageId: string): Promise<Session>;
+  /** Has the model summarise the conversation so far, to free the context window. Slow. */
+  compress(id: string): Promise<{ session: Session; context: ContextUse }>;
+  /** Drops the summary, so the whole conversation is sent again. */
+  expand(id: string): Promise<{ session: Session; context: ContextUse }>;
   stop(id: string): Promise<void>;
   getSettings(): Promise<PublicSettings>;
   /** When this installation's street was first opened: what its wear is counted from. */
@@ -184,6 +191,18 @@ export function createApi(base = "/api"): ChatApi {
       return (
         await data<{ session: Session }>(`/sessions/${id}/messages/${messageId}`, body("DELETE"))
       ).session;
+    },
+    compress(id) {
+      return data<{ session: Session; context: ContextUse }>(
+        `/sessions/${id}/compress`,
+        body("POST", {}),
+      );
+    },
+    expand(id) {
+      return data<{ session: Session; context: ContextUse }>(
+        `/sessions/${id}/compress`,
+        body("DELETE"),
+      );
     },
     async stop(id) {
       await call(`/sessions/${id}/stop`, body("POST", {}));

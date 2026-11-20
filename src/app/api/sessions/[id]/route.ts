@@ -1,5 +1,6 @@
 import { cleanTitle } from "@/lib/title";
 import type { SessionDetail } from "@/lib/types";
+import { contextOf } from "@/lib/server/chat";
 import { getGeneration, stopGeneration } from "@/lib/server/generations";
 import { guard } from "@/lib/server/guard";
 import { BadRequest, errorJson, json, readBody } from "@/lib/server/http";
@@ -17,7 +18,7 @@ type Context = { params: Promise<{ id: string }> };
 
 const notFound = () => errorJson(404, "not_found", "Session not found.");
 
-/** GET /api/sessions/:id  →  { session, generating, partial, thinking } */
+/** GET /api/sessions/:id  →  { session, generating, partial, thinking, context } */
 export async function GET(request: Request, { params }: Context): Promise<Response> {
   const blocked = guard(request);
   if (blocked) return blocked;
@@ -30,6 +31,7 @@ export async function GET(request: Request, { params }: Context): Promise<Respon
     generating: Boolean(generation),
     partial: generation?.partial ?? "",
     thinking: generation?.thinking ?? "",
+    context: contextOf(session),
   };
   return json(detail);
 }

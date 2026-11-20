@@ -182,6 +182,17 @@ export function readFile(sessionId: string, attachmentId: string): Buffer | null
   }
 }
 
+/** How many bytes a stored file holds, without reading it. 0 when it is not there. */
+export function fileSize(sessionId: string, attachmentId: string): number {
+  const file = fileFor(sessionId, attachmentId);
+  if (!file) return 0;
+  try {
+    return fs.statSync(/* turbopackIgnore: true */ file).size;
+  } catch {
+    return 0;
+  }
+}
+
 /** Deletes stored files of a session that no message refers to any more. */
 export function pruneFiles(sessionId: string, keep: Set<string>): void {
   if (!ID_RE.test(sessionId)) return;

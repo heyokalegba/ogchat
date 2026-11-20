@@ -1,10 +1,12 @@
 import type { ProviderContentPart, ProviderMessage } from "@/lib/provider/adapter";
-import type { Attachment, ChatMessage, Project, Session } from "@/lib/types";
-import { readFile } from "./files";
+import type { Attachment, ChatMessage, ContextUse, Project, Session } from "@/lib/types";
+import { fileSize, readFile } from "./files";
 
 /**
- * Turns a stored session into the messages sent to the provider: the full
+ * Turns a stored session into the messages sent to the provider: the
  * history, with each attachment folded into the message it was sent with.
+ * Once a conversation has been compressed, its summary goes in place of the
+ * messages it covers.
  */
 
 function fence(text: string): string {
@@ -81,6 +83,79 @@ function projectContext(project: Project): { text: string; images: ProviderConte
   return { text: parts.join("\n\n"), images };
 }
 
+/** The messages that are still sent as themselves: all of them, or those after the summary. */
+export function liveMessages(session: Session): ChatMessage[] {
+  const covered = session.summary
+    ? session.messages.findIndex((m) => m.id === session.summary?.upTo)
+    : -1;
+  return covered === -1 ? session.messages : session.messages.slice(covered + 1);
+}
+
+/** How the summary of a compressed conversation is put to the model. */
+function summaryNote(session: Session): string {
+  const covered = session.summary
+    ? session.messages.some((m) => m.id === session.summary?.upTo)
+    : false;
+  if (!session.summary || !covered) return "";
+  return (
+    "The earlier part of this conversation was compressed to save room. " +
+    "This summary stands in for it; carry on from it as if you remembered the whole exchange.\n\n" +
+    `<summary>\n${session.summary.text}\n</summary>`
+  );
+}
+
+/** Characters of ordinary text per token, near enough for a meter. Erring on the full side. */
+const CHARS_PER_TOKEN = 3.6;
+/** What a picture costs, give or take: providers charge by size, around this much. */
+const TOKENS_PER_IMAGE = 1_100;
+/** The wrapping every message carries: its role and its separators. */
+const TOKENS_PER_MESSAGE = 4;
+
+/**
+ * How full the context window is with this session as it would be sent now.
+ * An estimate from the length of the text: nothing is read from disk but the
+ * sizes of attached files, so it is cheap enough to ask after every turn.
+ */
+export function measureContext(
+  session: Session,
+  systemPrompt: string,
+  project: Project | null,
+  limit: number,
+): ContextUse {
+  let chars = systemPrompt.trim().length + summaryNote(session).length;
+  let images = 0;
+  let messages = 1;
+  const attached = (owner: string, attachment: Attachment) => {
+    if (attachment.kind === "image") images += 1;
+    else chars += fileSize(owner, attachment.id) + attachment.name.length + 24;
+  };
+  if (project) {
+    chars += project.name.length + project.instructions.length + 48;
+    for (const file of project.files) attached(project.id, file);
+  }
+  for (const message of liveMessages(session)) {
+    messages += 1;
+    chars += message.content.length;
+    for (const attachment of message.attachments ?? []) attached(session.id, attachment);
+  }
+  const tokens =
+    Math.ceil(chars / CHARS_PER_TOKEN) + images * TOKENS_PER_IMAGE + messages * TOKENS_PER_MESSAGE;
+  return { tokens, limit };
+}
+
+/** Roughly how many tokens one message for the provider takes. */
+export function tokensOf(message: ProviderMessage): number {
+  if (typeof message.content === "string") {
+    return Math.ceil(message.content.length / CHARS_PER_TOKEN) + TOKENS_PER_MESSAGE;
+  }
+  let tokens = TOKENS_PER_MESSAGE;
+  for (const part of message.content) {
+    tokens +=
+      part.type === "text" ? Math.ceil(part.text.length / CHARS_PER_TOKEN) : TOKENS_PER_IMAGE;
+  }
+  return tokens;
+}
+
 /**
  * The messages for one turn. The system message comes first when there is
  * anything to put in it: the system prompt from settings, then the project
@@ -91,9 +166,11 @@ export function buildProviderMessages(
   systemPrompt = "",
   project: Project | null = null,
 ): ProviderMessage[] {
-  const history = session.messages.map((message) => toProviderMessage(session.id, message));
+  const history = liveMessages(session).map((message) => toProviderMessage(session.id, message));
   const context = project ? projectContext(project) : null;
-  const system = [systemPrompt.trim(), context?.text ?? ""].filter(Boolean).join("\n\n");
+  const system = [systemPrompt.trim(), context?.text ?? "", summaryNote(session)]
+    .filter(Boolean)
+    .join("\n\n");
   const lead: ProviderMessage[] = system ? [{ role: "system", content: system }] : [];
   if (context?.images.length) {
     lead.push({

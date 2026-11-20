@@ -1,13 +1,20 @@
-import type { ChatError, ChatMessage, Session, StreamEvent } from "@/lib/types";
-import { ProviderError, streamChat } from "@/lib/provider/adapter";
+import type { ChatError, ChatMessage, ContextUse, Session, StreamEvent } from "@/lib/types";
+import { ProviderError, streamChat, type ProviderMessage } from "@/lib/provider/adapter";
 import { MAX_FILES_PER_MESSAGE, MAX_REQUEST_BYTES } from "@/lib/limits";
-import { buildProviderMessages } from "./context";
+import { buildProviderMessages, liveMessages, measureContext, tokensOf } from "./context";
 import { FileRejected, ingestFile, saveFile, type IngestedFile } from "./files";
 import { beginGeneration, endGeneration, type Generation } from "./generations";
 import { BadRequest, readBody } from "./http";
 import { getProject } from "./projects";
 import { resolveSettings } from "./settings";
-import { appendMessage, getSession, pruneSessionFiles, toMeta, truncateFrom } from "./store";
+import {
+  appendMessage,
+  getSession,
+  pruneSessionFiles,
+  setSummary,
+  toMeta,
+  truncateFrom,
+} from "./store";
 
 /** Turn handling: validate the request, persist the user's side, then stream the reply. */
 
@@ -317,4 +324,124 @@ export async function runTurn(
   } finally {
     endGeneration(sessionId, generation);
   }
+}
+
+/** How full the context window is with a session as it stands. */
+export function contextOf(session: Session): ContextUse {
+  const settings = resolveSettings();
+  const project = session.projectId ? getProject(session.projectId) : null;
+  return measureContext(session, settings.systemPrompt, project, settings.contextWindow);
+}
+
+/** What the model is asked to do when a conversation is compressed. */
+const COMPRESS_REQUEST = `Stop here. Do not reply to the conversation: summarise it.
+
+Write a summary of everything above that can stand in for it, so the conversation can carry on from the summary alone with the original messages gone. Write it as notes for yourself, not as a message to the user. Keep:
+
+- what the user is trying to do, and why
+- every decision, conclusion and agreed plan, with the reasons that matter
+- the user's instructions and preferences about how to work or how to answer
+- names, numbers, dates, file names, identifiers and exact wording wherever they matter
+- code, commands and configuration that are still in play, verbatim
+- the contents of attached files as far as they were used or will be needed
+- what is unfinished, what was about to happen next, and questions still open
+
+Leave out pleasantries and anything settled and no longer relevant. Be as long as the conversation needs, and no longer. Output only the summary.`;
+
+/** The share of the context window a request to compress may fill, leaving room to answer. */
+const COMPRESS_ROOM = 0.85;
+
+/**
+ * Compresses a session: asks the model for a summary of the conversation so
+ * far and records it, so that from now on the summary is sent in place of
+ * the messages it covers. The messages stay in the session to read.
+ *
+ * A conversation already too long for the window loses its oldest messages
+ * from the request (not from the session), so that there is always a way
+ * back from a full window.
+ */
+export async function compressSession(sessionId: string, signal?: AbortSignal): Promise<Session> {
+  const session = getSession(sessionId);
+  if (!session) throw new ChatRequestError(404, "not_found", "Session not found.");
+  const live = liveMessages(session);
+  const last = live.at(-1);
+  if (!last || live.length < 2) {
+    throw new ChatRequestError(
+      400,
+      "nothing_to_compress",
+      "There is not enough conversation here to compress yet.",
+    );
+  }
+  const generation = beginGeneration(sessionId);
+  if (!generation) {
+    throw new ChatRequestError(409, "busy", "This session is busy. Try again when it is done.");
+  }
+  const onAbort = () => generation.controller.abort();
+  signal?.addEventListener("abort", onAbort);
+  try {
+    const settings = resolveSettings();
+    const project = session.projectId ? getProject(session.projectId) : null;
+    const all = buildProviderMessages(session, settings.systemPrompt, project);
+    const lead = all.filter((m) => m.role === "system");
+    const rest = all.filter((m) => m.role !== "system");
+    const ask: ProviderMessage = { role: "user", content: COMPRESS_REQUEST };
+    // Newest first, as many as fit; what does not fit is left out of the request.
+    let room =
+      settings.contextWindow * COMPRESS_ROOM -
+      [...lead, ask].reduce((sum, m) => sum + tokensOf(m), 0);
+    const kept: ProviderMessage[] = [];
+    for (const message of rest.toReversed()) {
+      room -= tokensOf(message);
+      if (room < 0 && kept.length > 0) break;
+      kept.unshift(message);
+    }
+    if (kept.length < rest.length) {
+      kept.unshift({
+        role: "user",
+        content:
+          "[The earliest messages of this conversation are not shown: it had grown too long.]",
+      });
+    }
+
+    let text = "";
+    const stream = streamChat({
+      config: { baseUrl: settings.baseUrl, apiKey: settings.apiKey, model: settings.model },
+      messages: [...lead, ...kept, ask],
+      signal: generation.controller.signal,
+      // A summary wants care more than cleverness; the provider's own default is left alone.
+      reasoningEffort: null,
+      webSearch: false,
+    });
+    for await (const piece of stream) text += piece;
+    if (!text.trim()) {
+      throw new ChatRequestError(502, "empty_summary", "The model sent back an empty summary.");
+    }
+    // The conversation may have been edited while the summary was being written.
+    const now = getSession(sessionId);
+    if (!now?.messages.some((m) => m.id === last.id)) {
+      throw new ChatRequestError(
+        409,
+        "changed",
+        "The conversation changed while it was compressed.",
+      );
+    }
+    return setSummary(sessionId, { text: text.trim(), upTo: last.id }) ?? now;
+  } catch (err) {
+    if (err instanceof ChatRequestError) throw err;
+    if (err instanceof ProviderError) {
+      const { message } = toChatError(err);
+      throw new ChatRequestError(err.code === "aborted" ? 499 : 502, err.code, message);
+    }
+    throw err;
+  } finally {
+    signal?.removeEventListener("abort", onAbort);
+    endGeneration(sessionId, generation);
+  }
+}
+
+/** Takes a session's summary away again, so the whole conversation is sent as before. */
+export function expandSession(sessionId: string): Session {
+  const session = setSummary(sessionId, null);
+  if (!session) throw new ChatRequestError(404, "not_found", "Session not found.");
+  return session;
 }

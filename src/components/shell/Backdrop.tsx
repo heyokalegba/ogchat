@@ -1,9 +1,16 @@
 import type { CSSProperties } from "react";
 import { brooklynClock, type SkyView } from "@/lib/daylight";
-import { conditionsFor, greyOf, shelterOf, type Conditions, type SeasonName } from "@/lib/weather";
+import {
+  conditionsFor,
+  greyOf,
+  shelterOf,
+  USUAL_TEMP_C,
+  type Conditions,
+  type SeasonName,
+} from "@/lib/weather";
 import { SCENES, SKY, type SceneId } from "./art";
 import styles from "./backdrop.module.css";
-import { roofPartyAt } from "./life";
+import { bustleAt, pastBedtime, roofPartyAt } from "./life";
 import { SkyTraffic } from "./SkyTraffic";
 import { StreetLife } from "./StreetLife";
 import { Wear } from "./Wear";
@@ -14,6 +21,7 @@ import { WindowSwitches } from "./WindowSwitches";
 /** Each scene keeps its own diary of rooftop barbecues. */
 const PARTY_SALT: Record<SceneId, number> = { skyline: 11, brooklyn: 23 };
 const minuteOfDay = (ms: number) => brooklynClock(ms).minutes;
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 /**
  * The living scene behind the interface.
@@ -64,6 +72,8 @@ export function Backdrop(props: {
   season?: SeasonName;
   snowy?: boolean;
   conditions?: Conditions;
+  /** The temperature in °C, when New York's is known. Otherwise the season's usual is assumed. */
+  tempC?: number | null;
   people?: boolean;
   /** Frozen: nothing moves, nobody arrives. The light still follows the clock. */
   still?: boolean;
@@ -181,9 +191,18 @@ export function Backdrop(props: {
     .map((roof, index) => ({ roof, index }))
     .filter(({ roof }) => roof.w >= 34);
   const event = roofPartyAt(now, PARTY_SALT[scene], hosts.length, minuteOfDay);
-  // Nobody barbecues in the rain or the snow.
+  // How the street should be just now, the way New York does it: by the hour and the
+  // day of the week, by the cold and the heat, and by the weather.
+  const clock = brooklynClock(now);
+  const hour = clock.minutes / 60;
+  const tempC = props.tempC ?? USUAL_TEMP_C[season];
+  const bustle = bustleAt(hour, WEEKDAYS.indexOf(clock.weekday), tempC, indoors);
+  const tooColdToSit = tempC < 9 || snowy || indoors >= 0.3;
+  // Nobody barbecues in the rain or the snow, or in a coat.
   const party =
-    event && indoors < 0.3 ? { roof: hosts[event.roof]!.index, endsAt: event.endsAt } : null;
+    event && indoors < 0.3 && tempC >= 12
+      ? { roof: hosts[event.roof]!.index, endsAt: event.endsAt }
+      : null;
   const beaconGlow = Math.min(1, night * 1.8);
 
   const parked = art.parked && (
@@ -320,7 +339,9 @@ export function Backdrop(props: {
             scene={scene}
             light={light}
             night={night}
-            shelter={indoors}
+            bustle={bustle}
+            late={pastBedtime(hour)}
+            noSitting={tooColdToSit}
             kerb={parked}
             party={party}
             now={now}
