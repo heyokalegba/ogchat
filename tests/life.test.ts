@@ -6,9 +6,13 @@ import {
   castWalkers,
   HATCH_DEPTH,
   bustleAt,
+  lateAt,
   MAX_HEADS,
+  onTheRoad,
   pastBedtime,
+  placeOf,
   roofPartyAt,
+  trafficAt,
   wantedHeads,
   type LifeConfig,
   type LifeMeta,
@@ -180,6 +184,68 @@ describe("how busy the street is, the way New York does it", () => {
       const party = castWalkers(rand, meta, street, { noSitting: true });
       expect(party.steps.some((step) => step.kind === "sit")).toBe(false);
     }
+  });
+});
+
+describe("the road and the windows, by the hour", () => {
+  const WED = 3;
+  const THU = 4;
+  const FRI = 5;
+  const SAT = 6;
+  const SUN = 0;
+
+  it("has the most traffic at the rush and the least before dawn, but never none", () => {
+    const day = Array.from({ length: 96 }, (_, i) => trafficAt(i / 4, WED));
+    expect(Math.max(...day)).toBe(1);
+    expect(trafficAt(8.5, WED)).toBe(1);
+    expect(trafficAt(17.5, WED)).toBe(1);
+    expect(trafficAt(3.5, WED)).toBeLessThan(0.2);
+    expect(Math.min(...day)).toBeGreaterThan(0.08);
+    expect(trafficAt(12, WED)).toBeGreaterThan(trafficAt(23, WED));
+    // a day off has no rush, and more about after midnight
+    expect(trafficAt(8.5, SAT)).toBeLessThan(trafficAt(8.5, WED) * 0.6);
+    expect(trafficAt(1, SAT)).toBeGreaterThan(trafficAt(1, WED));
+    // weather takes a little off, not most of it
+    expect(trafficAt(17.5, WED, 0.85)).toBeGreaterThan(0.7);
+    expect(trafficAt(17.5, WED, 0.85)).toBeLessThan(1);
+  });
+
+  it("puts cars on the road in a fixed order, all of them at the rush", () => {
+    const places = Array.from({ length: 200 }, (_, n) => placeOf(n % 4, n * 37));
+    expect(places.every((p) => p >= 0 && p < 1)).toBe(true);
+    expect(placeOf(2, 120)).toBe(placeOf(2, 120));
+    const out = (level: number) => places.filter((p) => onTheRoad(p, level)).length;
+    expect(out(1)).toBe(200);
+    expect(out(0)).toBe(0);
+    expect(out(0.15)).toBeGreaterThan(15);
+    expect(out(0.15)).toBeLessThan(50);
+    // whoever is out when it is quiet is still out when it is busy
+    const quiet = places.filter((p) => onTheRoad(p, 0.2));
+    expect(quiet.every((p) => onTheRoad(p, 0.7))).toBe(true);
+  });
+
+  it("leaves the lights on all evening, a few in the small hours, and brings them back by morning", () => {
+    expect(lateAt(19, WED)).toBe(0);
+    expect(lateAt(21, WED)).toBe(0);
+    expect(lateAt(23, WED)).toBeGreaterThan(0.2);
+    expect(lateAt(23, WED)).toBeLessThan(0.5);
+    expect(lateAt(3, THU)).toBe(1); // three in the morning after Wednesday night
+    expect(lateAt(6, THU)).toBeLessThan(0.8);
+    expect(lateAt(8, THU)).toBe(0);
+    expect(lateAt(13, WED)).toBe(0);
+    for (let h = 0; h < 24; h += 0.25) {
+      expect(lateAt(h, WED)).toBeGreaterThanOrEqual(0);
+      expect(lateAt(h, WED)).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("keeps later hours on a Friday and a Saturday night", () => {
+    expect(lateAt(0.5, SAT)).toBeLessThan(lateAt(0.5, THU)); // half past midnight, Friday night
+    expect(lateAt(23, SAT)).toBeLessThan(lateAt(23, WED));
+    expect(lateAt(1, SUN)).toBeLessThan(lateAt(1, WED)); // Saturday night
+    expect(lateAt(7.5, SUN)).toBeGreaterThan(lateAt(7.5, WED)); // and a lie-in after it
+    expect(lateAt(23, SUN)).toBe(lateAt(23, WED)); // Sunday night is a work night
+    expect(lateAt(23, FRI)).toBeLessThan(lateAt(23, THU));
   });
 });
 

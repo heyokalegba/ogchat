@@ -184,11 +184,11 @@ function block(season = "summer") {
       for (let wx = x + 2; wx < x + w - 3; wx += 3) {
         const roll = rand();
         if (roll < 0.6) skyline.set(wx, wy, shade(color, 0.86));
-        if (roll < 0.16) emit.light(skyline, wx, wy, 1, 1, hex("#b89f66"), litFrom());
+        if (roll < 0.16) emit.home(skyline, wx, wy, 1, 1, hex("#b89f66"), litFrom());
         else if (roll < 0.22)
           emit.light(skyline, wx, wy, 1, 1, hex("#c9ae70"), chance(0.5) ? "a" : "c");
         else if (roll < 0.6 && L.chance(0.3))
-          emit.light(skyline, wx, wy, 1, 1, hex("#b89f66"), "night");
+          emit.home(skyline, wx, wy, 1, 1, hex("#b89f66"), "night");
       }
     }
     x += w;
@@ -210,7 +210,7 @@ function block(season = "summer") {
       skyline.rect(x + w - 2, PARK_BASE - h, 2, h, shade(color, 0.9));
       for (let wy = PARK_BASE - h + 3; wy < PARK_BASE - 30; wy += 4) {
         for (let wx = x + 1; wx < x + w - 2; wx += 3) {
-          if (M.chance(0.14)) emit.light(skyline, wx, wy, 1, 1, M.pick(glow), "night");
+          if (M.chance(0.14)) emit.home(skyline, wx, wy, 1, 1, M.pick(glow), "night");
         }
       }
       x += w + (M.chance(0.25) ? M.between(1, 3) : 0);
@@ -263,7 +263,7 @@ function block(season = "summer") {
           const on = chance(0.2);
           skyline.set(wx, wy, shade(stone, 0.8));
           const when = on ? "evening" : lateOn();
-          if (when) emit.light(skyline, wx, wy, 1, 1, hex("#c4aa6c"), when);
+          if (when) emit.home(skyline, wx, wy, 1, 1, hex("#c4aa6c"), when);
         }
       }
     }
@@ -403,7 +403,7 @@ function block(season = "summer") {
         }
         when ??= lateOn();
         if (when) {
-          const id = emit.light(skyline, wx, wy, 3, 5, glass, when);
+          const id = emit.home(skyline, wx, wy, 3, 5, glass, when);
           if (blind) emit.detail(skyline, id, wx, wy, 3, 2, shade(tone, 0.7), when);
         }
       }
@@ -527,7 +527,7 @@ function block(season = "summer") {
     if (!when) return;
     // Now and then the light in a room is a coloured LED strip, not a warm lamp.
     const glow = LED.chance(0.025) ? LED.pick(LED_TONES) : tone;
-    const id = emit.light(rooftops, wx, wy, ww, wh, glow, when);
+    const id = emit.home(rooftops, wx, wy, ww, wh, glow, when);
     if (dressing === "shade") {
       emit.detail(rooftops, id, wx, wy, ww, Math.ceil(wh * 0.4), shade(glow, 0.68), when); // pulled down
     } else if (dressing === "curtain") {
@@ -629,7 +629,7 @@ function block(season = "summer") {
     const transomTone = transomLit ? pick(WARM) : L.pick(WARM);
     rooftops.rect(doorX, fy + 7, 7, 2, hex("#22232c")); // transom
     const transomWhen = transomLit ? "evening" : lateOn();
-    if (transomWhen) emit.light(rooftops, doorX, fy + 7, 7, 2, transomTone, transomWhen);
+    if (transomWhen) emit.home(rooftops, doorX, fy + 7, 7, 2, transomTone, transomWhen);
     rooftops.rect(
       doorX,
       fy + 9,
@@ -649,7 +649,7 @@ function block(season = "summer") {
       const on = chance(0.3);
       const tone = on ? pick(WARM) : null;
       rooftops.rect(wx, fy + 3, 5, 5, hex("#16171d"));
-      if (on) emit.light(rooftops, wx, fy + 3, 5, 5, tone, "evening");
+      if (on) emit.home(rooftops, wx, fy + 3, 5, 5, tone, "evening");
       rooftops.rect(wx + 1, fy + 3, 1, 5, iron);
       rooftops.rect(wx + 3, fy + 3, 1, 5, iron);
     }
@@ -944,6 +944,11 @@ function block(season = "summer") {
       parked: emit.render(parked, state, GRADES[state]),
     };
   }
+  // The small hours: what to lay over the night pictures as the windows go dark.
+  const late = {
+    city: emit.late(skyline, GRADES.night),
+    rooftops: emit.late(rooftops, GRADES.night),
+  };
   // Windows still in plain sight: not behind a tree, not swallowed by a shop.
   const windows = panes
     .filter(
@@ -990,6 +995,7 @@ function block(season = "summer") {
   };
   return {
     states,
+    late,
     glow,
     beacons,
     chimneys,
@@ -1096,6 +1102,14 @@ export function brooklynScene(puff, cast) {
     "glow-front-a.png": scene.glow.frontA,
     "glow-front-b.png": scene.glow.frontB,
   };
+  for (const season of SEASONS) {
+    seasons[season].late.city.forEach((image, i) => {
+      images[`late-city-${season}-${i + 1}.png`] = image;
+    });
+    seasons[season].late.rooftops.forEach((image, i) => {
+      images[`late-rooftops-${season}-${i + 1}.png`] = image;
+    });
+  }
   const layout = trafficLayout();
   for (const state of STATES) {
     images[`traffic-${state}.png`] = traffic(state, layout);

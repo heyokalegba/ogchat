@@ -170,6 +170,20 @@ export function snowfall(c, snow, { from = 0, to = c.h - 1 } = {}) {
 }
 
 /** Which lights are on in each state. "always" lights burn even by day. */
+/**
+ * How the windows go dark as the night gets late: the share of them out by
+ * the end of each of three steps. A fifth stay lit till morning.
+ */
+export const LATE_SHARES = [0.3, 0.58, 0.8];
+
+/** A repeatable number in [0, 1) for a pair of whole numbers. */
+function unit(a, b) {
+  let t = (Math.imul(a | 0, 0x9e3779b1) ^ Math.imul((b | 0) + 0x51ed270b, 0x85ebca6b)) >>> 0;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
 const LIT_IN = {
   day: ["always"],
   golden: ["always"],
@@ -198,13 +212,77 @@ export function grade({ gain, tint, amount = 0 }) {
 export function emitter() {
   const ops = [];
   let nextId = 1;
+  /** Windows of homes and offices, by light id: when in the night each one goes dark. */
+  const bedtime = new Map();
+  const light = (c, x, y, w, h, color, when) => {
+    const id = nextId++;
+    c.mark(x, y, w, h, id);
+    ops.push({ kind: "rect", c, id, x, y, w, h, color, when });
+    return id;
+  };
+  /** The night picture with the windows that have gone dark by `tier` left unlit. */
+  const lateRender = (source, gradeFn, tier) => {
+    const out = source.graded(gradeFn);
+    const dark = (id) => (bedtime.get(id) ?? Infinity) <= tier;
+    for (const op of ops) {
+      if (op.c !== source || !LIT_IN.night.includes(op.when)) continue;
+      if (op.kind === "rect") {
+        if (dark(op.id)) continue;
+        for (let y = op.y; y < op.y + op.h; y++) {
+          for (let x = op.x; x < op.x + op.w; x++)
+            if (source.owns(x, y, op.id)) out.set(x, y, op.color);
+        }
+      } else if (op.kind === "spill") {
+        if (!hidden(source, op) && !(op.of && dark(op.of.id))) {
+          glow(out, op.cx, op.cy, op.r, op.color, op.strength);
+        }
+      } else {
+        op.fn(out);
+      }
+    }
+    return out;
+  };
   return {
     /** A lit patch. Returns its id, for `detail`. */
-    light(c, x, y, w, h, color, when) {
-      const id = nextId++;
-      c.mark(x, y, w, h, id);
-      ops.push({ kind: "rect", c, id, x, y, w, h, color, when });
+    light,
+    /**
+     * A lit window with somebody behind it, who will at some point go to bed.
+     * It is a light like any other, and is also given a place in the order
+     * the windows go dark as the night gets late (see `late`). Which place is
+     * worked out from where the window is, not rolled, so adding this to a
+     * window changes nothing else in the picture.
+     */
+    home(c, x, y, w, h, color, when) {
+      const id = light(c, x, y, w, h, color, when);
+      const rank = unit(x * 7919 + w, y * 104729 + h);
+      const tier = LATE_SHARES.findIndex((share) => rank < share);
+      if (tier !== -1) bedtime.set(id, tier + 1);
       return id;
+    },
+    /**
+     * The late night, as pictures to lay over the night one: each holds only
+     * the windows that have gone dark by then, drawn unlit, and is clear
+     * everywhere else. Laid on in order as the night goes, they take the
+     * city from an evening with most lights on to the small hours with a few.
+     */
+    late(source, gradeFn) {
+      const out = [];
+      let before = lateRender(source, gradeFn, 0);
+      for (let tier = 1; tier <= LATE_SHARES.length; tier++) {
+        const now = lateRender(source, gradeFn, tier);
+        const changed = canvas(source.w, source.h);
+        for (let i = 0; i < now.data.length; i += 4) {
+          const same =
+            now.data[i] === before.data[i] &&
+            now.data[i + 1] === before.data[i + 1] &&
+            now.data[i + 2] === before.data[i + 2] &&
+            now.data[i + 3] === before.data[i + 3];
+          if (!same) changed.data.set(now.data.subarray(i, i + 4), i);
+        }
+        out.push(changed);
+        before = now;
+      }
+      return out;
     },
     /** Part of an existing light: a blind, a sash bar. Shown only where that light still shows. */
     detail(c, id, x, y, w, h, color, when) {

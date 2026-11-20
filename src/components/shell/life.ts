@@ -203,6 +203,112 @@ export function bustleAt(hour: number, weekday: number, tempC: number | null, sh
   return level * (tempC === null ? 1 : along(BY_TEMPERATURE, tempC)) * weather;
 }
 
+/** How much traffic a working day has, by the hour: 1 is the rush. It never quite stops. */
+const TRAFFIC_WORKDAY: readonly (readonly [number, number])[] = [
+  [0, 0.28],
+  [2, 0.14],
+  [4.5, 0.12],
+  [5.5, 0.3],
+  [7, 0.85],
+  [8.5, 1],
+  [10, 0.72],
+  [15, 0.75],
+  [16.5, 1],
+  [18.5, 1],
+  [20, 0.7],
+  [22, 0.5],
+  [24, 0.28],
+];
+
+/** And a day off: no rush, a steady afternoon, more about late at night. */
+const TRAFFIC_DAY_OFF: readonly (readonly [number, number])[] = [
+  [0, 0.42],
+  [2.5, 0.22],
+  [5, 0.12],
+  [8, 0.35],
+  [11, 0.75],
+  [14, 0.85],
+  [19, 0.8],
+  [22, 0.6],
+  [24, 0.42],
+];
+
+/**
+ * How much traffic is on the road, from 0 (none) to 1 (all of it): the rush
+ * hours full, the middle of the day steady, and at three in the morning the
+ * odd cab. Bad weather takes a little off; it does not empty the road the
+ * way it empties the pavement.
+ */
+export function trafficAt(hour: number, weekday: number, shelter = 0): number {
+  const h = ((hour % 24) + 24) % 24;
+  const off = weekday === 0 || weekday === 6;
+  let level = along(off ? TRAFFIC_DAY_OFF : TRAFFIC_WORKDAY, h);
+  if (weekday === 5 && h >= 19) level = Math.max(level, along(TRAFFIC_DAY_OFF, h));
+  if (weekday === 0 && h >= 19) level = Math.min(level, along(TRAFFIC_WORKDAY, h));
+  return level * (1 - 0.3 * Math.min(1, Math.max(0, shelter)));
+}
+
+/**
+ * How far into the night the windows are, on a clock that runs from the
+ * evening through to the morning (21 is nine at night, 26 is two in the
+ * morning). 0: an evening, everyone's lights on. 1: the small hours, a few
+ * left. It comes back down before dawn as the early risers get up.
+ */
+const LATE_WORKNIGHT: readonly (readonly [number, number])[] = [
+  [21, 0],
+  [22.5, 0.2],
+  [24, 0.55],
+  [25.5, 0.85],
+  [26.5, 1],
+  [28.5, 1],
+  [29.5, 0.8],
+  [30.5, 0.5],
+  [31.5, 0.2],
+  [32, 0],
+];
+
+/** The night before a day off: later to bed, later to rise. */
+const LATE_FREE_NIGHT: readonly (readonly [number, number])[] = [
+  [22, 0],
+  [23.5, 0.18],
+  [25, 0.45],
+  [26.5, 0.78],
+  [27.5, 1],
+  [30, 1],
+  [31.5, 0.75],
+  [33, 0.4],
+  [34, 0.15],
+  [34.5, 0],
+];
+
+/**
+ * How many of the city's windows have gone dark: 0 on an evening, 1 in the
+ * small hours. Friday and Saturday nights run later.
+ */
+export function lateAt(hour: number, weekday: number): number {
+  const h = ((hour % 24) + 24) % 24;
+  // Before noon belongs to the night that began the evening before.
+  const evening = h < 12 ? (weekday + 6) % 7 : weekday;
+  const free = evening === 5 || evening === 6;
+  return along(free ? LATE_FREE_NIGHT : LATE_WORKNIGHT, h < 12 ? h + 24 : h);
+}
+
+/**
+ * Whether a thing with this place in the order (a number from 0 to 1, fixed
+ * for each vehicle) is out when traffic is at `level`. At 1 everything is.
+ */
+export function onTheRoad(place: number, level: number): boolean {
+  return place < level;
+}
+
+/** A fixed place in the order, from 0 to 1, for the `n`th thing of the `group`th set. */
+export function placeOf(group: number, n: number): number {
+  let t = (Math.imul(group + 1, 0x9e3779b1) ^ Math.imul(n + 0x51ed270b, 0x85ebca6b)) >>> 0;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
 /** Whether it is an hour at which children, prams and ball games are off the street. */
 export function pastBedtime(hour: number): boolean {
   const h = ((hour % 24) + 24) % 24;

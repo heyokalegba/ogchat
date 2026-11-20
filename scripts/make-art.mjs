@@ -32,6 +32,7 @@ import {
   birds,
   CHAT_ART,
   ROOT,
+  LATE_SHARES,
   SEASONS,
   SHELL_ART,
   smoke,
@@ -137,8 +138,20 @@ const perState = (pattern) => `{ ${STATES.map((s) => `${s}: ${src(pattern(s))}`)
 const perSeason = (pattern) =>
   `{\n      ${SEASONS.map((season) => `${season}: ${perState((s) => pattern(season, s))}`).join(",\n      ")},\n    }`;
 
+/** The late-night overlays of a layer: for each season, one picture per step into the night. */
+const lateSteps = (id, layer) =>
+  `{\n      ${SEASONS.map((season) => `${season}: [${LATE_SHARES.map((_, i) => src(`${id}/late-${layer}-${season}-${i + 1}.png`)).join(", ")}]`).join(",\n      ")},\n    }`;
+
 const sceneBlock = (id) => `{
     city: ${perSeason((season, s) => `${id}/city-${season}-${s}.png`)},
+    /**
+     * The small hours: pictures laid over the night ones as it gets late, each
+     * putting out some more of the windows.
+     */
+    late: {
+      city: ${lateSteps(id, "city")},
+      rooftops: ${lateSteps(id, "rooftops")},
+    },
     rooftops: ${perSeason((season, s) => `${id}/rooftops-${season}-${s}.png`)},
     /** Cars at the kerb, drawn over the people on the pavement. Only some scenes have them. */
     parked: ${known(`${id}/parked-summer-day.png`) ? perSeason((season, s) => `${id}/parked-${season}-${s}.png`) : "null"},

@@ -126,7 +126,7 @@ function city(season = "summer") {
         when ??= later(0.13, 0.3);
         if (!when) continue;
         const led = o.ww >= 2 && LED.chance(0.02);
-        const id = emit.light(c, wx, wy, o.ww, o.wh, led ? LED.pick(LED_TONES) : color2, when);
+        const id = emit.home(c, wx, wy, o.ww, o.wh, led ? LED.pick(LED_TONES) : color2, when);
         if (c === rooftops && when !== "b") {
           panes.push({ x: wx, y: wy, w: o.ww, h: o.wh, when, id });
         }
@@ -162,7 +162,7 @@ function city(season = "summer") {
     for (let wy = GROUND - h + 5; wy < GROUND - 5; wy += 5) {
       for (let wx = x + 2; wx < x + w - 2; wx += 4) {
         if (chance(0.55)) skyline.set(wx, wy, shade(color, 0.9));
-        if (L.chance(0.2)) emit.light(skyline, wx, wy, 1, 1, L.pick(lit), "night");
+        if (L.chance(0.2)) emit.home(skyline, wx, wy, 1, 1, L.pick(lit), "night");
       }
     }
     x += w;
@@ -182,7 +182,7 @@ function city(season = "summer") {
         for (let wx = left + 2; wx < left + w - 3; wx += 3) {
           if (chance(0.6)) c.set(wx, wy, shade(color, 0.88));
           if (L.chance(0.26)) {
-            emit.light(c, wx, wy, 1, 1, L.pick(lit), L.chance(0.3) ? "evening" : "night");
+            emit.home(c, wx, wy, 1, 1, L.pick(lit), L.chance(0.3) ? "evening" : "night");
           }
         }
       }
@@ -361,7 +361,7 @@ function city(season = "summer") {
           const tone = on ? pick(lit) : null;
           skyline.set(wx, wy, wy % 7 === 0 ? G("#22303d") : G("#33475a"));
           const when = on ? "always" : later(0.1, 0.3);
-          if (when) emit.light(skyline, wx, wy, 1, 1, tone ?? L.pick(lit), when);
+          if (when) emit.home(skyline, wx, wy, 1, 1, tone ?? L.pick(lit), when);
         }
       }
     }
@@ -682,6 +682,11 @@ function city(season = "summer") {
       rooftops: emit.render(rooftops, state, GRADES[state]),
     };
   }
+  // The small hours: what to lay over the night pictures as the windows go dark.
+  const late = {
+    city: emit.late(skyline, GRADES.night),
+    rooftops: emit.late(rooftops, GRADES.night),
+  };
   const inView = panes
     .filter(
       (p) =>
@@ -710,6 +715,7 @@ function city(season = "summer") {
   };
   return {
     states,
+    late,
     glow,
     beacons,
     roofs,
@@ -751,6 +757,14 @@ export function skylineScene(puff, cast) {
     "glow-front-b.png": scene.glow.frontB,
     "traffic.png": traffic(),
   };
+  for (const season of SEASONS) {
+    seasons[season].late.city.forEach((image, i) => {
+      images[`late-city-${season}-${i + 1}.png`] = image;
+    });
+    seasons[season].late.rooftops.forEach((image, i) => {
+      images[`late-rooftops-${season}-${i + 1}.png`] = image;
+    });
+  }
   for (const state of STATES) {
     for (const season of SEASONS) {
       const drawn = seasons[season].states[state];

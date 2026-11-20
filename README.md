@@ -81,6 +81,15 @@ interface is see-through, over a pixel-art New York that keeps real time.
   and snow. After half past nine at night there are no children, prams or
   ball games; below about 9°C nobody sits out on a doorstep, and nobody
   barbecues in a coat.
+- **Traffic and lights keep the same hours.** The road is full at the two
+  rush hours, steady through the day, and down to the odd car at three in the
+  morning; days off have no rush and more about after midnight. Cars join
+  and leave the road off the edge of the picture, never in view. Windows go
+  dark as the night gets late: most are lit all evening, they go out in
+  three waves from about ten, and in the small hours a fifth of them are
+  still on, with the street lamps and the shops. They come back on before
+  dawn, and Friday and Saturday nights run an hour or so later. Few flights
+  come over after midnight.
 - **Weather.** New York's own, live: what is over the city right now is
   what is over the scene, looked at again every ten minutes. Clear, broken
   cloud, overcast, drizzle, rain, a downpour, thunder, fog, flurries, snow.
@@ -525,7 +534,11 @@ Day to day, use the look panel (above). To change what it starts from:
   how many people the street aims for (three to five at an ordinary busy
   hour), `MAX_HEADS` the ceiling (20). `bustleAt` is how busy it is by the
   hour, the day of the week, the temperature and the weather: `WORKDAY`,
-  `DAY_OFF` and `BY_TEMPERATURE` are the curves it reads. `StreetLife.tsx` holds how often groups come by. `SITS` is how
+  `DAY_OFF` and `BY_TEMPERATURE` are the curves it reads. `trafficAt` does
+  the same for the road and `lateAt` for how many windows have gone dark.
+  Which windows go dark, and in which wave, is drawn into the art: `home` in
+  `scripts/art/lib.mjs` marks a window as lived behind, and `LATE_SHARES`
+  is how many are out after each wave. `StreetLife.tsx` holds how often groups come by. `SITS` is how
   likely each kind of party is to sit on a doorstep; `roofPartyAt` decides when
   there is a barbecue. `WindowLife.tsx` is who shows in the windows and
   `SkyTraffic.tsx` the aircraft and the birds.

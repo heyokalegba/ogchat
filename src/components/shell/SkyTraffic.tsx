@@ -58,8 +58,18 @@ function schedule(id: number): Flight {
   };
 }
 
-export function SkyTraffic(props: { light: SkyState; night: number; still?: boolean }) {
+export function SkyTraffic(props: {
+  light: SkyState;
+  night: number;
+  still?: boolean;
+  /** How far into the night it is, 0 to 1: in the small hours few flights come over. */
+  late?: number;
+}) {
   const { light, night, still = false } = props;
+  const lateness = useRef(props.late ?? 0);
+  useEffect(() => {
+    lateness.current = props.late ?? 0;
+  }, [props.late]);
   const [flights, setFlights] = useState<Flight[]>([]);
   const [flocks, setFlocks] = useState<Flock[]>([]);
   const dark = useRef(night);
@@ -97,6 +107,8 @@ export function SkyTraffic(props: { light: SkyState; night: number; still?: bool
     const timer = setInterval(() => {
       if (document.hidden || seconds() < next) return;
       next = seconds() + 60 + Math.random() * 120;
+      // The airports all but shut overnight: most of what would have come over does not.
+      if (Math.random() < lateness.current * 0.85) return;
       setFlights((current) => (current.length >= 2 ? current : [...current, schedule(++id)]));
     }, 3000);
     return () => clearInterval(timer);

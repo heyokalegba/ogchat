@@ -36,6 +36,12 @@ import skylineGlowBackB from "./skyline/glow-back-b.png";
 import skylineGlowFrontA from "./skyline/glow-front-a.png";
 import skylineGlowFrontB from "./skyline/glow-front-b.png";
 import skylineTraffic from "./skyline/traffic.png";
+import skylineLateCitySpring1 from "./skyline/late-city-spring-1.png";
+import skylineLateCitySpring2 from "./skyline/late-city-spring-2.png";
+import skylineLateCitySpring3 from "./skyline/late-city-spring-3.png";
+import skylineLateRooftopsSpring1 from "./skyline/late-rooftops-spring-1.png";
+import skylineLateRooftopsSpring2 from "./skyline/late-rooftops-spring-2.png";
+import skylineLateRooftopsSpring3 from "./skyline/late-rooftops-spring-3.png";
 import skylineCitySpringDay from "./skyline/city-spring-day.png";
 import skylineRooftopsSpringDay from "./skyline/rooftops-spring-day.png";
 import skylineCitySnowDay from "./skyline/city-snow-day.png";
@@ -68,6 +74,18 @@ import brooklynGlowBackA from "./brooklyn/glow-back-a.png";
 import brooklynGlowBackB from "./brooklyn/glow-back-b.png";
 import brooklynGlowFrontA from "./brooklyn/glow-front-a.png";
 import brooklynGlowFrontB from "./brooklyn/glow-front-b.png";
+import brooklynLateCitySpring1 from "./brooklyn/late-city-spring-1.png";
+import brooklynLateCitySpring2 from "./brooklyn/late-city-spring-2.png";
+import brooklynLateCitySpring3 from "./brooklyn/late-city-spring-3.png";
+import brooklynLateRooftopsSpring1 from "./brooklyn/late-rooftops-spring-1.png";
+import brooklynLateRooftopsSpring2 from "./brooklyn/late-rooftops-spring-2.png";
+import brooklynLateRooftopsSpring3 from "./brooklyn/late-rooftops-spring-3.png";
+import brooklynLateCityWinter1 from "./brooklyn/late-city-winter-1.png";
+import brooklynLateCityWinter2 from "./brooklyn/late-city-winter-2.png";
+import brooklynLateCityWinter3 from "./brooklyn/late-city-winter-3.png";
+import brooklynLateRooftopsWinter1 from "./brooklyn/late-rooftops-winter-1.png";
+import brooklynLateRooftopsWinter2 from "./brooklyn/late-rooftops-winter-2.png";
+import brooklynLateRooftopsWinter3 from "./brooklyn/late-rooftops-winter-3.png";
 import brooklynTrafficDay from "./brooklyn/traffic-day.png";
 import brooklynCabDay from "./brooklyn/cab-day.png";
 import brooklynCitySpringDay from "./brooklyn/city-spring-day.png";
@@ -239,6 +257,26 @@ export const SCENES = {
       autumn: { day: skylineCitySpringDay.src, golden: skylineCitySpringGolden.src, dusk: skylineCitySpringDusk.src, night: skylineCitySpringNight.src },
       winter: { day: skylineCitySpringDay.src, golden: skylineCitySpringGolden.src, dusk: skylineCitySpringDusk.src, night: skylineCitySpringNight.src },
       snow: { day: skylineCitySnowDay.src, golden: skylineCitySnowGolden.src, dusk: skylineCitySnowDusk.src, night: skylineCitySnowNight.src },
+    },
+    /**
+     * The small hours: pictures laid over the night ones as it gets late, each
+     * putting out some more of the windows.
+     */
+    late: {
+      city: {
+      spring: [skylineLateCitySpring1.src, skylineLateCitySpring2.src, skylineLateCitySpring3.src],
+      summer: [skylineLateCitySpring1.src, skylineLateCitySpring2.src, skylineLateCitySpring3.src],
+      autumn: [skylineLateCitySpring1.src, skylineLateCitySpring2.src, skylineLateCitySpring3.src],
+      winter: [skylineLateCitySpring1.src, skylineLateCitySpring2.src, skylineLateCitySpring3.src],
+      snow: [skylineLateCitySpring1.src, skylineLateCitySpring2.src, skylineLateCitySpring3.src],
+    },
+      rooftops: {
+      spring: [skylineLateRooftopsSpring1.src, skylineLateRooftopsSpring2.src, skylineLateRooftopsSpring3.src],
+      summer: [skylineLateRooftopsSpring1.src, skylineLateRooftopsSpring2.src, skylineLateRooftopsSpring3.src],
+      autumn: [skylineLateRooftopsSpring1.src, skylineLateRooftopsSpring2.src, skylineLateRooftopsSpring3.src],
+      winter: [skylineLateRooftopsSpring1.src, skylineLateRooftopsSpring2.src, skylineLateRooftopsSpring3.src],
+      snow: [skylineLateRooftopsSpring1.src, skylineLateRooftopsSpring2.src, skylineLateRooftopsSpring3.src],
+    },
     },
     rooftops: {
       spring: { day: skylineRooftopsSpringDay.src, golden: skylineRooftopsSpringGolden.src, dusk: skylineRooftopsSpringDusk.src, night: skylineRooftopsSpringNight.src },
@@ -1435,6 +1473,26 @@ export const SCENES = {
       autumn: { day: brooklynCityAutumnDay.src, golden: brooklynCityAutumnGolden.src, dusk: brooklynCityAutumnDusk.src, night: brooklynCityAutumnNight.src },
       winter: { day: brooklynCityWinterDay.src, golden: brooklynCityWinterGolden.src, dusk: brooklynCityWinterDusk.src, night: brooklynCityWinterNight.src },
       snow: { day: brooklynCitySnowDay.src, golden: brooklynCitySnowGolden.src, dusk: brooklynCitySnowDusk.src, night: brooklynCitySnowNight.src },
+    },
+    /**
+     * The small hours: pictures laid over the night ones as it gets late, each
+     * putting out some more of the windows.
+     */
+    late: {
+      city: {
+      spring: [brooklynLateCitySpring1.src, brooklynLateCitySpring2.src, brooklynLateCitySpring3.src],
+      summer: [brooklynLateCitySpring1.src, brooklynLateCitySpring2.src, brooklynLateCitySpring3.src],
+      autumn: [brooklynLateCitySpring1.src, brooklynLateCitySpring2.src, brooklynLateCitySpring3.src],
+      winter: [brooklynLateCityWinter1.src, brooklynLateCityWinter2.src, brooklynLateCityWinter3.src],
+      snow: [brooklynLateCityWinter1.src, brooklynLateCityWinter2.src, brooklynLateCityWinter3.src],
+    },
+      rooftops: {
+      spring: [brooklynLateRooftopsSpring1.src, brooklynLateRooftopsSpring2.src, brooklynLateRooftopsSpring3.src],
+      summer: [brooklynLateRooftopsSpring1.src, brooklynLateRooftopsSpring2.src, brooklynLateRooftopsSpring3.src],
+      autumn: [brooklynLateRooftopsSpring1.src, brooklynLateRooftopsSpring2.src, brooklynLateRooftopsSpring3.src],
+      winter: [brooklynLateRooftopsWinter1.src, brooklynLateRooftopsWinter2.src, brooklynLateRooftopsWinter3.src],
+      snow: [brooklynLateRooftopsWinter1.src, brooklynLateRooftopsWinter2.src, brooklynLateRooftopsWinter3.src],
+    },
     },
     rooftops: {
       spring: { day: brooklynRooftopsSpringDay.src, golden: brooklynRooftopsSpringGolden.src, dusk: brooklynRooftopsSpringDusk.src, night: brooklynRooftopsSpringNight.src },

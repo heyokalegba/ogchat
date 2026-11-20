@@ -17,7 +17,7 @@ function windows(c, emit, L, left, top, w, h, color, lit, share = 0.22) {
     for (let x = left + 1; x < left + w - 1; x += 3) {
       c.set(x, y, shade(color, 0.9));
       if (L.chance(share)) {
-        emit.light(c, x, y, 1, 1, L.pick(lit), L.chance(0.3) ? "evening" : "night");
+        emit.home(c, x, y, 1, 1, L.pick(lit), L.chance(0.3) ? "evening" : "night");
       }
     }
   }
