@@ -21,7 +21,7 @@ import {
   text,
   textCentred,
 } from "./street.mjs";
-import { dealer, lamps, stamp, vehicle } from "./vehicles.mjs";
+import { dealer, lamps, stamp, vehicle, VEHICLES } from "./vehicles.mjs";
 import {
   bayer,
   canvas,
@@ -171,6 +171,7 @@ function block(season = "summer") {
   // ------------------------------------------------------------ far: downtown in the haze
   const far = ["#4b4966", "#52506c", "#45445e", "#58556f"].map(hex);
   for (let x = -6; x < 320;) {
+    emit.building("office");
     const w = between(9, 20);
     const h = Math.round(between(34, 96) * (0.45 + Math.exp(-(((x - 128) / 95) ** 2))));
     const color = pick(far);
@@ -184,11 +185,12 @@ function block(season = "summer") {
       for (let wx = x + 2; wx < x + w - 3; wx += 3) {
         const roll = rand();
         if (roll < 0.6) skyline.set(wx, wy, shade(color, 0.86));
-        if (roll < 0.16) emit.home(skyline, wx, wy, 1, 1, hex("#b89f66"), litFrom());
-        else if (roll < 0.22)
-          emit.light(skyline, wx, wy, 1, 1, hex("#c9ae70"), chance(0.5) ? "a" : "c");
-        else if (roll < 0.6 && L.chance(0.3))
-          emit.home(skyline, wx, wy, 1, 1, hex("#b89f66"), "night");
+        // The same rolls as ever, so the towers come out as they always have. They
+        // no longer decide which windows are lit: every window is somebody's.
+        if (roll < 0.16) litFrom();
+        else if (roll < 0.22) chance(0.5);
+        else if (roll < 0.6) L.chance(0.3);
+        if (roll < 0.6) emit.home(skyline, wx, wy, 1, 1, hex(roll < 0.22 ? "#c9ae70" : "#b89f66"));
       }
     }
     x += w;
@@ -202,6 +204,7 @@ function block(season = "summer") {
     const haze = ["#605e7e", "#676585", "#5b5a79"].map(hex);
     const glow = [hex("#b89f66"), hex("#c9ae70")];
     for (let x = 300; x < 492;) {
+      emit.building("office");
       const w = M.between(7, 13);
       const near = Math.exp(-(((x - 352) / 34) ** 2)) + 0.75 * Math.exp(-(((x - 452) / 26) ** 2));
       const h = Math.round(M.between(44, 62) + 46 * near);
@@ -210,7 +213,7 @@ function block(season = "summer") {
       skyline.rect(x + w - 2, PARK_BASE - h, 2, h, shade(color, 0.9));
       for (let wy = PARK_BASE - h + 3; wy < PARK_BASE - 30; wy += 4) {
         for (let wx = x + 1; wx < x + w - 2; wx += 3) {
-          if (M.chance(0.14)) emit.home(skyline, wx, wy, 1, 1, M.pick(glow), "night");
+          emit.home(skyline, wx, wy, 1, 1, M.chance(0.14) ? M.pick(glow) : null);
         }
       }
       x += w + (M.chance(0.25) ? M.between(1, 3) : 0);
@@ -244,6 +247,7 @@ function block(season = "summer") {
   // The clock tower (the Williamsburgh Savings Bank tower, downtown Brooklyn's
   // own landmark): a slender stepped shaft under a dome, its clock face lit.
   {
+    emit.building("office");
     const cx = 168;
     const stone = hex("#665f78");
     let y = PARK_BASE;
@@ -262,8 +266,8 @@ function block(season = "summer") {
         for (let wx = left + 3; wx < left + w - 4; wx += 3) {
           const on = chance(0.2);
           skyline.set(wx, wy, shade(stone, 0.8));
-          const when = on ? "evening" : lateOn();
-          if (when) emit.home(skyline, wx, wy, 1, 1, hex("#c4aa6c"), when);
+          if (!on) lateOn();
+          emit.home(skyline, wx, wy, 1, 1, hex("#c4aa6c"));
         }
       }
     }
@@ -371,6 +375,7 @@ function block(season = "summer") {
   // ------------------------------------------------------------ mid: apartment houses and a church
   const midFlicker = () => (chance(0.5) ? "a" : "c");
   const apartment = (x, w, h, color) => {
+    emit.building("flat");
     const top = SIDEWALK - h;
     skyline.rect(x, top, w, h, color);
     weather(skyline, d, x, top, w, h);
@@ -402,10 +407,8 @@ function block(season = "summer") {
           glass = pick(WARM);
         }
         when ??= lateOn();
-        if (when) {
-          const id = emit.home(skyline, wx, wy, 3, 5, glass, when);
-          if (blind) emit.detail(skyline, id, wx, wy, 3, 2, shade(tone, 0.7), when);
-        }
+        const id = emit.home(skyline, wx, wy, 3, 5, glass);
+        if (blind) emit.detail(skyline, id, wx, wy, 3, 2, shade(tone, 0.7), when);
       }
     }
     // fire escape down one bay
@@ -524,20 +527,20 @@ function block(season = "summer") {
     let when = on ? litFrom() : null;
     if (!on && chance(0.32)) when = "b"; // one of the windows that switch on and off
     when ??= lateOn();
-    if (!when) return;
     // Now and then the light in a room is a coloured LED strip, not a warm lamp.
-    const glow = LED.chance(0.025) ? LED.pick(LED_TONES) : tone;
-    const id = emit.home(rooftops, wx, wy, ww, wh, glow, when);
+    const glow = when && LED.chance(0.025) ? LED.pick(LED_TONES) : tone;
+    const id = emit.home(rooftops, wx, wy, ww, wh, glow);
     if (dressing === "shade") {
       emit.detail(rooftops, id, wx, wy, ww, Math.ceil(wh * 0.4), shade(glow, 0.68), when); // pulled down
     } else if (dressing === "curtain") {
       emit.detail(rooftops, id, wx, wy, 1, wh, shade(glow, 0.6), when);
     }
     emit.detail(rooftops, id, wx, sash, ww, 1, shade(glow, 0.55), when);
-    if (when !== "b") panes.push({ x: wx, y: wy, w: ww, h: wh, when, id });
+    if (when && when !== "b") panes.push({ x: wx, y: wy, w: ww, h: wh, when, id });
   };
 
   const brownstone = (x, w, floors, color, shop) => {
+    emit.building("flat");
     const garden = 10;
     const parlor = 24;
     const upper = 20;
@@ -629,7 +632,7 @@ function block(season = "summer") {
     const transomTone = transomLit ? pick(WARM) : L.pick(WARM);
     rooftops.rect(doorX, fy + 7, 7, 2, hex("#22232c")); // transom
     const transomWhen = transomLit ? "evening" : lateOn();
-    if (transomWhen) emit.home(rooftops, doorX, fy + 7, 7, 2, transomTone, transomWhen);
+    emit.home(rooftops, doorX, fy + 7, 7, 2, transomWhen ? transomTone : null);
     rooftops.rect(
       doorX,
       fy + 9,
@@ -649,7 +652,7 @@ function block(season = "summer") {
       const on = chance(0.3);
       const tone = on ? pick(WARM) : null;
       rooftops.rect(wx, fy + 3, 5, 5, hex("#16171d"));
-      if (on) emit.home(rooftops, wx, fy + 3, 5, 5, tone, "evening");
+      emit.home(rooftops, wx, fy + 3, 5, 5, tone);
       rooftops.rect(wx + 1, fy + 3, 1, 5, iron);
       rooftops.rect(wx + 3, fy + 3, 1, 5, iron);
     }
@@ -944,11 +947,8 @@ function block(season = "summer") {
       parked: emit.render(parked, state, GRADES[state]),
     };
   }
-  // The small hours: what to lay over the night pictures as the windows go dark.
-  const late = {
-    city: emit.late(skyline, GRADES.night),
-    rooftops: emit.late(rooftops, GRADES.night),
-  };
+  // The windows people live and work behind, for the scene to light as the hours go.
+  const homes = { city: emit.homes(skyline), rooftops: emit.homes(rooftops) };
   // Windows still in plain sight: not behind a tree, not swallowed by a shop.
   const windows = panes
     .filter(
@@ -995,7 +995,7 @@ function block(season = "summer") {
   };
   return {
     states,
-    late,
+    homes,
     glow,
     beacons,
     chimneys,
@@ -1087,6 +1087,15 @@ function cab(state) {
   return c;
 }
 
+/** A police cruiser on patrol: nose right, in one light. Not often seen. */
+const CRUISER = { w: VEHICLES.police.w, h: VEHICLES.police.h };
+function cruiser(state) {
+  const c = canvas(CRUISER.w, CRUISER.h);
+  stamp(c, vehicle("police", null), 0, CRUISER.h - 1, { tone: (p) => GRADES[state](dusk(p)) });
+  lamps(c, CRUISER, 0, CRUISER.h - 1, { on: state === "dusk" || state === "night" });
+  return c;
+}
+
 /** Things on the pavement worth stopping at, by x. */
 const TREES = [58, 132, 236, 318, 398, 474, 590];
 const HYDRANT = 307;
@@ -1102,18 +1111,16 @@ export function brooklynScene(puff, cast) {
     "glow-front-a.png": scene.glow.frontA,
     "glow-front-b.png": scene.glow.frontB,
   };
+  // The lit look of every lived-behind window, season by season (a bare tree hides less).
   for (const season of SEASONS) {
-    seasons[season].late.city.forEach((image, i) => {
-      images[`late-city-${season}-${i + 1}.png`] = image;
-    });
-    seasons[season].late.rooftops.forEach((image, i) => {
-      images[`late-rooftops-${season}-${i + 1}.png`] = image;
-    });
+    images[`homes-city-${season}.png`] = seasons[season].homes.city.lit;
+    images[`homes-rooftops-${season}.png`] = seasons[season].homes.rooftops.lit;
   }
   const layout = trafficLayout();
   for (const state of STATES) {
     images[`traffic-${state}.png`] = traffic(state, layout);
     images[`cab-${state}.png`] = cab(state);
+    images[`cruiser-${state}.png`] = cruiser(state);
     for (const season of SEASONS) {
       const drawn = seasons[season].states[state];
       images[`city-${season}-${state}.png`] = drawn.city;
@@ -1129,6 +1136,11 @@ export function brooklynScene(puff, cast) {
   return {
     images,
     wear: wearFor(scene.site, 5150),
+    // Where the lived-behind windows are and whose they are (the same in every season).
+    homes: {
+      city: { windows: scene.homes.city.windows, kinds: scene.homes.city.kinds },
+      rooftops: { windows: scene.homes.rooftops.windows, kinds: scene.homes.rooftops.kinds },
+    },
     config: {
       label: "brooklyn",
       hint: "a brownstone block by Prospect Park",
@@ -1182,6 +1194,8 @@ export function brooklynScene(puff, cast) {
         // Where a cab can be hailed: empty kerb. And the rows a cab drives and stops on.
         hail: scene.hail,
         cab: { ...CAB, lane: LANES[0].base, kerb: PARKED_BASE + 2 },
+        // A police car now and then: its size, the row it drives on, and where its lights are.
+        patrol: { ...CRUISER, lane: LANES[0].base, bar: VEHICLES.police.bar },
       },
       // Lit windows in plain view, for the people and pets seen moving behind them.
       windows: scene.windows,

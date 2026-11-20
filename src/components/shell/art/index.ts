@@ -34,14 +34,9 @@ import skylineGlintsB from "./skyline/glints-b.png";
 import skylineGlowBackA from "./skyline/glow-back-a.png";
 import skylineGlowBackB from "./skyline/glow-back-b.png";
 import skylineGlowFrontA from "./skyline/glow-front-a.png";
-import skylineGlowFrontB from "./skyline/glow-front-b.png";
 import skylineTraffic from "./skyline/traffic.png";
-import skylineLateCitySpring1 from "./skyline/late-city-spring-1.png";
-import skylineLateCitySpring2 from "./skyline/late-city-spring-2.png";
-import skylineLateCitySpring3 from "./skyline/late-city-spring-3.png";
-import skylineLateRooftopsSpring1 from "./skyline/late-rooftops-spring-1.png";
-import skylineLateRooftopsSpring2 from "./skyline/late-rooftops-spring-2.png";
-import skylineLateRooftopsSpring3 from "./skyline/late-rooftops-spring-3.png";
+import skylineHomesCitySpring from "./skyline/homes-city-spring.png";
+import skylineHomesRooftopsSpring from "./skyline/homes-rooftops-spring.png";
 import skylineCitySpringDay from "./skyline/city-spring-day.png";
 import skylineRooftopsSpringDay from "./skyline/rooftops-spring-day.png";
 import skylineCitySnowDay from "./skyline/city-snow-day.png";
@@ -74,20 +69,13 @@ import brooklynGlowBackA from "./brooklyn/glow-back-a.png";
 import brooklynGlowBackB from "./brooklyn/glow-back-b.png";
 import brooklynGlowFrontA from "./brooklyn/glow-front-a.png";
 import brooklynGlowFrontB from "./brooklyn/glow-front-b.png";
-import brooklynLateCitySpring1 from "./brooklyn/late-city-spring-1.png";
-import brooklynLateCitySpring2 from "./brooklyn/late-city-spring-2.png";
-import brooklynLateCitySpring3 from "./brooklyn/late-city-spring-3.png";
-import brooklynLateRooftopsSpring1 from "./brooklyn/late-rooftops-spring-1.png";
-import brooklynLateRooftopsSpring2 from "./brooklyn/late-rooftops-spring-2.png";
-import brooklynLateRooftopsSpring3 from "./brooklyn/late-rooftops-spring-3.png";
-import brooklynLateCityWinter1 from "./brooklyn/late-city-winter-1.png";
-import brooklynLateCityWinter2 from "./brooklyn/late-city-winter-2.png";
-import brooklynLateCityWinter3 from "./brooklyn/late-city-winter-3.png";
-import brooklynLateRooftopsWinter1 from "./brooklyn/late-rooftops-winter-1.png";
-import brooklynLateRooftopsWinter2 from "./brooklyn/late-rooftops-winter-2.png";
-import brooklynLateRooftopsWinter3 from "./brooklyn/late-rooftops-winter-3.png";
+import brooklynHomesCitySpring from "./brooklyn/homes-city-spring.png";
+import brooklynHomesRooftopsSpring from "./brooklyn/homes-rooftops-spring.png";
+import brooklynHomesCityWinter from "./brooklyn/homes-city-winter.png";
+import brooklynHomesRooftopsWinter from "./brooklyn/homes-rooftops-winter.png";
 import brooklynTrafficDay from "./brooklyn/traffic-day.png";
 import brooklynCabDay from "./brooklyn/cab-day.png";
+import brooklynCruiserDay from "./brooklyn/cruiser-day.png";
 import brooklynCitySpringDay from "./brooklyn/city-spring-day.png";
 import brooklynRooftopsSpringDay from "./brooklyn/rooftops-spring-day.png";
 import brooklynParkedSpringDay from "./brooklyn/parked-spring-day.png";
@@ -105,6 +93,7 @@ import brooklynPropsDay from "./brooklyn/props-day.png";
 import brooklynWheelsDay from "./brooklyn/wheels-day.png";
 import brooklynTrafficGolden from "./brooklyn/traffic-golden.png";
 import brooklynCabGolden from "./brooklyn/cab-golden.png";
+import brooklynCruiserGolden from "./brooklyn/cruiser-golden.png";
 import brooklynCitySpringGolden from "./brooklyn/city-spring-golden.png";
 import brooklynRooftopsSpringGolden from "./brooklyn/rooftops-spring-golden.png";
 import brooklynParkedSpringGolden from "./brooklyn/parked-spring-golden.png";
@@ -122,6 +111,7 @@ import brooklynPropsGolden from "./brooklyn/props-golden.png";
 import brooklynWheelsGolden from "./brooklyn/wheels-golden.png";
 import brooklynTrafficDusk from "./brooklyn/traffic-dusk.png";
 import brooklynCabDusk from "./brooklyn/cab-dusk.png";
+import brooklynCruiserDusk from "./brooklyn/cruiser-dusk.png";
 import brooklynCitySpringDusk from "./brooklyn/city-spring-dusk.png";
 import brooklynRooftopsSpringDusk from "./brooklyn/rooftops-spring-dusk.png";
 import brooklynParkedSpringDusk from "./brooklyn/parked-spring-dusk.png";
@@ -139,6 +129,7 @@ import brooklynPropsDusk from "./brooklyn/props-dusk.png";
 import brooklynWheelsDusk from "./brooklyn/wheels-dusk.png";
 import brooklynTrafficNight from "./brooklyn/traffic-night.png";
 import brooklynCabNight from "./brooklyn/cab-night.png";
+import brooklynCruiserNight from "./brooklyn/cruiser-night.png";
 import brooklynCitySpringNight from "./brooklyn/city-spring-night.png";
 import brooklynRooftopsSpringNight from "./brooklyn/rooftops-spring-night.png";
 import brooklynParkedSpringNight from "./brooklyn/parked-spring-night.png";
@@ -203,12 +194,12 @@ export const PEOPLE = {
   "person": {
     "w": 9,
     "h": 15,
-    "rows": 40
+    "rows": 44
   },
   "prop": {
     "w": 12,
     "h": 9,
-    "rows": 10
+    "rows": 12
   },
   "wheel": {
     "w": 20,
@@ -240,6 +231,12 @@ export const PEOPLE = {
       36,
       4
     ],
+    "rough": [
+      40,
+      4
+    ],
+    "cart": 10,
+    "bundle": 11,
     "dogs": [
       0,
       8
@@ -259,24 +256,12 @@ export const SCENES = {
       snow: { day: skylineCitySnowDay.src, golden: skylineCitySnowGolden.src, dusk: skylineCitySnowDusk.src, night: skylineCitySnowNight.src },
     },
     /**
-     * The small hours: pictures laid over the night ones as it gets late, each
-     * putting out some more of the windows.
+     * Every window somebody lives or works behind, lit: clear everywhere else.
+     * The scene copies windows out of these one at a time (see CityLights.tsx).
      */
-    late: {
-      city: {
-      spring: [skylineLateCitySpring1.src, skylineLateCitySpring2.src, skylineLateCitySpring3.src],
-      summer: [skylineLateCitySpring1.src, skylineLateCitySpring2.src, skylineLateCitySpring3.src],
-      autumn: [skylineLateCitySpring1.src, skylineLateCitySpring2.src, skylineLateCitySpring3.src],
-      winter: [skylineLateCitySpring1.src, skylineLateCitySpring2.src, skylineLateCitySpring3.src],
-      snow: [skylineLateCitySpring1.src, skylineLateCitySpring2.src, skylineLateCitySpring3.src],
-    },
-      rooftops: {
-      spring: [skylineLateRooftopsSpring1.src, skylineLateRooftopsSpring2.src, skylineLateRooftopsSpring3.src],
-      summer: [skylineLateRooftopsSpring1.src, skylineLateRooftopsSpring2.src, skylineLateRooftopsSpring3.src],
-      autumn: [skylineLateRooftopsSpring1.src, skylineLateRooftopsSpring2.src, skylineLateRooftopsSpring3.src],
-      winter: [skylineLateRooftopsSpring1.src, skylineLateRooftopsSpring2.src, skylineLateRooftopsSpring3.src],
-      snow: [skylineLateRooftopsSpring1.src, skylineLateRooftopsSpring2.src, skylineLateRooftopsSpring3.src],
-    },
+    homes: {
+      city: { spring: skylineHomesCitySpring.src, summer: skylineHomesCitySpring.src, autumn: skylineHomesCitySpring.src, winter: skylineHomesCitySpring.src, snow: skylineHomesCitySpring.src },
+      rooftops: { spring: skylineHomesRooftopsSpring.src, summer: skylineHomesRooftopsSpring.src, autumn: skylineHomesRooftopsSpring.src, winter: skylineHomesRooftopsSpring.src, snow: skylineHomesRooftopsSpring.src },
     },
     rooftops: {
       spring: { day: skylineRooftopsSpringDay.src, golden: skylineRooftopsSpringGolden.src, dusk: skylineRooftopsSpringDusk.src, night: skylineRooftopsSpringNight.src },
@@ -292,11 +277,13 @@ export const SCENES = {
     wheels: { day: skylineWheelsDay.src, golden: skylineWheelsGolden.src, dusk: skylineWheelsDusk.src, night: skylineWheelsNight.src },
     /** The cab that answers a hail. Only where there is a street to hail one on. */
     cab: null,
+    /** A police car, for the rare patrol. Only where there is a street. */
+    cruiser: null,
     /** Sparkle on the water, as two pictures that take turns. Only where there is water. */
     glints: [skylineGlintsA.src, skylineGlintsB.src],
     glow: {
       back: [skylineGlowBackA.src, skylineGlowBackB.src],
-      front: [skylineGlowFrontA.src, skylineGlowFrontB.src],
+      front: [skylineGlowFrontA.src, skylineGlowFrontA.src],
     },
     /** The traffic strips, in each light. A scene with one picture for all hours repeats it. */
     traffic: { day: skylineTraffic.src, golden: skylineTraffic.src, dusk: skylineTraffic.src, night: skylineTraffic.src },
@@ -1158,311 +1145,8 @@ export const SCENES = {
         }
       ],
       "switches": {
-        "back": [
-          {
-            "x": 34,
-            "y": 250,
-            "w": 3,
-            "h": 3,
-            "color": "#bd9a50"
-          },
-          {
-            "x": 34,
-            "y": 304,
-            "w": 3,
-            "h": 3,
-            "color": "#c9ae5c"
-          },
-          {
-            "x": 55,
-            "y": 214,
-            "w": 2,
-            "h": 4,
-            "color": "#c9ae5c"
-          },
-          {
-            "x": 127,
-            "y": 301,
-            "w": 2,
-            "h": 4,
-            "color": "#ddd096"
-          },
-          {
-            "x": 143,
-            "y": 223,
-            "w": 2,
-            "h": 4,
-            "color": "#ddd096"
-          },
-          {
-            "x": 143,
-            "y": 295,
-            "w": 2,
-            "h": 4,
-            "color": "#ddd096"
-          },
-          {
-            "x": 148,
-            "y": 303,
-            "w": 2,
-            "h": 4,
-            "color": "#d8c478"
-          },
-          {
-            "x": 153,
-            "y": 303,
-            "w": 2,
-            "h": 4,
-            "color": "#bd9a50"
-          },
-          {
-            "x": 143,
-            "y": 311,
-            "w": 2,
-            "h": 4,
-            "color": "#bd9a50"
-          },
-          {
-            "x": 151,
-            "y": 208,
-            "w": 2,
-            "h": 4,
-            "color": "#ddd096"
-          },
-          {
-            "x": 161,
-            "y": 244,
-            "w": 3,
-            "h": 3,
-            "color": "#bd9a50"
-          },
-          {
-            "x": 161,
-            "y": 298,
-            "w": 3,
-            "h": 3,
-            "color": "#c9ae5c"
-          },
-          {
-            "x": 161,
-            "y": 310,
-            "w": 3,
-            "h": 3,
-            "color": "#c9ae5c"
-          },
-          {
-            "x": 193,
-            "y": 275,
-            "w": 3,
-            "h": 3,
-            "color": "#ddd096"
-          },
-          {
-            "x": 198,
-            "y": 311,
-            "w": 3,
-            "h": 3,
-            "color": "#d8c478"
-          },
-          {
-            "x": 277,
-            "y": 253,
-            "w": 2,
-            "h": 4,
-            "color": "#d8c478"
-          },
-          {
-            "x": 488,
-            "y": 173,
-            "w": 2,
-            "h": 4,
-            "color": "#ddd096"
-          },
-          {
-            "x": 493,
-            "y": 181,
-            "w": 2,
-            "h": 4,
-            "color": "#ddd096"
-          },
-          {
-            "x": 496,
-            "y": 151,
-            "w": 2,
-            "h": 4,
-            "color": "#bd9a50"
-          },
-          {
-            "x": 557,
-            "y": 178,
-            "w": 2,
-            "h": 4,
-            "color": "#bd9a50"
-          }
-        ],
-        "front": [
-          {
-            "x": 4,
-            "y": 320,
-            "w": 4,
-            "h": 6,
-            "color": "#d8c478"
-          },
-          {
-            "x": 13,
-            "y": 332,
-            "w": 4,
-            "h": 6,
-            "color": "#d8c478"
-          },
-          {
-            "x": 59,
-            "y": 348,
-            "w": 4,
-            "h": 6,
-            "color": "#c9ae5c"
-          },
-          {
-            "x": 155,
-            "y": 310,
-            "w": 4,
-            "h": 6,
-            "color": "#ddd096"
-          },
-          {
-            "x": 119,
-            "y": 322,
-            "w": 4,
-            "h": 6,
-            "color": "#d8c478"
-          },
-          {
-            "x": 155,
-            "y": 322,
-            "w": 4,
-            "h": 6,
-            "color": "#bd9a50"
-          },
-          {
-            "x": 146,
-            "y": 334,
-            "w": 4,
-            "h": 6,
-            "color": "#c9ae5c"
-          },
-          {
-            "x": 164,
-            "y": 334,
-            "w": 4,
-            "h": 6,
-            "color": "#ddd096"
-          },
-          {
-            "x": 137,
-            "y": 346,
-            "w": 4,
-            "h": 6,
-            "color": "#ddd096"
-          },
-          {
-            "x": 146,
-            "y": 346,
-            "w": 4,
-            "h": 6,
-            "color": "#d0503a"
-          },
-          {
-            "x": 176,
-            "y": 340,
-            "w": 4,
-            "h": 6,
-            "color": "#d8c478"
-          },
-          {
-            "x": 212,
-            "y": 352,
-            "w": 4,
-            "h": 6,
-            "color": "#d8c478"
-          },
-          {
-            "x": 268,
-            "y": 344,
-            "w": 4,
-            "h": 6,
-            "color": "#ddd096"
-          },
-          {
-            "x": 277,
-            "y": 344,
-            "w": 4,
-            "h": 6,
-            "color": "#bd9a50"
-          },
-          {
-            "x": 369,
-            "y": 326,
-            "w": 4,
-            "h": 6,
-            "color": "#bd9a50"
-          },
-          {
-            "x": 360,
-            "y": 338,
-            "w": 4,
-            "h": 6,
-            "color": "#bd9a50"
-          },
-          {
-            "x": 434,
-            "y": 315,
-            "w": 4,
-            "h": 6,
-            "color": "#bd9a50"
-          },
-          {
-            "x": 434,
-            "y": 327,
-            "w": 4,
-            "h": 6,
-            "color": "#ddd096"
-          },
-          {
-            "x": 434,
-            "y": 339,
-            "w": 4,
-            "h": 6,
-            "color": "#d8c478"
-          },
-          {
-            "x": 513,
-            "y": 332,
-            "w": 4,
-            "h": 6,
-            "color": "#c9ae5c"
-          },
-          {
-            "x": 522,
-            "y": 344,
-            "w": 4,
-            "h": 6,
-            "color": "#d8c478"
-          },
-          {
-            "x": 596,
-            "y": 300,
-            "w": 4,
-            "h": 6,
-            "color": "#bd9a50"
-          },
-          {
-            "x": 610,
-            "y": 343,
-            "w": 4,
-            "h": 6,
-            "color": "#ddd096"
-          }
-        ]
+        "back": [],
+        "front": []
       }
     },
   },
@@ -1475,24 +1159,12 @@ export const SCENES = {
       snow: { day: brooklynCitySnowDay.src, golden: brooklynCitySnowGolden.src, dusk: brooklynCitySnowDusk.src, night: brooklynCitySnowNight.src },
     },
     /**
-     * The small hours: pictures laid over the night ones as it gets late, each
-     * putting out some more of the windows.
+     * Every window somebody lives or works behind, lit: clear everywhere else.
+     * The scene copies windows out of these one at a time (see CityLights.tsx).
      */
-    late: {
-      city: {
-      spring: [brooklynLateCitySpring1.src, brooklynLateCitySpring2.src, brooklynLateCitySpring3.src],
-      summer: [brooklynLateCitySpring1.src, brooklynLateCitySpring2.src, brooklynLateCitySpring3.src],
-      autumn: [brooklynLateCitySpring1.src, brooklynLateCitySpring2.src, brooklynLateCitySpring3.src],
-      winter: [brooklynLateCityWinter1.src, brooklynLateCityWinter2.src, brooklynLateCityWinter3.src],
-      snow: [brooklynLateCityWinter1.src, brooklynLateCityWinter2.src, brooklynLateCityWinter3.src],
-    },
-      rooftops: {
-      spring: [brooklynLateRooftopsSpring1.src, brooklynLateRooftopsSpring2.src, brooklynLateRooftopsSpring3.src],
-      summer: [brooklynLateRooftopsSpring1.src, brooklynLateRooftopsSpring2.src, brooklynLateRooftopsSpring3.src],
-      autumn: [brooklynLateRooftopsSpring1.src, brooklynLateRooftopsSpring2.src, brooklynLateRooftopsSpring3.src],
-      winter: [brooklynLateRooftopsWinter1.src, brooklynLateRooftopsWinter2.src, brooklynLateRooftopsWinter3.src],
-      snow: [brooklynLateRooftopsWinter1.src, brooklynLateRooftopsWinter2.src, brooklynLateRooftopsWinter3.src],
-    },
+    homes: {
+      city: { spring: brooklynHomesCitySpring.src, summer: brooklynHomesCitySpring.src, autumn: brooklynHomesCitySpring.src, winter: brooklynHomesCityWinter.src, snow: brooklynHomesCityWinter.src },
+      rooftops: { spring: brooklynHomesRooftopsSpring.src, summer: brooklynHomesRooftopsSpring.src, autumn: brooklynHomesRooftopsSpring.src, winter: brooklynHomesRooftopsWinter.src, snow: brooklynHomesRooftopsWinter.src },
     },
     rooftops: {
       spring: { day: brooklynRooftopsSpringDay.src, golden: brooklynRooftopsSpringGolden.src, dusk: brooklynRooftopsSpringDusk.src, night: brooklynRooftopsSpringNight.src },
@@ -1514,6 +1186,8 @@ export const SCENES = {
     wheels: { day: brooklynWheelsDay.src, golden: brooklynWheelsGolden.src, dusk: brooklynWheelsDusk.src, night: brooklynWheelsNight.src },
     /** The cab that answers a hail. Only where there is a street to hail one on. */
     cab: { day: brooklynCabDay.src, golden: brooklynCabGolden.src, dusk: brooklynCabDusk.src, night: brooklynCabNight.src },
+    /** A police car, for the rare patrol. Only where there is a street. */
+    cruiser: { day: brooklynCruiserDay.src, golden: brooklynCruiserGolden.src, dusk: brooklynCruiserDusk.src, night: brooklynCruiserNight.src },
     /** Sparkle on the water, as two pictures that take turns. Only where there is water. */
     glints: null,
     glow: {
@@ -1828,6 +1502,17 @@ export const SCENES = {
           "h": 12,
           "lane": 353,
           "kerb": 350
+        },
+        "patrol": {
+          "w": 28,
+          "h": 12,
+          "lane": 353,
+          "bar": {
+            "x": 11,
+            "y": 0,
+            "w": 5,
+            "h": 1
+          }
         }
       },
       "windows": [
@@ -2351,542 +2036,8 @@ export const SCENES = {
         }
       ],
       "switches": {
-        "back": [
-          {
-            "x": 47,
-            "y": 195,
-            "w": 1,
-            "h": 1,
-            "color": "#c9ae70"
-          },
-          {
-            "x": 104,
-            "y": 148,
-            "w": 1,
-            "h": 1,
-            "color": "#c9ae70"
-          },
-          {
-            "x": 101,
-            "y": 176,
-            "w": 1,
-            "h": 1,
-            "color": "#c9ae70"
-          },
-          {
-            "x": 104,
-            "y": 176,
-            "w": 1,
-            "h": 1,
-            "color": "#c9ae70"
-          },
-          {
-            "x": 107,
-            "y": 204,
-            "w": 1,
-            "h": 1,
-            "color": "#c9ae70"
-          },
-          {
-            "x": 118,
-            "y": 148,
-            "w": 1,
-            "h": 1,
-            "color": "#c9ae70"
-          },
-          {
-            "x": 118,
-            "y": 168,
-            "w": 1,
-            "h": 1,
-            "color": "#c9ae70"
-          },
-          {
-            "x": 127,
-            "y": 208,
-            "w": 1,
-            "h": 1,
-            "color": "#c9ae70"
-          },
-          {
-            "x": 152,
-            "y": 187,
-            "w": 1,
-            "h": 1,
-            "color": "#c9ae70"
-          },
-          {
-            "x": 181,
-            "y": 159,
-            "w": 1,
-            "h": 1,
-            "color": "#c9ae70"
-          },
-          {
-            "x": 178,
-            "y": 187,
-            "w": 1,
-            "h": 1,
-            "color": "#c9ae70"
-          },
-          {
-            "x": 187,
-            "y": 171,
-            "w": 1,
-            "h": 1,
-            "color": "#c9ae70"
-          },
-          {
-            "x": 190,
-            "y": 191,
-            "w": 1,
-            "h": 1,
-            "color": "#c9ae70"
-          },
-          {
-            "x": 193,
-            "y": 191,
-            "w": 1,
-            "h": 1,
-            "color": "#c9ae70"
-          },
-          {
-            "x": 187,
-            "y": 219,
-            "w": 1,
-            "h": 1,
-            "color": "#c9ae70"
-          },
-          {
-            "x": 187,
-            "y": 223,
-            "w": 1,
-            "h": 1,
-            "color": "#c9ae70"
-          },
-          {
-            "x": 208,
-            "y": 169,
-            "w": 1,
-            "h": 1,
-            "color": "#c9ae70"
-          },
-          {
-            "x": 59,
-            "y": 236,
-            "w": 3,
-            "h": 5,
-            "color": "#d29a50"
-          },
-          {
-            "x": 10,
-            "y": 246,
-            "w": 3,
-            "h": 5,
-            "color": "#dfa85a"
-          },
-          {
-            "x": 17,
-            "y": 246,
-            "w": 3,
-            "h": 5,
-            "color": "#ecd08a"
-          },
-          {
-            "x": 45,
-            "y": 266,
-            "w": 3,
-            "h": 5,
-            "color": "#e0b565"
-          },
-          {
-            "x": 52,
-            "y": 276,
-            "w": 3,
-            "h": 5,
-            "color": "#b98548"
-          },
-          {
-            "x": 31,
-            "y": 306,
-            "w": 3,
-            "h": 5,
-            "color": "#b98548"
-          },
-          {
-            "x": 10,
-            "y": 316,
-            "w": 3,
-            "h": 5,
-            "color": "#dfa85a"
-          },
-          {
-            "x": 103,
-            "y": 264,
-            "w": 3,
-            "h": 5,
-            "color": "#dfa85a"
-          },
-          {
-            "x": 110,
-            "y": 284,
-            "w": 3,
-            "h": 5,
-            "color": "#dfa85a"
-          },
-          {
-            "x": 138,
-            "y": 304,
-            "w": 3,
-            "h": 5,
-            "color": "#e0b565"
-          },
-          {
-            "x": 271,
-            "y": 194,
-            "w": 3,
-            "h": 5,
-            "color": "#ecd08a"
-          },
-          {
-            "x": 243,
-            "y": 224,
-            "w": 3,
-            "h": 5,
-            "color": "#d29a50"
-          },
-          {
-            "x": 264,
-            "y": 234,
-            "w": 3,
-            "h": 5,
-            "color": "#e0b565"
-          },
-          {
-            "x": 271,
-            "y": 234,
-            "w": 3,
-            "h": 5,
-            "color": "#e0b565"
-          },
-          {
-            "x": 229,
-            "y": 254,
-            "w": 3,
-            "h": 5,
-            "color": "#d29a50"
-          },
-          {
-            "x": 243,
-            "y": 284,
-            "w": 3,
-            "h": 5,
-            "color": "#b98548"
-          },
-          {
-            "x": 236,
-            "y": 324,
-            "w": 3,
-            "h": 5,
-            "color": "#b98548"
-          },
-          {
-            "x": 317,
-            "y": 226,
-            "w": 3,
-            "h": 5,
-            "color": "#d29a50"
-          },
-          {
-            "x": 310,
-            "y": 246,
-            "w": 3,
-            "h": 5,
-            "color": "#b98548"
-          },
-          {
-            "x": 317,
-            "y": 256,
-            "w": 3,
-            "h": 5,
-            "color": "#b98548"
-          },
-          {
-            "x": 345,
-            "y": 276,
-            "w": 3,
-            "h": 5,
-            "color": "#e0b565"
-          },
-          {
-            "x": 324,
-            "y": 316,
-            "w": 3,
-            "h": 5,
-            "color": "#ecd08a"
-          },
-          {
-            "x": 388,
-            "y": 210,
-            "w": 3,
-            "h": 5,
-            "color": "#b98548"
-          },
-          {
-            "x": 437,
-            "y": 210,
-            "w": 3,
-            "h": 5,
-            "color": "#ecd08a"
-          },
-          {
-            "x": 395,
-            "y": 220,
-            "w": 3,
-            "h": 5,
-            "color": "#b98548"
-          },
-          {
-            "x": 437,
-            "y": 220,
-            "w": 3,
-            "h": 5,
-            "color": "#dfa85a"
-          },
-          {
-            "x": 388,
-            "y": 260,
-            "w": 3,
-            "h": 5,
-            "color": "#ecd08a"
-          },
-          {
-            "x": 444,
-            "y": 280,
-            "w": 3,
-            "h": 5,
-            "color": "#e0b565"
-          },
-          {
-            "x": 402,
-            "y": 290,
-            "w": 3,
-            "h": 5,
-            "color": "#dfa85a"
-          },
-          {
-            "x": 388,
-            "y": 300,
-            "w": 3,
-            "h": 5,
-            "color": "#e0b565"
-          },
-          {
-            "x": 388,
-            "y": 310,
-            "w": 3,
-            "h": 5,
-            "color": "#e0b565"
-          },
-          {
-            "x": 409,
-            "y": 320,
-            "w": 3,
-            "h": 5,
-            "color": "#d29a50"
-          },
-          {
-            "x": 444,
-            "y": 320,
-            "w": 3,
-            "h": 5,
-            "color": "#ecd08a"
-          },
-          {
-            "x": 481,
-            "y": 278,
-            "w": 3,
-            "h": 5,
-            "color": "#e0b565"
-          },
-          {
-            "x": 495,
-            "y": 278,
-            "w": 3,
-            "h": 5,
-            "color": "#ecd08a"
-          },
-          {
-            "x": 481,
-            "y": 288,
-            "w": 3,
-            "h": 5,
-            "color": "#e0b565"
-          },
-          {
-            "x": 495,
-            "y": 298,
-            "w": 3,
-            "h": 5,
-            "color": "#e0b565"
-          },
-          {
-            "x": 495,
-            "y": 318,
-            "w": 3,
-            "h": 5,
-            "color": "#ecd08a"
-          }
-        ],
-        "front": [
-          {
-            "x": 35,
-            "y": 266,
-            "w": 5,
-            "h": 10,
-            "color": "#d29a50"
-          },
-          {
-            "x": 78,
-            "y": 266,
-            "w": 5,
-            "h": 10,
-            "color": "#ecd08a"
-          },
-          {
-            "x": 91,
-            "y": 266,
-            "w": 5,
-            "h": 10,
-            "color": "#d29a50"
-          },
-          {
-            "x": 78,
-            "y": 286,
-            "w": 5,
-            "h": 10,
-            "color": "#b98548"
-          },
-          {
-            "x": 133,
-            "y": 226,
-            "w": 5,
-            "h": 10,
-            "color": "#d29a50"
-          },
-          {
-            "x": 145,
-            "y": 226,
-            "w": 5,
-            "h": 10,
-            "color": "#dfa85a"
-          },
-          {
-            "x": 174,
-            "y": 246,
-            "w": 5,
-            "h": 10,
-            "color": "#b98548"
-          },
-          {
-            "x": 162,
-            "y": 266,
-            "w": 5,
-            "h": 10,
-            "color": "#ecd08a"
-          },
-          {
-            "x": 174,
-            "y": 286,
-            "w": 5,
-            "h": 10,
-            "color": "#e0b565"
-          },
-          {
-            "x": 201,
-            "y": 286,
-            "w": 5,
-            "h": 10,
-            "color": "#dfa85a"
-          },
-          {
-            "x": 201,
-            "y": 306,
-            "w": 5,
-            "h": 14,
-            "color": "#dfa85a"
-          },
-          {
-            "x": 273,
-            "y": 266,
-            "w": 5,
-            "h": 10,
-            "color": "#ecd08a"
-          },
-          {
-            "x": 283,
-            "y": 286,
-            "w": 5,
-            "h": 10,
-            "color": "#d29a50"
-          },
-          {
-            "x": 328,
-            "y": 266,
-            "w": 5,
-            "h": 10,
-            "color": "#d29a50"
-          },
-          {
-            "x": 308,
-            "y": 306,
-            "w": 5,
-            "h": 14,
-            "color": "#dfa85a"
-          },
-          {
-            "x": 353,
-            "y": 266,
-            "w": 5,
-            "h": 10,
-            "color": "#b98548"
-          },
-          {
-            "x": 476,
-            "y": 266,
-            "w": 5,
-            "h": 10,
-            "color": "#b98548"
-          },
-          {
-            "x": 456,
-            "y": 306,
-            "w": 5,
-            "h": 14,
-            "color": "#ecd08a"
-          },
-          {
-            "x": 491,
-            "y": 266,
-            "w": 5,
-            "h": 10,
-            "color": "#ecd08a"
-          },
-          {
-            "x": 502,
-            "y": 286,
-            "w": 5,
-            "h": 10,
-            "color": "#b98548"
-          },
-          {
-            "x": 527,
-            "y": 266,
-            "w": 5,
-            "h": 10,
-            "color": "#e0b565"
-          }
-        ]
+        "back": [],
+        "front": []
       }
     },
   },

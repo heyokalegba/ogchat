@@ -104,6 +104,8 @@ function city(season = "summer") {
 
   /** A grid of windows. Some dark ones are also noted for the flicker layers. */
   const windows = (c, x, y, w, h, color, o) => {
+    // Near buildings are lived in; those behind are a mixture of flats and offices.
+    emit.building(c === rooftops ? "flat" : "mixed");
     const dark = shade(color, 0.62);
     const glass = pick([G("#3f566b"), G("#34485a"), G("#2a2f33")]);
     const useGlass = chance(0.4);
@@ -124,10 +126,9 @@ function city(season = "summer") {
           color2 = pick(lit);
         }
         when ??= later(0.13, 0.3);
-        if (!when) continue;
-        const led = o.ww >= 2 && LED.chance(0.02);
-        const id = emit.home(c, wx, wy, o.ww, o.wh, led ? LED.pick(LED_TONES) : color2, when);
-        if (c === rooftops && when !== "b") {
+        const led = when && o.ww >= 2 && LED.chance(0.02);
+        const id = emit.home(c, wx, wy, o.ww, o.wh, led ? LED.pick(LED_TONES) : color2);
+        if (c === rooftops && when && when !== "b") {
           panes.push({ x: wx, y: wy, w: o.ww, h: o.wh, when, id });
         }
         if (blind) emit.detail(c, id, wx, wy, o.ww, 1, shade(tone, 0.72), when);
@@ -151,6 +152,7 @@ function city(season = "summer") {
   // --- far skyline: hazy silhouettes, tall where the clusters are
   const haze = ["#70899e", "#768ea2", "#69839a", "#7c91a3"].map(hex);
   for (let x = -6; x < W;) {
+    emit.building("office");
     const w = between(8, 20);
     const h = Math.round(between(48, 122) * (0.62 + rise(x + 30) * 0.6));
     const color = pick(haze);
@@ -162,7 +164,7 @@ function city(season = "summer") {
     for (let wy = GROUND - h + 5; wy < GROUND - 5; wy += 5) {
       for (let wx = x + 2; wx < x + w - 2; wx += 4) {
         if (chance(0.55)) skyline.set(wx, wy, shade(color, 0.9));
-        if (L.chance(0.2)) emit.home(skyline, wx, wy, 1, 1, L.pick(lit), "night");
+        emit.home(skyline, wx, wy, 1, 1, L.chance(0.2) ? L.pick(lit) : null);
       }
     }
     x += w;
@@ -172,6 +174,7 @@ function city(season = "summer") {
   // comes out exactly as before; the real ones are drawn in their place.
   const unseen = canvas(W, H);
   const landmark = (x, color, parts, spire, c = skyline) => {
+    emit.building("office");
     let y = GROUND;
     for (const [w, h] of parts) {
       y -= h;
@@ -181,9 +184,12 @@ function city(season = "summer") {
       for (let wy = y + 3; wy < y + h - 2; wy += 4) {
         for (let wx = left + 2; wx < left + w - 3; wx += 3) {
           if (chance(0.6)) c.set(wx, wy, shade(color, 0.88));
+          let tone = null;
           if (L.chance(0.26)) {
-            emit.home(c, wx, wy, 1, 1, L.pick(lit), L.chance(0.3) ? "evening" : "night");
+            tone = L.pick(lit);
+            L.chance(0.3);
           }
+          emit.home(c, wx, wy, 1, 1, tone);
         }
       }
     }
@@ -355,13 +361,16 @@ function city(season = "summer") {
       });
     } else {
       // curtain wall: tall strips of glass
+      emit.building("office");
       for (let wx = x + 3; wx < x + w - 4; wx += 3) {
         for (let wy = top + 5; wy < GROUND - 5; wy++) {
           const on = chance(0.07);
           const tone = on ? pick(lit) : null;
           skyline.set(wx, wy, wy % 7 === 0 ? G("#22303d") : G("#33475a"));
           const when = on ? "always" : later(0.1, 0.3);
-          if (when) emit.home(skyline, wx, wy, 1, 1, tone ?? L.pick(lit), when);
+          // A curtain wall is lit a floor at a time: one window for each three rows of glass.
+          const color = when ? (tone ?? L.pick(lit)) : null;
+          if (wy % 3 === 0) emit.home(skyline, wx, wy, 1, 2, color);
         }
       }
     }
@@ -682,11 +691,8 @@ function city(season = "summer") {
       rooftops: emit.render(rooftops, state, GRADES[state]),
     };
   }
-  // The small hours: what to lay over the night pictures as the windows go dark.
-  const late = {
-    city: emit.late(skyline, GRADES.night),
-    rooftops: emit.late(rooftops, GRADES.night),
-  };
+  // The windows people live and work behind, for the scene to light as the hours go.
+  const homes = { city: emit.homes(skyline), rooftops: emit.homes(rooftops) };
   const inView = panes
     .filter(
       (p) =>
@@ -715,7 +721,7 @@ function city(season = "summer") {
   };
   return {
     states,
-    late,
+    homes,
     glow,
     beacons,
     roofs,
@@ -757,13 +763,10 @@ export function skylineScene(puff, cast) {
     "glow-front-b.png": scene.glow.frontB,
     "traffic.png": traffic(),
   };
+  // The lit look of every lived-behind window, season by season (a bare tree hides less).
   for (const season of SEASONS) {
-    seasons[season].late.city.forEach((image, i) => {
-      images[`late-city-${season}-${i + 1}.png`] = image;
-    });
-    seasons[season].late.rooftops.forEach((image, i) => {
-      images[`late-rooftops-${season}-${i + 1}.png`] = image;
-    });
+    images[`homes-city-${season}.png`] = seasons[season].homes.city.lit;
+    images[`homes-rooftops-${season}.png`] = seasons[season].homes.rooftops.lit;
   }
   for (const state of STATES) {
     for (const season of SEASONS) {
@@ -778,6 +781,11 @@ export function skylineScene(puff, cast) {
   return {
     images,
     wear: wearFor(scene.site, 5151, 600),
+    // Where the lived-behind windows are and whose they are (the same in every season).
+    homes: {
+      city: { windows: scene.homes.city.windows, kinds: scene.homes.city.kinds },
+      rooftops: { windows: scene.homes.rooftops.windows, kinds: scene.homes.rooftops.kinds },
+    },
     config: {
       label: "skyline",
       hint: "the harbour, the bridge and the towers",

@@ -184,16 +184,3 @@ describe("wear and tear", () => {
     }
   });
 });
-
-describe("the small hours in the pictures", () => {
-  it("has three steps of windows going dark for every layer, season and scene", async () => {
-    const { SCENES, SEASONS } = await import("@/components/shell/art");
-    for (const scene of Object.values(SCENES)) {
-      for (const season of SEASONS) {
-        for (const layer of [scene.late.city[season], scene.late.rooftops[season]]) {
-          expect(layer).toHaveLength(3);
-        }
-      }
-    }
-  });
-});

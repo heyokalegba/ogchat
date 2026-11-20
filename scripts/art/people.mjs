@@ -295,8 +295,41 @@ function castPerson(d, kind, heritage) {
   };
 }
 
-/** How many of each kind of person the sheet holds, in row order. */
-export const CAST = { adults: 28, children: 8, runners: 4 };
+/**
+ * How many of each kind of person the sheet holds, in row order. The last
+ * are people living rough: the man with a cart of cans, whoever is asleep on
+ * a doorstep, the one walking up and down talking to nobody. They are part
+ * of any New York street, and are drawn like everybody else on it: the same
+ * figures, in heavier and more worn clothes.
+ */
+export const CAST = { adults: 28, children: 8, runners: 4, rough: 4 };
+
+/** What somebody living outdoors wears: layers, in colours that have seen weather. */
+const WORN = ["#3b3a36", "#4a4438", "#2f3438", "#514636", "#3d3a44", "#5a5248"].map(hex);
+
+function castRough(d, heritage) {
+  const { pick, chance } = d;
+  const hatStyle = chance(0.75) ? "beanie" : null;
+  return {
+    legs: 4,
+    torso: 5,
+    stride: 1,
+    skin: pick(heritage.skin),
+    hair: chance(0.45) ? GREY : pick(heritage.hair),
+    top: pick(WORN),
+    pants: pick([LEGS[2], LEGS[3], LEGS[5]]),
+    shoes: pick([SHOES[0], SHOES[1]]),
+    hat: hatStyle ? pick(WORN) : null,
+    hatStyle,
+    long: !hatStyle && chance(0.5),
+    puff: false,
+    bare: false,
+    coat: 2, // a long coat, whatever the weather
+    pack: chance(0.5) ? pick([BAGS[0], BAGS[5]]) : null,
+    bag: null,
+    wait: pick(["look", "shift"]),
+  };
+}
 
 /** For everyone who never hails a cab: those columns show them standing about. */
 const standing = (pose) => (pose >= HAIL_FRAME ? pose - 4 : pose);
@@ -308,7 +341,7 @@ export function peopleSheet() {
     ...Array(CAST.children).fill("child"),
     ...Array(CAST.runners).fill("runner"),
   ];
-  const c = canvas(PERSON.w * FRAMES, PERSON.h * kinds.length);
+  const c = canvas(PERSON.w * FRAMES, PERSON.h * (kinds.length + CAST.rough));
   const d = dice(4242);
   // Equal shares within each kind, so the children and the runners are as mixed as the adults.
   const heritage = [
@@ -320,6 +353,14 @@ export function peopleSheet() {
     const look = castPerson(d, kind, heritage[row]);
     for (let pose = 0; pose < FRAMES; pose++) {
       person(c, pose * PERSON.w, row * PERSON.h, look, pose);
+    }
+  });
+  // Dealt from dice of their own, after everybody else, so nobody above changes.
+  const r = dice(4343);
+  shares(r, CAST.rough).forEach((part, n) => {
+    const look = castRough(r, part);
+    for (let pose = 0; pose < FRAMES; pose++) {
+      person(c, pose * PERSON.w, (kinds.length + n) * PERSON.h, look, pose);
     }
   });
   return c;
@@ -618,7 +659,78 @@ function lead(c, ox, oy) {
 
 /** Rows of the props sheet. Dogs first, small to large. */
 export const DOGS = 8;
-export const PROPS = { pram: DOGS, lead: DOGS + 1, rows: DOGS + 2 };
+export const PROPS = {
+  pram: DOGS,
+  lead: DOGS + 1,
+  cart: DOGS + 2,
+  bundle: DOGS + 3,
+  rows: DOGS + 4,
+};
+
+/**
+ * A shopping cart heaped with bags of cans and bottles, pushed from the left:
+ * a week's collecting on its way to the redemption centre.
+ */
+function cart(c, ox, oy, pose) {
+  const ground = oy + PROP.h - 1;
+  const px = (x, y, color) => c.set(ox + x, y, color);
+  const wire = hex("#8d9096");
+  const dark = hex("#4b4e55");
+  const tyre = hex("#0e0e11");
+  // the basket: wire, so the bags inside show through it
+  for (let x = 3; x <= 10; x++) {
+    for (let y = ground - 5; y <= ground - 2; y++) {
+      const edge = x === 3 || x === 10 || y === ground - 2;
+      px(x, y, edge ? dark : (x + y) % 2 ? wire : hex("#6f8296"));
+    }
+  }
+  // the heap: clear bags of cans, a black bag, tied on top
+  const bags = [hex("#9fb0bd"), hex("#c9c9c0"), hex("#1e1e22"), hex("#7d93a8")];
+  [
+    [3, 6, 0],
+    [4, 6, 1],
+    [5, 7, 1],
+    [6, 7, 3],
+    [7, 8, 3],
+    [8, 7, 2],
+    [9, 6, 2],
+    [10, 6, 0],
+    [5, 6, 0],
+    [6, 6, 1],
+    [7, 6, 0],
+    [7, 7, 0],
+    [8, 6, 3],
+    [6, 8, 1],
+  ].forEach(([x, up, bag]) => px(x, ground - up, bags[bag]));
+  px(2, ground - 5, dark); // the handle, up to the pusher's hands
+  px(1, ground - 6, dark);
+  px(0, ground - 6, dark);
+  for (const wx of [4, 9]) {
+    px(wx, ground - 1, dark);
+    px(wx, ground, tyre);
+    px(wx + (pose % 2 ? 1 : -1), ground, tyre); // a caster, swivelling
+  }
+}
+
+/** What somebody sleeping out keeps beside them: a couple of bags and a rolled blanket. */
+function bundle(c, ox, oy) {
+  const ground = oy + PROP.h - 1;
+  const px = (x, y, color) => c.set(ox + x, y, color);
+  const bag = hex("#2b2d33");
+  const blanket = hex("#566b4a");
+  const sack = hex("#8d8a80");
+  for (let x = 2; x <= 5; x++) for (let y = ground - 3; y <= ground; y++) px(x, y, bag);
+  px(2, ground - 3, shade(bag, 1.5));
+  px(5, ground - 3, shade(bag, 1.5));
+  px(3, ground - 4, bag);
+  px(4, ground - 4, bag);
+  for (let x = 6; x <= 10; x++) for (let y = ground - 1; y <= ground; y++) px(x, y, blanket);
+  px(6, ground - 1, shade(blanket, 0.7));
+  px(10, ground, shade(blanket, 0.7));
+  px(8, ground - 2, sack);
+  px(9, ground - 2, sack);
+  px(9, ground - 3, sack);
+}
 
 export function propsSheet() {
   const c = canvas(PROP.w * FRAMES, PROP.h * PROPS.rows);
@@ -640,6 +752,8 @@ export function propsSheet() {
   for (let pose = 0; pose < FRAMES; pose++) {
     pram(c, pose * PROP.w, PROPS.pram * PROP.h, pose);
     lead(c, pose * PROP.w, PROPS.lead * PROP.h);
+    cart(c, pose * PROP.w, PROPS.cart * PROP.h, pose);
+    bundle(c, pose * PROP.w, PROPS.bundle * PROP.h);
   }
   return c;
 }
@@ -648,7 +762,7 @@ export function propsSheet() {
 export const PEOPLE_META = {
   frames: FRAMES,
   walkFrames: WALK_FRAMES,
-  person: { ...PERSON, rows: CAST.adults + CAST.children + CAST.runners },
+  person: { ...PERSON, rows: CAST.adults + CAST.children + CAST.runners + CAST.rough },
   prop: { ...PROP, rows: PROPS.rows },
   wheel: { ...WHEEL, rows: RIDERS.cyclists + RIDERS.skaters + RIDERS.ballers },
   cast: {
@@ -658,6 +772,10 @@ export const PEOPLE_META = {
     adults: [0, CAST.adults],
     children: [CAST.adults, CAST.children],
     runners: [CAST.adults + CAST.children, CAST.runners],
+    // people living rough, and what they have with them
+    rough: [CAST.adults + CAST.children + CAST.runners, CAST.rough],
+    cart: PROPS.cart,
+    bundle: PROPS.bundle,
     // the first half of the dogs are small, the second half large
     dogs: [0, DOGS],
     pram: PROPS.pram,

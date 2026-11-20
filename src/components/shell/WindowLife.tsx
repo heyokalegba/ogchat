@@ -34,6 +34,9 @@ const LIT: Record<SkyState, readonly string[]> = {
 
 const MAX_AT_ONCE = 4;
 
+/** The colour of a lit room behind a figure. */
+const ROOM_LIGHT = "#cdb26e";
+
 export function WindowLife(props: { scene: SceneId; light: SkyState; still?: boolean }) {
   const { scene, light, still = false } = props;
   const windows = SCENES[scene].config.windows;
@@ -111,7 +114,14 @@ export function WindowLife(props: { scene: SceneId; light: SkyState; still?: boo
           <div
             key={shadow.id}
             className={styles.pane}
-            style={{ left: px(w.x), top: px(w.y), width: px(w.w), height: px(w.h) }}
+            // Somebody is in: the room is lit for as long as they can be seen in it.
+            style={{
+              left: px(w.x),
+              top: px(w.y),
+              width: px(w.w),
+              height: px(w.h),
+              background: ROOM_LIGHT,
+            }}
           >
             <div
               className={`${styles.shadow} ${styles[`shadow-${shadow.kind}`]} ${

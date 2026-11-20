@@ -13,12 +13,17 @@ import { mix, shade } from "./lib.mjs";
 /** Sparse lit windows on a face, decided by the lighting dice so nothing else shifts. */
 function windows(c, emit, L, left, top, w, h, color, lit, share = 0.22) {
   if (!emit) return;
+  emit.building("office");
   for (let y = top + 2; y < top + h - 1; y += 4) {
     for (let x = left + 1; x < left + w - 1; x += 3) {
       c.set(x, y, shade(color, 0.9));
+      // The same rolls as ever; they no longer decide which windows are lit.
+      let tone = null;
       if (L.chance(share)) {
-        emit.home(c, x, y, 1, 1, L.pick(lit), L.chance(0.3) ? "evening" : "night");
+        tone = L.pick(lit);
+        L.chance(0.3);
       }
+      emit.home(c, x, y, 1, 1, tone);
     }
   }
 }

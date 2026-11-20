@@ -170,11 +170,8 @@ export function snowfall(c, snow, { from = 0, to = c.h - 1 } = {}) {
 }
 
 /** Which lights are on in each state. "always" lights burn even by day. */
-/**
- * How the windows go dark as the night gets late: the share of them out by
- * the end of each of three steps. A fifth stay lit till morning.
- */
-export const LATE_SHARES = [0.3, 0.58, 0.8];
+/** What a lived-behind window glows when the drawing has no colour of its own for it. */
+const HOME_TONES = ["#b89f66", "#c9ae70", "#c4aa6c", "#d8c478", "#bd9a50", "#e3c98a"].map(hex);
 
 /** A repeatable number in [0, 1) for a pair of whole numbers. */
 function unit(a, b) {
@@ -183,6 +180,9 @@ function unit(a, b) {
   t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
+
+/** What a window lit from inside looks like from the street by day: glass, mostly. */
+const DAY_GLASS = hex("#7b8088");
 
 const LIT_IN = {
   day: ["always"],
@@ -212,81 +212,87 @@ export function grade({ gain, tint, amount = 0 }) {
 export function emitter() {
   const ops = [];
   let nextId = 1;
-  /** Windows of homes and offices, by light id: when in the night each one goes dark. */
-  const bedtime = new Map();
+  /**
+   * Windows with somebody behind them, by light id. These are never lit in
+   * the pictures themselves: which of them are on is decided as the scene
+   * runs, hour by hour and differently every night (see `homes`).
+   */
+  const lived = new Map(); // id -> { building }
+  /** The buildings those windows are in: what kind each is, in the order they were begun. */
+  const kinds = ["flat"];
   const light = (c, x, y, w, h, color, when) => {
     const id = nextId++;
     c.mark(x, y, w, h, id);
     ops.push({ kind: "rect", c, id, x, y, w, h, color, when });
     return id;
   };
-  /** The night picture with the windows that have gone dark by `tier` left unlit. */
-  const lateRender = (source, gradeFn, tier) => {
-    const out = source.graded(gradeFn);
-    const dark = (id) => (bedtime.get(id) ?? Infinity) <= tier;
-    for (const op of ops) {
-      if (op.c !== source || !LIT_IN.night.includes(op.when)) continue;
-      if (op.kind === "rect") {
-        if (dark(op.id)) continue;
-        for (let y = op.y; y < op.y + op.h; y++) {
-          for (let x = op.x; x < op.x + op.w; x++)
-            if (source.owns(x, y, op.id)) out.set(x, y, op.color);
-        }
-      } else if (op.kind === "spill") {
-        if (!hidden(source, op) && !(op.of && dark(op.of.id))) {
-          glow(out, op.cx, op.cy, op.r, op.color, op.strength);
-        }
-      } else {
-        op.fn(out);
-      }
-    }
-    return out;
-  };
   return {
     /** A lit patch. Returns its id, for `detail`. */
     light,
     /**
-     * A lit window with somebody behind it, who will at some point go to bed.
-     * It is a light like any other, and is also given a place in the order
-     * the windows go dark as the night gets late (see `late`). Which place is
-     * worked out from where the window is, not rolled, so adding this to a
-     * window changes nothing else in the picture.
+     * Says that the windows drawn from here on belong to a new building:
+     * "office" (it empties in the evening, floor by floor), "flat" (people
+     * live there and go to bed), or "mixed" (one or the other, decided once).
      */
-    home(c, x, y, w, h, color, when) {
-      const id = light(c, x, y, w, h, color, when);
-      const rank = unit(x * 7919 + w, y * 104729 + h);
-      const tier = LATE_SHARES.findIndex((share) => rank < share);
-      if (tier !== -1) bedtime.set(id, tier + 1);
+    building(kind) {
+      kinds.push(kind);
+    },
+    /**
+     * A window with somebody behind it: an office, a room in a flat. Every
+     * such window should be given here, whether or not the old dice had it
+     * lit, because it is not this drawing that decides. The pictures show it
+     * dark; the scene lights it when its people are in.
+     *
+     * `color` is what it glows when lit; null picks a warm one from where
+     * the window is (no dice are rolled, so nothing else in the picture
+     * moves). `when` is accepted and ignored, so call sites can keep the
+     * rolls they always made.
+     */
+    home(c, x, y, w, h, color) {
+      const tone =
+        color ?? HOME_TONES[Math.floor(unit(x * 7919 + w, y * 104729 + h) * HOME_TONES.length)];
+      const id = light(c, x, y, w, h, tone, "home");
+      lived.set(id, { building: kinds.length - 1 });
       return id;
     },
     /**
-     * The late night, as pictures to lay over the night one: each holds only
-     * the windows that have gone dark by then, drawn unlit, and is clear
-     * everywhere else. Laid on in order as the night goes, they take the
-     * city from an evening with most lights on to the small hours with a few.
+     * Everything the scene needs to light the lived-behind windows of one
+     * canvas itself: a picture with every one of them lit (clear everywhere
+     * else, and only where the window still shows, so a tree in front of a
+     * window stays in front of it), and the list of them: where each is, and
+     * which building it belongs to. `kinds` says what each building is.
      */
-    late(source, gradeFn) {
-      const out = [];
-      let before = lateRender(source, gradeFn, 0);
-      for (let tier = 1; tier <= LATE_SHARES.length; tier++) {
-        const now = lateRender(source, gradeFn, tier);
-        const changed = canvas(source.w, source.h);
-        for (let i = 0; i < now.data.length; i += 4) {
-          const same =
-            now.data[i] === before.data[i] &&
-            now.data[i + 1] === before.data[i + 1] &&
-            now.data[i + 2] === before.data[i + 2] &&
-            now.data[i + 3] === before.data[i + 3];
-          if (!same) changed.data.set(now.data.subarray(i, i + 4), i);
+    homes(source) {
+      const lit = canvas(source.w, source.h);
+      const seen = new Set();
+      const windows = [];
+      const local = new Map(); // building id -> index among this canvas's buildings
+      let codes = "";
+      for (const op of ops) {
+        if (op.c !== source || op.kind !== "rect" || !lived.has(op.id)) continue;
+        for (let y = op.y; y < op.y + op.h; y++) {
+          for (let x = op.x; x < op.x + op.w; x++)
+            if (source.owns(x, y, op.id)) lit.set(x, y, op.color);
         }
-        out.push(changed);
-        before = now;
+        if (seen.has(op.id)) continue; // a blind or a sash bar on a window already listed
+        seen.add(op.id);
+        if (op.x < 0 || op.y < 0 || op.x + op.w > source.w || op.y + op.h > source.h) continue;
+        const building = lived.get(op.id).building;
+        if (!local.has(building)) {
+          local.set(building, local.size);
+          const kind = kinds[building];
+          // A "mixed" building is offices or flats: settled here, once, by which building it is.
+          const settled = kind === "mixed" ? (unit(building, 77) < 0.55 ? "office" : "flat") : kind;
+          codes += settled === "office" ? "o" : "f";
+        }
+        windows.push(op.x, op.y, op.w, op.h, local.get(building));
       }
-      return out;
+      return { lit, windows, kinds: codes };
     },
     /** Part of an existing light: a blind, a sash bar. Shown only where that light still shows. */
     detail(c, id, x, y, w, h, color, when) {
-      ops.push({ kind: "rect", c, id, x, y, w, h, color, when });
+      // A blind on a lived-behind window is lit with the window, not by the clock.
+      ops.push({ kind: "rect", c, id, x, y, w, h, color, when: lived.has(id) ? "home" : when });
     },
     /** Light spilling onto whatever is around: a lamp's pool, a shop front. */
     spill(c, cx, cy, r, color, strength, when, { halo = true, of = null } = {}) {
@@ -302,12 +308,17 @@ export function emitter() {
     render(source, state, gradeFn) {
       const out = source.graded(gradeFn);
       const on = LIT_IN[state];
+      // In daylight a lit shop window does not glow: you see into it, dimly.
+      const sunlit = state === "day" ? 0.6 : state === "golden" ? 0.35 : 0;
       for (const op of ops) {
         if (op.c !== source || !on.includes(op.when)) continue;
         if (op.kind === "rect") {
+          const color = sunlit
+            ? shade(mix(op.color, DAY_GLASS, sunlit), 1 - sunlit * 0.25)
+            : op.color;
           for (let y = op.y; y < op.y + op.h; y++) {
             for (let x = op.x; x < op.x + op.w; x++)
-              if (source.owns(x, y, op.id)) out.set(x, y, op.color);
+              if (source.owns(x, y, op.id)) out.set(x, y, color);
           }
         } else if (op.kind === "spill") {
           if (!hidden(source, op)) glow(out, op.cx, op.cy, op.r, op.color, op.strength);

@@ -63,6 +63,19 @@
   inset: 0;
 }
 
+/*
+ * The lit windows: a small canvas the size the scene is drawn at, stretched
+ * over it with hard edges like every other layer.
+ */
+.cityLights {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  transition: opacity 2s linear;
+}
+
 .mirrored {
   transform: scaleX(-1);
 }
@@ -189,11 +202,6 @@
   position: absolute;
   inset: 0;
   transition: opacity 900ms linear;
-}
-
-.switchOn {
-  position: absolute;
-  animation: og-fade 500ms steps(3) both;
 }
 
 /* Sparkle on the river: two pictures of glints that slowly take turns. */
@@ -777,6 +785,29 @@
   top: 0;
   background-repeat: no-repeat;
   background-size: 100% 100%;
+}
+
+/*
+ * A police car's light bar when it is on a call: red and blue by turns, with
+ * the colour thrown onto whatever is near. Whole steps, never a fade.
+ */
+.patrolBar {
+  position: absolute;
+  animation: patrol-lights 0.5s steps(1) infinite;
+}
+
+@keyframes patrol-lights {
+  0%,
+  100% {
+    background: linear-gradient(to right, #ff3b2f 50%, #1b2a5c 50%);
+    box-shadow: calc(var(--u) * -3) 0 calc(var(--u) * 7) calc(var(--u) * 2)
+      rgba(255, 59, 47, calc(var(--throw) * 0.55));
+  }
+  50% {
+    background: linear-gradient(to right, #5c1b1b 50%, #3d6bff 50%);
+    box-shadow: calc(var(--u) * 3) 0 calc(var(--u) * 7) calc(var(--u) * 2)
+      rgba(61, 107, 255, calc(var(--throw) * 0.55));
+  }
 }
 
 /* Everybody is drawn facing right. Walking left, the whole formation is mirrored. */

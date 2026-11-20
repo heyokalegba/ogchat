@@ -6,3 +6,4 @@ next-env.d.ts
 AGENTS.md
 src/components/shell/art/index.ts
 src/components/shell/art/wear.ts
+src/components/shell/art/windows.ts

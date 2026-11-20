@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { darkness } from "@/lib/citylights";
 import { brooklynClock, type SkyView } from "@/lib/daylight";
 import {
   conditionsFor,
@@ -17,7 +18,8 @@ import { Vehicle } from "./Vehicle";
 import { Wear } from "./Wear";
 import { WeatherLayer } from "./Weather";
 import { WindowLife } from "./WindowLife";
-import { WindowSwitches } from "./WindowSwitches";
+import { WINDOWS } from "./art/windows";
+import { CityLights } from "./CityLights";
 
 /** Each scene keeps its own diary of rooftop barbecues. */
 const PARTY_SALT: Record<SceneId, number> = { skyline: 11, brooklyn: 23 };
@@ -125,19 +127,8 @@ export function Backdrop(props: {
   // How much traffic is about, and how many windows have gone dark for the night.
   const traffic = trafficAt(hour, weekday, indoors);
   const late = lateAt(hour, weekday);
-  // How much of what is showing is the night picture: the late hours are laid over that.
-  const deepNight = blend.from === "night" ? 1 : blend.to === "night" ? blend.mix : 0;
-  /** The windows that have gone dark by now, over one layer of the city. */
-  const lightsOut = (steps: readonly string[]) =>
-    steps.map((src, step) => {
-      const opacity = Math.min(1, Math.max(0, late * steps.length - step)) * deepNight;
-      return (
-        opacity > 0.004 && (
-          <div key={src} className={styles.layer} style={{ ...image(src), opacity }} />
-        )
-      );
-    });
-
+  // How dark it is out: what decides whether a lit window shows at all.
+  const dark = darkness(view.elevation, grey);
   // Every vehicle's place in the order they take to the road: shuffled once, the same
   // every time, and spread evenly, so a tenth of the traffic is a tenth of the vehicles.
   const all = config.lanes.flatMap((lane, index) =>
@@ -216,7 +207,7 @@ export function Backdrop(props: {
   /** Halos round the lights: two layers per depth, each breathing on its own rhythm. */
   const glow = (sources: readonly [string, string], phase: "Back" | "Front") =>
     night > 0.03 && (
-      <div className={styles.glowGroup} style={{ opacity: night * (1 - 0.88 * late * deepNight) }}>
+      <div className={styles.glowGroup} style={{ opacity: night }}>
         <div className={`${styles.layer} ${styles[`glow${phase}A`]}`} style={image(sources[0])} />
         <div className={`${styles.layer} ${styles[`glow${phase}B`]}`} style={image(sources[1])} />
       </div>
@@ -334,19 +325,19 @@ export function Backdrop(props: {
         <SkyTraffic light={light} night={night} still={still || weather === "storm"} late={late} />
 
         <Blend className={styles.layer} sources={art.city[ground]} view={view} />
-        {lightsOut(art.late.city[ground])}
+        <CityLights
+          windows={WINDOWS[scene]!.city}
+          src={art.homes.city[ground]}
+          now={now}
+          dark={dark}
+          salt={1}
+        />
         {art.glints && (
           <div className={styles.switches} style={{ opacity: switching }}>
             <div className={`${styles.layer} ${styles.glintsA}`} style={image(art.glints[0])} />
             <div className={`${styles.layer} ${styles.glintsB}`} style={image(art.glints[1])} />
           </div>
         )}
-        <WindowSwitches
-          windows={config.switches.back}
-          strength={switching}
-          still={still}
-          late={late}
-        />
         {glow(art.glow.back, "Back")}
         {smoke(false)}
         {lanes(false)}
@@ -369,17 +360,18 @@ export function Backdrop(props: {
         )}
 
         <Blend className={styles.layer} sources={art.rooftops[ground]} view={view} />
-        {lightsOut(art.late.rooftops[ground])}
-        <Wear scene={scene} days={props.age ?? 0} night={night} />
-        <WindowSwitches
-          windows={config.switches.front}
-          strength={switching}
-          still={still}
-          late={late}
+        <CityLights
+          windows={WINDOWS[scene]!.rooftops}
+          src={art.homes.rooftops[ground]}
+          now={now}
+          dark={dark}
+          salt={2}
         />
+        <Wear scene={scene} days={props.age ?? 0} night={night} />
         {glow(art.glow.front, "Front")}
         {/* Cars at the kerb stand between the pavement and us; cyclists pass outside them. */}
-        <WindowLife scene={scene} light={light} still={still} />
+        {/* Nobody is seen against a window until it is dark enough for the room to be lit. */}
+        <WindowLife scene={scene} light={light} still={still || dark < 0.55} />
         {people ? (
           <StreetLife
             scene={scene}

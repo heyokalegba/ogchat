@@ -30,6 +30,10 @@ export interface LifeMeta {
     dogs: readonly [number, number];
     pram: number;
     lead: number;
+    /** People living rough, and what they have with them: a cart of cans, a bedroll. */
+    rough?: readonly [number, number];
+    cart?: number;
+    bundle?: number;
   };
 }
 
@@ -54,6 +58,13 @@ export interface LifeConfig {
   hail: readonly number[];
   /** The cab: its size, the row it drives on and the row it stops on. Null where no cab comes. */
   cab: { w: number; h: number; lane: number; kerb: number } | null;
+  /** The police car that comes by now and then: its size, its row, and where its light bar is. */
+  patrol?: {
+    w: number;
+    h: number;
+    lane: number;
+    bar: { x: number; y: number; w: number; h: number };
+  } | null;
 }
 
 export interface Member {
@@ -82,6 +93,8 @@ export type Step =
   | { kind: "sit"; seconds: number }
   /** At the kerb with an arm up, flagging down a cab. */
   | { kind: "hail"; seconds: number }
+  /** Stopped, an arm in the air, holding forth to nobody. Facing whichever way they were going. */
+  | { kind: "rant"; seconds: number }
   /** Off the kerb and into the cab: down `drop` rows, and out of sight behind it. */
   | { kind: "board"; drop: number; seconds: number }
   /** Roofs only: up through the hatch (0) or back down out of sight (`depth`). */
@@ -97,6 +110,8 @@ export interface Party {
   road: boolean;
   /** Here for a barbecue: sent home if the barbecue is called off. */
   guest?: boolean;
+  /** Somebody sleeping out on a doorstep: there is never more than one. */
+  sleeper?: boolean;
   /** Where the party's middle starts; feet row; how far below the roof line it starts. */
   x: number;
   y: number;
@@ -337,7 +352,11 @@ type Kind =
   | "friends"
   | "cyclist"
   | "skater"
-  | "baller";
+  | "baller"
+  /** Somebody pushing a cart of cans and bottles to the redemption centre. */
+  | "canner"
+  /** Somebody walking up and down, stopping to hold forth to nobody. */
+  | "pacer";
 
 /** How often each kind of party turns up on the street. */
 const STREET_MIX: readonly [Kind, number][] = [
@@ -351,6 +370,9 @@ const STREET_MIX: readonly [Kind, number][] = [
   ["pram", 0.04],
   ["skater", 0.035],
   ["baller", 0.035],
+  // Part of any New York street, and not often.
+  ["canner", 0.022],
+  ["pacer", 0.014],
 ];
 
 function pickKind(rand: Rand, mix: readonly [Kind, number][], room: number): Kind {
@@ -416,10 +438,22 @@ function form(rand: Rand, meta: LifeMeta, kind: Kind, size = 0): Formation {
     if (lead) add("props", cast.lead, dx + 6, 0, 0);
     add("props", sprite, dx + (big ? 8 : 10) + (lead ? 0 : 2), 0, STRIDE.dog);
   };
+  /** Somebody living rough: one of their own rows, or any adult where a sheet has none. */
+  const rough = (dx: number) =>
+    add("people", row(rand, cast.rough ?? cast.adults), dx, 0, STRIDE.adult);
   let dog = false;
   let heads = 1;
 
   switch (kind) {
+    case "canner":
+      rough(0);
+      add("props", cast.cart ?? cast.pram, 6, 0, 0);
+      speed = between(rand, 3.4, 4.6); // a full cart is heavy
+      break;
+    case "pacer":
+      rough(0);
+      speed = between(rand, 7, 10);
+      break;
     case "solo":
       adult(0);
       break;
@@ -517,6 +551,8 @@ export interface CastOptions {
   late?: boolean;
   /** Too cold or too wet to sit out: nobody stops on a doorstep. */
   noSitting?: boolean;
+  /** Send exactly this kind of party, whatever the mix says. For previews and tests. */
+  only?: string;
 }
 
 /** Places on a doorstep, from its middle: how far across, and how many steps up. */
@@ -581,6 +617,9 @@ export function castWalkers(
 ): Party {
   const room = options.room ?? MAX_HEADS;
   let kind: Kind = options.group ? "friends" : pickKind(rand, STREET_MIX, room);
+  if (options.only && STREET_MIX.some(([name]) => name === options.only)) {
+    kind = options.only as Kind;
+  }
   if (kind === "cyclist" && !life.road) kind = "solo";
   if (options.late && ["child", "pram", "baller", "skater"].includes(kind)) kind = "solo";
   // The ones found sitting on a doorstep are neighbours, alone or in company.
@@ -593,12 +632,44 @@ export function castWalkers(
   const end = (rightward ? life.to : life.from) + (rightward ? 1 : -1) * shape.reach;
   const x = options.midway ? between(rand, life.from + 40, life.to - 40) : start;
 
+  if (kind === "pacer") {
+    // Up the street in fits and starts: a stretch forward, a stop to say their
+    // piece, a few steps back the way they came, and on again.
+    const steps: Step[] = [];
+    const way = rightward ? 1 : -1;
+    let at = x;
+    const walk = (to: number) => {
+      steps.push({ kind: "walk", to, seconds: Math.abs(to - at) / shape.speed });
+      at = to;
+    };
+    for (let n = 0; n < 12 && (end - at) * way > 90; n++) {
+      walk(at + way * between(rand, 40, 110));
+      steps.push({ kind: "rant", seconds: between(rand, 2.5, 6) });
+      if (rand() < 0.65) {
+        walk(at - way * between(rand, 14, 45));
+        steps.push({ kind: rand() < 0.5 ? "rant" : "wait", seconds: between(rand, 1.5, 4) });
+      }
+    }
+    walk(end);
+    return {
+      id: nextId(),
+      heads: 1,
+      roof: null,
+      road: false,
+      x,
+      y: whole(rand, life.far + 3, life.near),
+      lift: 0,
+      members: shape.members,
+      steps,
+    };
+  }
+
   // Stops along the way, in the order they will be reached.
   const stops: number[] = [];
   const hurried = kind === "runner" || kind === "cyclist" || kind === "skater";
   const pauses = hurried
     ? 0
-    : shape.dog || kind === "baller"
+    : shape.dog || kind === "baller" || kind === "canner"
       ? 0.6
       : kind === "friends"
         ? 0.5
@@ -674,6 +745,81 @@ export interface CabRide {
   arriveFor: number;
   /** When it pulls away with its fare. */
   leaveAt: number;
+}
+
+/**
+ * Somebody sleeping out: sitting on a doorstep with what they own beside
+ * them, for a good while, then up and away down the street. Null where
+ * there are no doorsteps.
+ */
+export function castSleeper(rand: Rand, meta: LifeMeta, life: LifeConfig): Party | null {
+  if (life.stoops.length === 0) return null;
+  const { cast, person } = meta;
+  const stoop = pick(rand, life.stoops);
+  const y = life.far + 3;
+  const speed = between(rand, 4.5, 6);
+  const rightward = rand() < 0.5;
+  const end = rightward ? life.to + 12 : life.from - 12;
+  const sitter: Member = {
+    sheet: "people",
+    row: row(rand, cast.rough ?? cast.adults),
+    dx: -Math.floor(person.w / 2),
+    dy: 0,
+    cadence: STRIDE.adult / speed,
+    phase: rand(),
+    idle: between(rand, 2.2, 3.4),
+  };
+  const members = [sitter];
+  if (cast.bundle !== undefined) {
+    // Their things, on the pavement by the step. Left where they are while the owner sits.
+    members.push({
+      sheet: "props",
+      row: cast.bundle,
+      dx: 3,
+      dy: 0,
+      cadence: 1,
+      phase: 0,
+      idle: 60,
+    });
+  }
+  seatMembers(members, meta, stoop, y);
+  return {
+    id: nextId(),
+    heads: 1,
+    roof: null,
+    road: false,
+    sleeper: true,
+    x: stoop.x,
+    y,
+    lift: 0,
+    members,
+    steps: [
+      { kind: "sit", seconds: between(rand, 8 * 60, 22 * 60) },
+      { kind: "walk", to: end, seconds: Math.abs(end - stoop.x) / speed },
+    ],
+  };
+}
+
+/** A police car going by: when it sets off is up to the street; this is how it goes. */
+export interface Patrol {
+  id: number;
+  /** Seconds to cross the picture. */
+  seconds: number;
+  /** On a call: lights going, and in a hurry. */
+  lights: boolean;
+  /** Driving right to left instead. */
+  leftward: boolean;
+}
+
+/** A police car's pass. Most are a slow patrol; one in five or so is on a call. */
+export function castPatrol(rand: Rand): Patrol {
+  const lights = rand() < 0.2;
+  return {
+    id: nextId(),
+    lights,
+    seconds: lights ? between(rand, 5, 7) : between(rand, 16, 24),
+    leftward: false,
+  };
 }
 
 /**

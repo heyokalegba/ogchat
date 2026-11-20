@@ -13,12 +13,15 @@ import { PEOPLE, SCENES, SKY, type SceneId, type SkyState } from "./art";
 import styles from "./backdrop.module.css";
 import {
   castCabRide,
+  castPatrol,
+  castSleeper,
   castRoofVisit,
   castStanding,
   castWalkers,
   MAX_HEADS,
   wantedHeads,
   type CabRide,
+  type Patrol,
   type LifeConfig,
   type Member,
   type Party,
@@ -130,6 +133,12 @@ const PartyView = memo(function PartyView(props: {
         }, step.seconds * 1000);
         return;
       }
+      if (step.kind === "rant") {
+        // An arm in the air, facing wherever they were headed, saying their piece.
+        el.dataset.gait = "hail";
+        timer = setTimeout(next, step.seconds * 1000);
+        return;
+      }
       if (step.kind === "hail") {
         // Facing the traffic that will bring the cab, which comes from the left.
         el.dataset.gait = "hail";
@@ -230,6 +239,64 @@ function Cab(props: {
 }
 
 /**
+ * A police car going by. Most of the time it is a slow patrol down the
+ * block; now and then it is on a call, lights going, and gone in seconds.
+ * One CSS transition takes it across; it is removed when it has left.
+ */
+function PatrolCar(props: {
+  patrol: Patrol;
+  car: NonNullable<LifeConfig["patrol"]>;
+  sprite: string;
+  far: number;
+  /** After dark the light bar throws its colours wider. */
+  night: number;
+  onGone: (id: number) => void;
+}) {
+  const { patrol, car, sprite, far, night, onGone } = props;
+  const element = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = element.current;
+    if (!el) return;
+    const at = (x: number) => `translate(${u(x)}, ${u(car.lane - car.h + 1)})`;
+    el.style.transform = at(-car.w - 14);
+    // Two frames: the start has to be on screen (just off it) before the drive can glide.
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        el.style.transition = `transform ${patrol.seconds}s linear`;
+        el.style.transform = at(far + 20);
+      });
+    });
+    const gone = setTimeout(() => onGone(patrol.id), (patrol.seconds + 0.6) * 1000);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(gone);
+    };
+  }, [patrol, car, far, onGone]);
+  return (
+    <div
+      ref={element}
+      className={styles.cab}
+      style={{ width: u(car.w), height: u(car.h), backgroundImage: `url(${sprite})` }}
+    >
+      {patrol.lights && (
+        <span
+          className={styles.patrolBar}
+          style={
+            {
+              left: u(car.bar.x),
+              top: u(car.bar.y),
+              width: u(car.bar.w),
+              height: u(car.bar.h),
+              "--throw": 0.35 + 0.65 * night,
+            } as CSSProperties
+          }
+        />
+      )}
+    </div>
+  );
+}
+
+/**
  * What goes up for a barbecue: a string of lights between two poles, and a
  * grill at one end with its smoke. After dark the bulbs and the coals glow.
  */
@@ -321,6 +388,12 @@ export function StreetLife(props: {
     (id: number) => setCabs((current) => current.filter((ride) => ride.id !== id)),
     [],
   );
+  /** Police cars on their way down the block. Rarely any. */
+  const [patrols, setPatrols] = useState<Patrol[]>([]);
+  const onPatrolGone = useCallback(
+    (id: number) => setPatrols((current) => current.filter((one) => one.id !== id)),
+    [],
+  );
   // How the street is just now, for the spawner to read whenever it next looks.
   const mood = useRef({ bustle: 1, late: false, noSitting: false });
   useEffect(() => {
@@ -384,6 +457,32 @@ export function StreetLife(props: {
     let nextGroup = seconds() + 45 + rand() * 90;
     // Now and then somebody flags down a cab. Only where there is a kerb to do it from.
     let nextCab = seconds() + 35 + rand() * 80;
+    // Rarer things. A police car comes by a couple of times an hour at most, and
+    // somebody sleeping out on a doorstep is looked for every several minutes.
+    let nextPatrol = seconds() + 600 + rand() * 1500;
+    let nextSleeper = seconds() + 90 + rand() * 420;
+
+    // For a look at the rare things without waiting for them: set
+    // localStorage "ogchat:preview" to any of patrol, call, sleeper, canner, pacer.
+    let preview: string[] = [];
+    try {
+      preview = (window.localStorage.getItem("ogchat:preview") ?? "").split(/[\s,]+/);
+    } catch {
+      // no storage: nothing to preview
+    }
+    const previews = setTimeout(() => {
+      if (onRoofs) return;
+      for (const name of preview) {
+        if (name === "patrol" || name === "call") {
+          if (life.patrol) {
+            setPatrols((current) => [...current, { ...castPatrol(rand), lights: name === "call" }]);
+          }
+        } else if (name === "sleeper") add(castSleeper(rand, PEOPLE, life));
+        else if (name === "canner" || name === "pacer") {
+          add(castWalkers(rand, PEOPLE, life, { only: name, midway: true }));
+        }
+      }
+    }, 1500);
 
     // The street carries on whether or not anyone is looking. It used to stop
     // while the window was hidden and fill up again in one go on the way back,
@@ -397,6 +496,18 @@ export function StreetLife(props: {
         if (heads() < wanted) add(one(Math.min(wanted + 1, MAX_HEADS) - heads()));
         // People come along more slowly when there are fewer of them about.
         nextArrival = now + (2 + rand() * 7) / Math.max(0.3, Math.min(1.3, mood.current.bustle));
+      }
+      if (now >= nextPatrol) {
+        nextPatrol = now + 1200 + rand() * 1800;
+        if (life.patrol) setPatrols((current) => [...current, castPatrol(rand)]);
+      }
+      if (now >= nextSleeper) {
+        nextSleeper = now + 300 + rand() * 480;
+        // More often at night, when the doorsteps are free and there is nowhere else to be.
+        const here = live.current.some((party) => party.sleeper);
+        if (!onRoofs && !here && rand() < (mood.current.late ? 0.5 : 0.12)) {
+          add(castSleeper(rand, PEOPLE, life));
+        }
       }
       if (now >= nextCab) {
         nextCab = now + 150 + rand() * 270;
@@ -441,8 +552,10 @@ export function StreetLife(props: {
     const timer = setInterval(tick, 1000);
     return () => {
       clearInterval(timer);
+      clearTimeout(previews);
       commit([]);
       setCabs([]);
+      setPatrols([]);
     };
   }, [life, commit, still]);
 
@@ -533,6 +646,19 @@ export function StreetLife(props: {
           <PartyView key={party.id} party={party} sheets={sheets} onDone={onDone} />
         ))}
       {props.kerb}
+      {life.patrol &&
+        art.cruiser &&
+        patrols.map((patrol) => (
+          <PatrolCar
+            key={patrol.id}
+            patrol={patrol}
+            car={life.patrol!}
+            sprite={art.cruiser![light]}
+            far={life.to}
+            night={props.night}
+            onGone={onPatrolGone}
+          />
+        ))}
       {life.cab &&
         art.cab &&
         cabs.map((ride) => (

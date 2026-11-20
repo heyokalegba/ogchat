@@ -219,6 +219,35 @@ export const VEHICLES = {
   },
 };
 
+/**
+ * A police cruiser: a white sedan with the blue stripes down its side and a
+ * light bar on the roof. The bar is drawn dark; the scene lights it when the
+ * car is on a call.
+ */
+VEHICLES.police = {
+  w: 28,
+  h: 12,
+  /** Where the light bar is on the sprite, for the scene to flash. */
+  bar: { x: 11, y: 0, w: 5, h: 1 },
+  draw(c) {
+    const white = hex("#d9d7cf");
+    const blue = hex("#27457c");
+    const inner = canvas(28, 11);
+    VEHICLES.sedan.draw(inner, white);
+    for (let y = 0; y < 11; y++) {
+      for (let x = 0; x < 28; x++) {
+        const p = inner.get(x, y);
+        if (p) c.set(x, y + 1, p);
+      }
+    }
+    c.rect(11, 0, 5, 1, hex("#3a3d46")); // the light bar, unlit
+    c.rect(1, 7, 26, 1, blue); // the stripes
+    c.rect(1, 9, 26, 1, shade(blue, 0.8));
+    c.rect(8, 6, 1, 1, blue); // a shield on the door
+    c.rect(15, 6, 3, 1, blue);
+  },
+};
+
 /** Sports cars come in louder colours than the rest of the street. */
 const HOT = ["#8f2a1f", "#b79a4c", "#1c1c20", "#c9c2ae", "#2f4f7a"].map(hex);
 

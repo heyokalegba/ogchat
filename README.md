@@ -81,15 +81,32 @@ interface is see-through, over a pixel-art New York that keeps real time.
   and snow. After half past nine at night there are no children, prams or
   ball games; below about 9°C nobody sits out on a doorstep, and nobody
   barbecues in a coat.
-- **Traffic and lights keep the same hours.** The road is full at the two
-  rush hours, steady through the day, and down to the odd car at three in the
-  morning; days off have no rush and more about after midnight. Cars join
-  and leave the road off the edge of the picture, never in view. Windows go
-  dark as the night gets late: most are lit all evening, they go out in
-  three waves from about ten, and in the small hours a fifth of them are
-  still on, with the street lamps and the shops. They come back on before
-  dawn, and Friday and Saturday nights run an hour or so later. Few flights
-  come over after midnight.
+- **Traffic keeps the same hours.** The road is full at the two rush hours,
+  steady through the day, and down to the odd car at three in the morning;
+  days off have no rush and more about after midnight. Cars join and leave
+  the road off the edge of the picture, never in view. Few flights come over
+  after midnight.
+- **Every window is somebody's.** No window is lit in the pictures. The scene
+  decides which are, from who is behind each one, and no two nights are the
+  same. An office floor is lit while it is staffed and empties between six
+  and nine, a floor at a time; the odd window stays on for somebody working
+  late; the lobby stays lit; on working nights the cleaners go up each tower
+  floor by floor, and at the weekend most of it never comes on. Flats light
+  up as it gets dark and people get home, and go dark as they go to bed:
+  most around eleven, later before a day off, a few night owls, one or two
+  up all night, the early risers before dawn, and now and then a light for
+  ten minutes at four in the morning. On a November afternoon the towers
+  are blazing at five; in June they have emptied before it is dark.
+- **No lights at midday.** A lit window shows only when it is dark enough
+  out to see it: nothing at noon, more as the sun goes down, and under a
+  heavy storm sky some come on in the afternoon. Shop windows by day are
+  glass you can see into, not lamps.
+- **The rest of the street.** Now and then, and not often: somebody pushing
+  a cart heaped with bags of cans to the redemption centre; somebody asleep
+  on a doorstep with their things beside them, more often at night;
+  somebody walking up and down, stopping to hold forth to nobody. A police
+  car comes down the block a couple of times an hour at most, and one time
+  in five it is on a call, lights going, and gone in seconds.
 - **Weather.** New York's own, live: what is over the city right now is
   what is over the scene, looked at again every ten minutes. Clear, broken
   cloud, overcast, drizzle, rain, a downpour, thunder, fog, flurries, snow.
@@ -535,13 +552,18 @@ Day to day, use the look panel (above). To change what it starts from:
   hour), `MAX_HEADS` the ceiling (20). `bustleAt` is how busy it is by the
   hour, the day of the week, the temperature and the weather: `WORKDAY`,
   `DAY_OFF` and `BY_TEMPERATURE` are the curves it reads. `trafficAt` does
-  the same for the road and `lateAt` for how many windows have gone dark.
-  Which windows go dark, and in which wave, is drawn into the art: `home` in
-  `scripts/art/lib.mjs` marks a window as lived behind, and `LATE_SHARES`
-  is how many are out after each wave. `StreetLife.tsx` holds how often groups come by. `SITS` is how
-  likely each kind of party is to sit on a doorstep; `roofPartyAt` decides when
-  there is a barbecue. `WindowLife.tsx` is who shows in the windows and
-  `SkyTraffic.tsx` the aircraft and the birds.
+  the same for the road. The rare ones (`canner`, `pacer`) are in
+  `STREET_MIX` with the rest; `castSleeper` and `castPatrol` have timers of
+  their own in `StreetLife.tsx`. To see the rare things without waiting for
+  them, set `localStorage["ogchat:preview"]` in the browser's console to any
+  of `patrol`, `call`, `sleeper`, `canner`, `pacer` (separated by commas)
+  and reload; remove it to go back.
+- **The lit windows:** `src/lib/citylights.ts` is the whole of who has a
+  light on: when offices empty, when the cleaners come, when flats go to
+  bed. `CityLights.tsx` draws the result. Which windows there are comes
+  from the art: `home` in `scripts/art/lib.mjs` marks a window as lived
+  behind, `building` says whether its building is offices or flats, and
+  `src/components/shell/art/windows.ts` is the list that comes out.
 - **Seasons and weather:** `FOLIAGE` in `brooklyn.mjs` holds each season's
   colours, and `snowfall` in `lib.mjs` lays the snow. `src/lib/weather.ts`
   holds the season by month, what each weather code from the service means

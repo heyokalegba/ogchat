@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  castPatrol,
   castRoofVisit,
+  castSleeper,
   castStanding,
   castCabRide,
   castWalkers,
@@ -249,6 +251,95 @@ describe("the road and the windows, by the hour", () => {
   });
 });
 
+describe("the rest of the street", () => {
+  // The sheet as the art writes it now: people living rough have rows and props of their own.
+  const full: LifeMeta = {
+    ...meta,
+    person: { ...meta.person, rows: 44 },
+    prop: { ...meta.prop, rows: 12 },
+    cast: { ...meta.cast, rough: [40, 4], cart: 10, bundle: 11 },
+  };
+
+  it("sends a can collector slowly down the street behind a loaded cart", () => {
+    const rand = seeded(3);
+    for (let n = 0; n < 40; n++) {
+      const party = castWalkers(rand, full, street, { only: "canner" });
+      expect(party.heads).toBe(1);
+      const [person] = people(party);
+      expect(person!.row).toBeGreaterThanOrEqual(40);
+      expect(person!.row).toBeLessThan(44);
+      expect(party.members.some((m) => m.sheet === "props" && m.row === 10)).toBe(true);
+      const walks = party.steps.filter((step) => step.kind === "walk");
+      const far = walks.reduce((sum, step, i) => {
+        const from = i === 0 ? party.x : (walks[i - 1] as { to: number }).to;
+        return sum + Math.abs((step as { to: number }).to - from);
+      }, 0);
+      const time = walks.reduce((sum, step) => sum + step.seconds, 0);
+      expect(far / time).toBeLessThan(5); // slower than anybody else on foot
+    }
+  });
+
+  it("has somebody walk up and down, stopping to hold forth, and get there in the end", () => {
+    const rand = seeded(5);
+    for (let n = 0; n < 40; n++) {
+      const party = castWalkers(rand, full, street, { only: "pacer" });
+      const rants = party.steps.filter((step) => step.kind === "rant");
+      expect(rants.length).toBeGreaterThanOrEqual(2);
+      // they double back at least once on the way...
+      const xs = [party.x, ...party.steps.flatMap((s) => (s.kind === "walk" ? [s.to] : []))];
+      const way = Math.sign(xs.at(-1)! - xs[0]!);
+      expect(xs.some((x, i) => i > 0 && Math.sign(x - xs[i - 1]!) === -way)).toBe(true);
+      // ...and still leave the picture by the far end
+      expect(way > 0 ? xs.at(-1)! > street.to : xs.at(-1)! < street.from).toBe(true);
+      expect(party.steps.every((s) => s.seconds > 0 && Number.isFinite(s.seconds))).toBe(true);
+    }
+  });
+
+  it("falls back to ordinary figures on a sheet with nobody living rough", () => {
+    const party = castWalkers(seeded(9), meta, street, { only: "canner" });
+    expect(people(party)[0]!.row).toBeLessThan(28);
+  });
+
+  it("is rare: a handful in a thousand passers-by", () => {
+    const rand = seeded(13);
+    let rough = 0;
+    for (let n = 0; n < 2000; n++) {
+      const party = castWalkers(rand, full, street);
+      if (people(party).some((m) => m.row >= 40)) rough++;
+    }
+    expect(rough).toBeGreaterThan(20);
+    expect(rough).toBeLessThan(140);
+  });
+
+  it("finds somebody a doorstep to sleep on, for a good while, with their things beside them", () => {
+    const rand = seeded(17);
+    for (let n = 0; n < 30; n++) {
+      const party = castSleeper(rand, full, street)!;
+      expect(party.sleeper).toBe(true);
+      expect(street.stoops.some((stoop) => stoop.x === party.x)).toBe(true);
+      const [sit, leave] = party.steps;
+      expect(sit).toMatchObject({ kind: "sit" });
+      expect(sit!.seconds).toBeGreaterThanOrEqual(8 * 60);
+      expect(sit!.seconds).toBeLessThanOrEqual(22 * 60);
+      expect(leave).toMatchObject({ kind: "walk" });
+      expect(people(party)[0]!.seat).toBeDefined();
+      expect(party.members.some((m) => m.sheet === "props" && m.row === 11)).toBe(true);
+    }
+    expect(castSleeper(rand, full, roofs)).toBeNull(); // no doorsteps up there
+  });
+
+  it("sends a police car by slowly, and now and then in a hurry with its lights on", () => {
+    const rand = seeded(19);
+    const passes = Array.from({ length: 400 }, () => castPatrol(rand));
+    const calls = passes.filter((p) => p.lights);
+    expect(calls.length).toBeGreaterThan(40);
+    expect(calls.length).toBeLessThan(130);
+    expect(Math.max(...calls.map((p) => p.seconds))).toBeLessThan(
+      Math.min(...passes.filter((p) => !p.lights).map((p) => p.seconds)),
+    );
+  });
+});
+
 describe("walkers on the pavement", () => {
   const parties = many(600, (rand) => castWalkers(rand, meta, street));
 
@@ -265,6 +356,8 @@ describe("walkers on the pavement", () => {
 
   it("only ever move forward, at a walking or running pace, stopping in order", () => {
     for (const party of parties) {
+      // The one who walks up and down has a test of their own: they do go backwards.
+      if (party.steps.some((step) => step.kind === "rant")) continue;
       let at = party.x;
       const end = party.steps.at(-1);
       const rightward = end?.kind === "walk" && end.to > party.x;
@@ -278,7 +371,7 @@ describe("walkers on the pavement", () => {
         }
         expect(rightward ? step.to > at : step.to < at).toBe(true);
         const speed = Math.abs(step.to - at) / step.seconds;
-        expect(speed).toBeGreaterThan(5);
+        expect(speed).toBeGreaterThan(3.3); // a loaded cart is the slowest thing on the street
         expect(speed).toBeLessThan(37);
         at = step.to;
       }
@@ -317,7 +410,7 @@ describe("walkers on the pavement", () => {
         expect(member.row).toBeGreaterThanOrEqual(0);
         expect(member.row).toBeLessThan(rows);
         expect(member.cadence).toBeGreaterThan(0.2);
-        expect(member.cadence).toBeLessThan(2);
+        expect(member.cadence).toBeLessThan(2.5);
         expect(member.phase).toBeGreaterThanOrEqual(0);
         expect(member.phase).toBeLessThan(1);
       }
