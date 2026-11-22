@@ -1269,3 +1269,28 @@
     opacity: 0;
   }
 }
+
+/* The choice between the two ways to a model, at the top of the settings panel. */
+.providerSwitch {
+  display: flex;
+  border: var(--og-line) solid var(--og-ink);
+  width: fit-content;
+}
+
+.panel .providerButton {
+  padding: 6px 14px;
+  font-family: var(--og-font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--og-ink);
+  background: var(--og-white);
+}
+
+.panel .providerButton + .providerButton {
+  border-left: var(--og-line) solid var(--og-ink);
+}
+
+.panel .providerActive {
+  color: var(--og-white);
+  background: var(--og-ink);
+}

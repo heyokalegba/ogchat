@@ -14,14 +14,18 @@ export async function GET(request: Request, { params }: Context): Promise<Respon
   return project ? json({ project }) : notFound();
 }
 
-/** PATCH /api/projects/:id { name?, instructions? }  →  { project } */
+/** PATCH /api/projects/:id { name?, instructions?, repo? }  →  { project } */
 export async function PATCH(request: Request, { params }: Context): Promise<Response> {
   const blocked = guard(request);
   if (blocked) return blocked;
   const { id } = await params;
   try {
     const body = await readBody(request);
-    const project = updateProject(id, { name: body.name, instructions: body.instructions });
+    const project = updateProject(id, {
+      name: body.name,
+      instructions: body.instructions,
+      repo: body.repo,
+    });
     return project ? json({ project }) : notFound();
   } catch (err) {
     if (err instanceof ProjectError) return errorJson(err.status, err.code, err.message);

@@ -171,6 +171,12 @@ describe("settings persistence", () => {
       reasoning: "default",
       systemPrompt: "",
       contextWindow: 1_000_000,
+      provider: "compatible",
+      claudeKey: null,
+      claudeKeySource: null,
+      claudeModel: "claude-opus-5-5",
+      githubToken: null,
+      githubTokenSource: null,
     });
   });
 
@@ -191,6 +197,12 @@ describe("settings persistence", () => {
       reasoning: "default",
       systemPrompt: "",
       contextWindow: 1_000_000,
+      provider: "compatible",
+      claudeKey: null,
+      claudeKeySource: null,
+      claudeModel: "claude-opus-5-5",
+      githubToken: null,
+      githubTokenSource: null,
     });
     const file = path.join(data.dir(), "settings.json");
     expect(fs.statSync(file).mode & 0o777).toBe(0o600);
@@ -217,6 +229,12 @@ describe("settings persistence", () => {
       reasoning: "default",
       systemPrompt: "",
       contextWindow: 1_000_000,
+      provider: "compatible",
+      claudeKey: null,
+      claudeKeySource: null,
+      claudeModel: "claude-opus-5-5",
+      githubToken: null,
+      githubTokenSource: null,
     });
     expect(settings.publicSettings().apiKey).toEqual({
       set: true,

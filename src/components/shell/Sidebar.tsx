@@ -210,8 +210,8 @@ export function Sidebar(props: SidebarProps) {
 
   const keyStatus = !settings
     ? "settings"
-    : settings.apiKey.set
-      ? settings.model
+    : settings.active.ready
+      ? settings.active.model
       : "add an api key";
 
   return (
@@ -357,7 +357,7 @@ export function Sidebar(props: SidebarProps) {
           onClick={props.onOpenSettings}
           aria-label="Open settings"
         >
-          <span className={`${styles.dot} ${settings?.apiKey.set ? "" : styles.dotOff}`} />
+          <span className={`${styles.dot} ${settings?.active.ready ? "" : styles.dotOff}`} />
           <span className={styles.settingsLabel}>{keyStatus}</span>
           <GearIcon />
         </button>

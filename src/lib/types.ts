@@ -71,6 +71,8 @@ export interface Project {
   updatedAt: string;
   /** How many sessions are filed under it. */
   sessionCount: number;
+  /** A GitHub repository ("owner/name") Claude can read and change in this project's chats. */
+  repo?: string;
 }
 
 /**
@@ -120,11 +122,27 @@ export interface PublicSettings {
   systemPrompt: string;
   /** How many tokens the model can take in at once: what the context meter measures against. */
   contextWindow: number;
+  /** Which of the two ways to a model is in use: any OpenAI-shaped provider, or Claude. */
+  provider: ProviderChoice;
+  /** The provider in use, in two words: whether it has a key, and which model it will ask. */
+  active: { ready: boolean; model: string };
+  /** Claude: the model, and the key (masked, as the other one is). */
+  claude: {
+    model: string;
+    key: { set: boolean; masked: string | null; source: KeySource | null };
+    /** The models the settings panel offers. Any other id can be typed. */
+    models: { id: string; label: string }[];
+  };
+  /** The GitHub token Claude's repository tools use (masked). */
+  github: { set: boolean; masked: string | null; source: KeySource | null };
 }
+
+export const PROVIDER_CHOICES = ["compatible", "claude"] as const;
+export type ProviderChoice = (typeof PROVIDER_CHOICES)[number];
 
 /** One line of a settings test: what was checked and what was found. */
 export interface SettingsCheckStep {
-  id: "settings" | "key" | "model" | "reply";
+  id: "settings" | "key" | "model" | "reply" | "github";
   /** true: fine. false: this is what is wrong. null: could not tell, or worth a look. */
   ok: boolean | null;
   title: string;

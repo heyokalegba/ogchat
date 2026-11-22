@@ -1,6 +1,7 @@
 import type {
   ContextUse,
   Project,
+  ProviderChoice,
   PublicSettings,
   ReasoningEffort,
   SendBody,
@@ -36,6 +37,11 @@ export interface SettingsUpdate {
   systemPrompt?: string;
   /** The model's context window in tokens; 0 for the default. */
   contextWindow?: number;
+  provider?: ProviderChoice;
+  /** The Claude key and the GitHub token: a string saves one, null removes it. */
+  claudeKey?: string | null;
+  claudeModel?: string;
+  githubToken?: string | null;
 }
 
 export interface ChatApi {
@@ -50,7 +56,10 @@ export interface ChatApi {
   moveSession(id: string, projectId: string | null): Promise<SessionMeta>;
   listProjects(): Promise<Project[]>;
   createProject(name: string): Promise<Project>;
-  updateProject(id: string, patch: { name?: string; instructions?: string }): Promise<Project>;
+  updateProject(
+    id: string,
+    patch: { name?: string; instructions?: string; repo?: string | null },
+  ): Promise<Project>;
   deleteProject(id: string): Promise<void>;
   addProjectFiles(id: string, files: File[]): Promise<Project>;
   removeProjectFile(id: string, fileId: string): Promise<Project>;

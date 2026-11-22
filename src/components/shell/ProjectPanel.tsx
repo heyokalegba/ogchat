@@ -28,6 +28,7 @@ export function ProjectPanel(props: ProjectPanelProps) {
   const { api, project, session } = props;
   const [name, setName] = useState(project.name);
   const [instructions, setInstructions] = useState(project.instructions);
+  const [repo, setRepo] = useState(project.repo ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -65,7 +66,10 @@ export function ProjectPanel(props: ProjectPanelProps) {
     }
   };
 
-  const dirty = name.trim() !== project.name || instructions.trim() !== project.instructions;
+  const dirty =
+    name.trim() !== project.name ||
+    instructions.trim() !== project.instructions ||
+    repo.trim() !== (project.repo ?? "");
   const inProject = session?.projectId === project.id;
 
   return (
@@ -83,7 +87,9 @@ export function ProjectPanel(props: ProjectPanelProps) {
         onSubmit={(event) => {
           event.preventDefault();
           void attempt(async () => {
-            props.onChanged(await api.updateProject(project.id, { name, instructions }));
+            props.onChanged(
+              await api.updateProject(project.id, { name, instructions, repo: repo.trim() }),
+            );
             props.onClose();
           }, "Could not save the project.");
         }}
@@ -136,6 +142,26 @@ export function ProjectPanel(props: ProjectPanelProps) {
             <p className={styles.help}>
               Sent ahead of every chat in this project, after your system prompt, together with the
               files below.
+            </p>
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="ogchat-project-repo">
+              GitHub repository
+            </label>
+            <input
+              id="ogchat-project-repo"
+              className={styles.textInput}
+              value={repo}
+              placeholder="owner/name, or paste its address"
+              autoComplete="off"
+              spellCheck={false}
+              onChange={(event) => setRepo(event.target.value)}
+            />
+            <p className={styles.help}>
+              Optional. With Claude as the provider and a GitHub token in settings, chats in this
+              project can read this repository and change it: every change goes to a branch named
+              after the chat, and reaches your main branch only through a pull request you merge.
             </p>
           </div>
 

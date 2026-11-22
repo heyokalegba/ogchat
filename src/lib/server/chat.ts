@@ -1,11 +1,13 @@
 import type { ChatError, ChatMessage, ContextUse, Session, StreamEvent } from "@/lib/types";
-import { ProviderError, streamChat, type ProviderMessage } from "@/lib/provider/adapter";
+import { ProviderError, type ProviderMessage } from "@/lib/provider/adapter";
 import { MAX_FILES_PER_MESSAGE, MAX_REQUEST_BYTES } from "@/lib/limits";
 import { buildProviderMessages, liveMessages, measureContext, tokensOf } from "./context";
 import { FileRejected, ingestFile, saveFile, type IngestedFile } from "./files";
 import { beginGeneration, endGeneration, type Generation } from "./generations";
 import { BadRequest, readBody } from "./http";
+import { githubTools, repoBriefing } from "./github";
 import { getProject } from "./projects";
+import { streamReply } from "./reply";
 import { resolveSettings } from "./settings";
 import {
   appendMessage,
@@ -288,16 +290,21 @@ export async function runTurn(
     emit({ type: "start", session: toMeta(turn.session), userMessage: turn.userMessage });
     const settings = resolveSettings();
     const project = turn.session.projectId ? getProject(turn.session.projectId) : null;
-    const messages = buildProviderMessages(turn.session, settings.systemPrompt, project);
+    // With Claude, a project tied to a repository, and a GitHub token, Claude gets the repository.
+    const repo = settings.provider === "claude" && settings.githubToken ? project?.repo : undefined;
+    const tools = repo ? githubTools({ token: settings.githubToken!, repo, sessionId }) : undefined;
+    const system = [settings.systemPrompt, repo ? repoBriefing(repo, sessionId) : ""]
+      .filter((part) => part.trim())
+      .join("\n\n");
+    const messages = buildProviderMessages(turn.session, system, project);
     sentImages = messages.some(
       (m) => Array.isArray(m.content) && m.content.some((part) => part.type === "image_url"),
     );
-    const stream = streamChat({
-      config: { baseUrl: settings.baseUrl, apiKey: settings.apiKey, model: settings.model },
-      messages,
+    const stream = streamReply(settings, messages, {
       signal: generation.controller.signal,
-      reasoningEffort: settings.reasoning === "default" ? null : settings.reasoning,
+      reasoning: settings.reasoning,
       webSearch: web,
+      tools,
       onThinking: (text) => {
         generation.thinking += text;
         emit({ type: "thinking", text });
@@ -316,7 +323,10 @@ export async function runTurn(
         emit({ type: "done", session: meta(), message, stopped: true });
       } else {
         if (!(err instanceof ProviderError)) console.error("[ogchat] reply failed:", err);
-        emit({ type: "error", session: meta(), error: toChatError(err, sentImages, web), message });
+        // The hints about images and web search are about the default provider, not Claude.
+        const hinted = resolveSettings().provider === "compatible";
+        const error = toChatError(err, hinted && sentImages, hinted && web);
+        emit({ type: "error", session: meta(), error, message });
       }
     } catch (inner) {
       console.error("[ogchat] could not record the failed reply:", inner);
@@ -404,13 +414,9 @@ export async function compressSession(sessionId: string, signal?: AbortSignal): 
     }
 
     let text = "";
-    const stream = streamChat({
-      config: { baseUrl: settings.baseUrl, apiKey: settings.apiKey, model: settings.model },
-      messages: [...lead, ...kept, ask],
+    const stream = streamReply(settings, [...lead, ...kept, ask], {
       signal: generation.controller.signal,
       // A summary wants care more than cleverness; the provider's own default is left alone.
-      reasoningEffort: null,
-      webSearch: false,
     });
     for await (const piece of stream) text += piece;
     if (!text.trim()) {

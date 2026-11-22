@@ -1,9 +1,12 @@
 import {
   REASONING_EFFORTS,
+  PROVIDER_CHOICES,
   type KeySource,
+  type ProviderChoice,
   type PublicSettings,
   type ReasoningEffort,
 } from "@/lib/types";
+import { CLAUDE_MODELS, DEFAULT_CLAUDE_MODEL } from "@/lib/provider/claude";
 import { maskKey } from "@/lib/provider/redact";
 import { readJson, writeJsonAtomic } from "./fsjson";
 import { settingsFile } from "./paths";
@@ -34,6 +37,12 @@ export interface ResolvedSettings {
   reasoning: ReasoningEffort;
   systemPrompt: string;
   contextWindow: number;
+  provider: ProviderChoice;
+  claudeKey: string | null;
+  claudeKeySource: KeySource | null;
+  claudeModel: string;
+  githubToken: string | null;
+  githubTokenSource: KeySource | null;
 }
 
 interface StoredSettings {
@@ -43,6 +52,10 @@ interface StoredSettings {
   reasoning?: ReasoningEffort;
   systemPrompt?: string;
   contextWindow?: number;
+  provider?: ProviderChoice;
+  claudeKey?: string;
+  claudeModel?: string;
+  githubToken?: string;
 }
 
 export interface SettingsPatch {
@@ -56,6 +69,12 @@ export interface SettingsPatch {
   contextWindow?: unknown;
   /** A string replaces the saved key; null or "" removes it; undefined leaves it alone. */
   apiKey?: unknown;
+  /** "compatible" or "claude". */
+  provider?: unknown;
+  /** The Claude key and the GitHub token: saved, removed and left alone as `apiKey` is. */
+  claudeKey?: unknown;
+  claudeModel?: unknown;
+  githubToken?: unknown;
 }
 
 export class SettingsValidationError extends Error {}
@@ -67,6 +86,10 @@ function env(name: string): string | null {
 
 function str(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function isProvider(value: unknown): value is ProviderChoice {
+  return typeof value === "string" && (PROVIDER_CHOICES as readonly string[]).includes(value);
 }
 
 function isEffort(value: unknown): value is ReasoningEffort {
@@ -87,6 +110,10 @@ function readStored(): StoredSettings {
     model: str(s.model),
     apiKey: str(s.apiKey),
     reasoning: isEffort(s.reasoning) && s.reasoning !== "default" ? s.reasoning : undefined,
+    provider: isProvider(s.provider) && s.provider !== "compatible" ? s.provider : undefined,
+    claudeKey: str(s.claudeKey),
+    claudeModel: str(s.claudeModel),
+    githubToken: str(s.githubToken),
     systemPrompt:
       typeof s.systemPrompt === "string" && s.systemPrompt.trim()
         ? s.systemPrompt.slice(0, MAX_SYSTEM_PROMPT_CHARS)
@@ -137,7 +164,20 @@ export function resolveSettings(): ResolvedSettings {
     reasoning: stored.reasoning ?? "default",
     systemPrompt: stored.systemPrompt ?? "",
     contextWindow: stored.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
+    provider: stored.provider ?? "compatible",
+    claudeKey: stored.claudeKey ?? env("ANTHROPIC_API_KEY"),
+    claudeKeySource: stored.claudeKey ? "settings" : env("ANTHROPIC_API_KEY") ? "env" : null,
+    claudeModel: stored.claudeModel ?? DEFAULT_CLAUDE_MODEL,
+    githubToken: stored.githubToken ?? env("OGCHAT_GITHUB_TOKEN"),
+    githubTokenSource: stored.githubToken ? "settings" : env("OGCHAT_GITHUB_TOKEN") ? "env" : null,
   };
+}
+
+/** The key and the model the chosen provider uses: what a turn is sent with. */
+export function activeModel(s: ResolvedSettings): { key: string | null; model: string } {
+  return s.provider === "claude"
+    ? { key: s.claudeKey, model: s.claudeModel }
+    : { key: s.apiKey, model: s.model };
 }
 
 export function publicSettings(): PublicSettings {
@@ -154,6 +194,22 @@ export function publicSettings(): PublicSettings {
     reasoning: s.reasoning,
     systemPrompt: s.systemPrompt,
     contextWindow: s.contextWindow,
+    provider: s.provider,
+    active: { ready: Boolean(activeModel(s).key), model: activeModel(s).model },
+    claude: {
+      model: s.claudeModel,
+      key: {
+        set: Boolean(s.claudeKey),
+        masked: s.claudeKey ? maskKey(s.claudeKey) : null,
+        source: s.claudeKeySource,
+      },
+      models: CLAUDE_MODELS.map((model) => ({ ...model })),
+    },
+    github: {
+      set: Boolean(s.githubToken),
+      masked: s.githubToken ? maskKey(s.githubToken) : null,
+      source: s.githubTokenSource,
+    },
   };
 }
 
@@ -190,6 +246,13 @@ export function previewSettings(patch: SettingsPatch): ResolvedSettings {
     model: patch.model === undefined ? current.model : cleanModel(patch.model),
     apiKey: typedKey ?? current.apiKey,
     keySource: typedKey ? "settings" : current.keySource,
+    provider: isProvider(patch.provider) ? patch.provider : current.provider,
+    claudeKey:
+      (patch.claudeKey === undefined ? null : cleanKey(patch.claudeKey)) ?? current.claudeKey,
+    claudeModel:
+      patch.claudeModel === undefined ? current.claudeModel : cleanModel(patch.claudeModel),
+    githubToken:
+      (patch.githubToken === undefined ? null : cleanKey(patch.githubToken)) ?? current.githubToken,
   };
 }
 
@@ -250,6 +313,29 @@ export function updateSettings(patch: SettingsPatch): PublicSettings {
     }
     if (asked === 0 || Math.round(asked) === DEFAULT_CONTEXT_WINDOW) delete stored.contextWindow;
     else stored.contextWindow = Math.round(asked);
+  }
+
+  if (patch.provider !== undefined) {
+    if (!isProvider(patch.provider)) {
+      throw new SettingsValidationError(`Provider must be one of: ${PROVIDER_CHOICES.join(", ")}.`);
+    }
+    if (patch.provider === "compatible") delete stored.provider;
+    else stored.provider = patch.provider;
+  }
+  if (patch.claudeKey !== undefined) {
+    const key = cleanKey(patch.claudeKey);
+    if (key) stored.claudeKey = key;
+    else delete stored.claudeKey;
+  }
+  if (patch.claudeModel !== undefined) {
+    const model = cleanModel(patch.claudeModel);
+    if (model === DEFAULT_CLAUDE_MODEL) delete stored.claudeModel;
+    else stored.claudeModel = model;
+  }
+  if (patch.githubToken !== undefined) {
+    const token = cleanKey(patch.githubToken);
+    if (token) stored.githubToken = token;
+    else delete stored.githubToken;
   }
 
   writeStored(stored);

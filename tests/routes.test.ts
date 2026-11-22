@@ -842,6 +842,14 @@ describe("settings API", () => {
       reasoning: "default",
       systemPrompt: "",
       contextWindow: 1_000_000,
+      provider: "compatible",
+      active: { ready: false, model: "abliterated-model-large-v2" },
+      claude: {
+        model: "claude-opus-5-5",
+        key: { set: false, masked: null, source: null },
+        models: expect.arrayContaining([{ id: "claude-opus-5-5", label: "Claude Opus 5.5" }]),
+      },
+      github: { set: false, masked: null, source: null },
     });
   });
 

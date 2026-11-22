@@ -27,6 +27,10 @@ export async function PUT(request: Request): Promise<Response> {
       reasoning: body.reasoning,
       systemPrompt: body.systemPrompt,
       contextWindow: body.contextWindow,
+      provider: body.provider,
+      claudeKey: body.claudeKey,
+      claudeModel: body.claudeModel,
+      githubToken: body.githubToken,
     });
     return json({ settings });
   } catch (err) {

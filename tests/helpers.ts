@@ -11,6 +11,10 @@ const ENV_NAMES = [
   "OGCHAT_API_KEY",
   "OGCHAT_MODEL",
   "OGCHAT_ALLOWED_HOSTS",
+  "ANTHROPIC_API_KEY",
+  "OGCHAT_GITHUB_TOKEN",
+  "OGCHAT_ANTHROPIC_URL",
+  "OGCHAT_GITHUB_URL",
 ] as const;
 
 /** Points the app at a fresh, empty data directory for every test. */
@@ -131,4 +135,62 @@ export function forbidNetwork(): void {
       throw new Error(`unexpected network call to ${String(input)}`);
     }),
   );
+}
+
+/** One reply from the Messages API as it streams: what the Anthropic SDK reads. */
+export type ClaudeBlock =
+  { text: string } | { thinking: string } | { tool: string; id: string; input: unknown };
+
+export function claudeStream(blocks: ClaudeBlock[], stop = "end_turn"): Response {
+  const events: [string, unknown][] = [
+    [
+      "message_start",
+      {
+        type: "message_start",
+        message: {
+          id: "msg_test",
+          type: "message",
+          role: "assistant",
+          model: "claude-opus-5-5",
+          content: [],
+          stop_reason: null,
+          stop_sequence: null,
+          usage: { input_tokens: 10, output_tokens: 0 },
+        },
+      },
+    ],
+  ];
+  blocks.forEach((block, index) => {
+    const start =
+      "text" in block
+        ? { type: "text", text: "" }
+        : "thinking" in block
+          ? { type: "thinking", thinking: "", signature: "" }
+          : { type: "tool_use", id: block.id, name: block.tool, input: {} };
+    const delta =
+      "text" in block
+        ? { type: "text_delta", text: block.text }
+        : "thinking" in block
+          ? { type: "thinking_delta", thinking: block.thinking }
+          : { type: "input_json_delta", partial_json: JSON.stringify(block.input) };
+    events.push([
+      "content_block_start",
+      { type: "content_block_start", index, content_block: start },
+    ]);
+    events.push(["content_block_delta", { type: "content_block_delta", index, delta }]);
+    events.push(["content_block_stop", { type: "content_block_stop", index }]);
+  });
+  events.push([
+    "message_delta",
+    {
+      type: "message_delta",
+      delta: { stop_reason: stop, stop_sequence: null },
+      usage: { output_tokens: 20 },
+    },
+  ]);
+  events.push(["message_stop", { type: "message_stop" }]);
+  const body = events
+    .map(([name, data]) => `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`)
+    .join("");
+  return new Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } });
 }

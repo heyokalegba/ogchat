@@ -436,10 +436,7 @@ export function AppShell() {
     }),
   );
 
-  const provider = useMemo(
-    () => (settings ? { ready: settings.apiKey.set, model: settings.model } : null),
-    [settings],
-  );
+  const provider = useMemo(() => (settings ? { ...settings.active } : null), [settings]);
 
   return (
     <div

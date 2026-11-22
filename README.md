@@ -2,10 +2,13 @@
 
 A personal AI chat interface that runs entirely on your machine. Multi-session
 chat with streaming replies, file attachments, local history, and one
-configurable OpenAI-compatible provider. No accounts, no cloud, no telemetry.
-Besides your provider it talks to one thing, and only if you leave it on: a
-public weather service, asked what the weather is in New York (see
-[Weather](#the-weather-is-new-yorks)).
+configurable provider: any OpenAI-compatible one, or Claude on your own
+Anthropic API key, which can also [work on a GitHub repository](#claude-and-a-github-repository)
+you point it at. No accounts, no cloud, no telemetry.
+Besides your provider it talks to a public weather service, if you leave that
+on, asked what the weather is in New York (see
+[Weather](#the-weather-is-new-yorks)); and to GitHub, only if you give it a
+token and tie a repository to a project.
 
 The chat is written on an old wall of pixelated bricks where no two are alike:
 mostly muted tan, with browns, greys, dull reds and limewashed pale ones, each
@@ -326,7 +329,94 @@ system prompt and web search setting it was sent, and with web search on it
 cites two made-up sources. The key `bad` is rejected as invalid (401), `broke`
 is out of credits (402) and `nope` is refused (403).
 
+### Try Claude without a key
+
+```bash
+node scripts/mock-claude.mjs
+```
+
+```bash
+OGCHAT_ANTHROPIC_URL=http://127.0.0.1:8789 OGCHAT_GITHUB_URL=http://127.0.0.1:8789 npm run dev
+```
+
+A stand-in for both the Claude API and GitHub. Switch the provider to Claude,
+enter any key and any token, and tie any `owner/name` to a project: Claude
+"looks" at a two-file repository and answers.
+
 ## Provider configuration
+
+The settings panel starts with a switch: **any provider** (the OpenAI-shaped
+one described below) or **claude**. Each keeps its own key and model, so you
+can go back and forth.
+
+### Claude, on your own API credit
+
+1. Make a key at [platform.claude.com](https://platform.claude.com) (API keys). It
+   starts `sk-ant-`. API credit is separate from a Claude subscription.
+2. In settings choose **claude**, paste the key, pick a model, press **test**
+   (it asks Anthropic whether the key can use that model, which costs nothing),
+   then **save**.
+
+Or put `ANTHROPIC_API_KEY=...` in `.env.local` instead of the settings panel.
+
+| Model               | Good for                      | Cost  |
+| ------------------- | ----------------------------- | ----- |
+| `claude-opus-5-5`   | the default: the hardest work | most  |
+| `claude-sonnet-5-5` | everyday chat and code        | less  |
+| `claude-haiku-5-5`  | quick questions               | least |
+
+You pay by the token on your Anthropic account, and every message sends the
+whole conversation again, so long chats cost more per message: the meter under
+the message box and **compress** are how you keep that down. Current prices
+are on [Anthropic's pricing page](https://www.anthropic.com/pricing); your
+spend is in the Console. Any other model id can be typed in by choosing
+"another model id…".
+
+With Claude the **think** button sets how much effort it puts in, its thinking
+is shown in summary, the globe turns on Anthropic's web search (billed per
+search by Anthropic), and images you attach are read as images.
+
+### Claude and a GitHub repository
+
+Give Claude a repository and it can read it, search it, change files and open
+a pull request, from the chat.
+
+1. On GitHub: Settings, Developer settings, Personal access tokens,
+   **Fine-grained tokens**, Generate new token. Under _Repository access_ choose
+   **Only select repositories** and pick the ones you want Claude to work on.
+   Under _Permissions_ set **Contents** and **Pull requests** to _Read and
+   write_. Nothing else.
+2. In ogchat settings (provider **claude**), paste it under **GitHub token** and
+   press **test**: it should say who the token signs in as.
+3. Make a project in the sidebar, open it (the gear beside its name) and put
+   the repository under **GitHub repository**: `owner/name` or its address.
+4. Start a chat in that project and ask: "what does this repo do?", "fix the
+   typo in the README and open a pull request".
+
+What Claude can and cannot do there:
+
+- It reads from the default branch (or from its own branch once it has written
+  to it).
+- It writes **only** to a branch named `ogchat/<the chat's id>`, made from the
+  default branch the first time it writes. One commit per file changed.
+- It can open a pull request from that branch. It cannot merge, cannot push to
+  your default branch, cannot touch another repository, and cannot run code:
+  it never has a checkout, only the GitHub API.
+- What it is doing shows under **thoughts** on the reply (`[reading
+src/app.ts]`, `[writing README.md]`).
+- You review and merge the pull request on GitHub, as with anybody's.
+
+The token is kept exactly as the API key is (below): in `data/settings.json`
+readable only by you, or in `.env.local` as `OGCHAT_GITHUB_TOKEN`; never sent
+to the browser, to Anthropic, or anywhere but `api.github.com`. Claude is told
+the repository's name, never the token. The limit on what can go wrong is the
+token itself, which is why it should cover only the repositories you chose.
+
+Reading a repository is token-hungry: each file Claude opens is added to the
+conversation and sent again with every step. For exploring, Sonnet or Haiku is
+the economical choice; switch to Opus for the hard part.
+
+### Any OpenAI-compatible provider
 
 Three values: API base URL, API key, model id. Set them in either place:
 
@@ -512,13 +602,16 @@ src/
     chat/                          the chat surface: transcript, composer, markdown
     shell/                         the app shell: sidebar, top bar, settings panel
   lib/
-    provider/adapter.ts            the only module that talks to the provider
+    provider/adapter.ts            the only module that talks to an OpenAI-shaped provider
+    provider/claude.ts             the only module that talks to Claude (Anthropic's SDK)
+    server/github.ts               the repository tools Claude is given, and the only module that talks to GitHub
     daylight.ts                    sun, moon and clock over Brooklyn
     server/                        persistence, projects, settings, turn handling, request guard
     client/api.ts                  browser client for the routes above
 tests/                             vitest: persistence, adapter, route contract, attachments, the clock, the people
 scripts/mock-provider.mjs          stand-in provider for local trials
 scripts/mock-weather.mjs           stand-in weather service for local trials
+scripts/mock-claude.mjs            stand-in Claude API and GitHub for local trials
 electron/                          the Mac app: a window and a launcher around this project (its own package)
 scripts/make-art.mjs, scripts/art/  generate the scenes, the sky, the people and the brick wall
 ```

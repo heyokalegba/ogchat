@@ -1,3 +1,4 @@
+import { parseRepo } from "./github";
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -24,6 +25,8 @@ interface ProjectFile {
   name: string;
   instructions: string;
   files: Attachment[];
+  /** The GitHub repository tied to the project, as "owner/name". */
+  repo?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -72,6 +75,7 @@ function load(id: string): ProjectFile | null {
     name: f.name,
     instructions: typeof f.instructions === "string" ? f.instructions : "",
     files: Array.isArray(f.files) ? f.files.filter(isAttachment) : [],
+    ...(parseRepo(f.repo) ? { repo: parseRepo(f.repo)! } : {}),
     createdAt: f.createdAt,
     updatedAt: f.updatedAt,
   };
@@ -82,8 +86,17 @@ function save(file: ProjectFile): void {
 }
 
 function toProject(file: ProjectFile, sessionCount: number): Project {
-  const { id, name, instructions, files, createdAt, updatedAt } = file;
-  return { id, name, instructions, files, createdAt, updatedAt, sessionCount };
+  const { id, name, instructions, files, createdAt, updatedAt, repo } = file;
+  return {
+    id,
+    name,
+    instructions,
+    files,
+    createdAt,
+    updatedAt,
+    sessionCount,
+    ...(repo ? { repo } : {}),
+  };
 }
 
 function cleanName(input: unknown): string {
@@ -154,12 +167,27 @@ export function createProject(name: unknown): Project {
 
 export function updateProject(
   id: string,
-  patch: { name?: unknown; instructions?: unknown },
+  patch: { name?: unknown; instructions?: unknown; repo?: unknown },
 ): Project | null {
   const file = load(id);
   if (!file) return null;
   if (patch.name !== undefined) file.name = cleanName(patch.name);
   if (patch.instructions !== undefined) file.instructions = cleanInstructions(patch.instructions);
+  if (patch.repo !== undefined) {
+    // "" or null unties the project; anything else has to be a repository.
+    if (patch.repo === null || patch.repo === "") delete file.repo;
+    else {
+      const repo = parseRepo(patch.repo);
+      if (!repo) {
+        throw new ProjectError(
+          400,
+          "bad_repo",
+          "That is not a GitHub repository. Give it as owner/name, or paste its address.",
+        );
+      }
+      file.repo = repo;
+    }
+  }
   file.updatedAt = new Date().toISOString();
   save(file);
   return getProject(id);

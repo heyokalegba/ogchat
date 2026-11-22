@@ -1,4 +1,7 @@
 import { checkProvider } from "@/lib/provider/adapter";
+import { checkClaude } from "@/lib/provider/claude";
+import { checkGitHub } from "@/lib/server/github";
+import type { SettingsCheckStep } from "@/lib/types";
 import { guard } from "@/lib/server/guard";
 import { BadRequest, errorJson, json, readBody } from "@/lib/server/http";
 import { previewSettings, SettingsValidationError } from "@/lib/server/settings";
@@ -22,7 +25,44 @@ export async function POST(request: Request): Promise<Response> {
       baseUrl: body.baseUrl,
       model: body.model,
       apiKey: body.apiKey,
+      provider: body.provider,
+      claudeKey: body.claudeKey,
+      claudeModel: body.claudeModel,
+      githubToken: body.githubToken,
     });
+    if (settings.provider === "claude") {
+      // Claude: ask Anthropic about the model (which costs nothing), and GitHub who the token is.
+      const claude = await checkClaude({
+        apiKey: settings.claudeKey,
+        model: settings.claudeModel,
+        baseUrl: process.env.OGCHAT_ANTHROPIC_URL?.trim() || null,
+      });
+      const steps: SettingsCheckStep[] = [
+        {
+          id: "key",
+          ok: claude.ok,
+          title: claude.ok ? "Claude is ready" : "Claude is not ready",
+          detail: claude.detail,
+        },
+      ];
+      if (settings.githubToken) {
+        const github = await checkGitHub(settings.githubToken);
+        steps.push({
+          id: "github",
+          ok: github.ok,
+          title: github.ok ? "GitHub token works" : "GitHub token does not work",
+          detail: github.detail,
+        });
+      } else {
+        steps.push({
+          id: "github",
+          ok: null,
+          title: "No GitHub token",
+          detail: "Claude can chat, but cannot read or change a repository until a token is added.",
+        });
+      }
+      return json({ check: { ok: claude.ok, steps }, keySource: settings.claudeKeySource });
+    }
     const check = await checkProvider({
       config: { baseUrl: settings.baseUrl, apiKey: settings.apiKey, model: settings.model },
     });
