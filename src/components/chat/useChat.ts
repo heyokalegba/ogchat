@@ -10,6 +10,7 @@ import type {
   SendBody,
   Session,
   SessionMeta,
+  SessionModel,
   SessionSummary,
   StreamEvent,
 } from "@/lib/types";
@@ -47,6 +48,8 @@ export interface UseChatOptions {
   api: ChatApi;
   /** The project a new conversation is filed under when its first message is sent. */
   projectId?: string | null;
+  /** The model a new conversation is set to, if not the one in settings. */
+  model?: SessionModel | null;
   onSessionCreated?: (session: SessionMeta) => void;
   onSessionUpdated?: (session: SessionMeta) => void;
   onSessionMissing?: (sessionId: string) => void;
@@ -57,8 +60,8 @@ const WEB_KEY = "ogchat:web";
 const STOP_GRACE_MS = 2500;
 
 function metaOf(session: Session): SessionMeta {
-  const { id, title, createdAt, updatedAt, messageCount, projectId } = session;
-  return { id, title, createdAt, updatedAt, messageCount, projectId };
+  const { id, title, createdAt, updatedAt, messageCount, projectId, model } = session;
+  return { id, title, createdAt, updatedAt, messageCount, projectId, model };
 }
 
 /** Requests the server refused because of what was sent; sending the same thing again cannot work. */
@@ -178,6 +181,8 @@ export function useChat(options: UseChatOptions) {
         const detail = await api.getSession(id);
         if (epochRef.current !== epoch) return false;
         setMessages(detail.session.messages);
+        // Whoever shows this chat learns what it is called and which model it is set to.
+        callbacks.current.onSessionUpdated?.(metaOf(detail.session));
         setContext(detail.context ?? null);
         setSummary(detail.session.summary ?? null);
         callbacks.current.onSessionUpdated?.(metaOf(detail.session));
@@ -376,7 +381,10 @@ export function useChat(options: UseChatOptions) {
 
       try {
         if (!id) {
-          const created = await api.createSession(callbacks.current.projectId ?? null);
+          const created = await api.createSession(
+            callbacks.current.projectId ?? null,
+            callbacks.current.model ?? null,
+          );
           if (epochRef.current !== epoch) {
             // The user moved on before the session existed; do not leave an empty one behind.
             void api.deleteSession(created.id).catch(() => {});

@@ -5,6 +5,8 @@ import {
   type ProviderChoice,
   type PublicSettings,
   type ReasoningEffort,
+  type ModelChoice,
+  type SessionModel,
 } from "@/lib/types";
 import { CLAUDE_MODELS, DEFAULT_CLAUDE_MODEL } from "@/lib/provider/claude";
 import { maskKey } from "@/lib/provider/redact";
@@ -195,6 +197,42 @@ export function activeModel(s: ResolvedSettings): { key: string | null; model: s
     : { key: s.apiKey, model: s.model };
 }
 
+/** Every model a chat can be set to. */
+function modelChoices(s: ResolvedSettings): ModelChoice[] {
+  const claude: { id: string; label: string }[] = CLAUDE_MODELS.map((m) => ({ ...m }));
+  // A Claude model typed by hand in settings is offered too.
+  if (!claude.some((m) => m.id === s.claudeModel)) {
+    claude.push({ id: s.claudeModel, label: s.claudeModel });
+  }
+  return [
+    ...claude.map((m) => ({
+      provider: "claude" as const,
+      model: m.id,
+      label: m.label,
+      ready: Boolean(s.claudeKey),
+    })),
+    { provider: "compatible" as const, model: s.model, label: s.model, ready: Boolean(s.apiKey) },
+  ];
+}
+
+/** A chat's own model, as sent by the browser: checked, or null if it is not one. */
+export function cleanSessionModel(input: unknown): SessionModel | null {
+  if (!input || typeof input !== "object") return null;
+  const given = input as Record<string, unknown>;
+  const model = str(given.model);
+  if (!isProvider(given.provider) || !model || model.length > 200) return null;
+  return { provider: given.provider, model };
+}
+
+/** The settings a chat's turn is sent with: the saved ones, with the chat's own model if it has one. */
+export function settingsFor(model: SessionModel | null | undefined): ResolvedSettings {
+  const s = resolveSettings();
+  if (!model) return s;
+  return model.provider === "claude"
+    ? { ...s, provider: "claude", claudeModel: model.model }
+    : { ...s, provider: "compatible", model: model.model };
+}
+
 export function publicSettings(): PublicSettings {
   const s = resolveSettings();
   return {
@@ -210,7 +248,12 @@ export function publicSettings(): PublicSettings {
     systemPrompt: s.systemPrompt,
     contextWindow: s.contextWindow,
     provider: s.provider,
-    active: { ready: Boolean(activeModel(s).key), model: activeModel(s).model },
+    active: {
+      ready: Boolean(activeModel(s).key),
+      model: activeModel(s).model,
+      provider: s.provider,
+    },
+    choices: modelChoices(s),
     claude: {
       model: s.claudeModel,
       workspace: s.claudeWorkspace,

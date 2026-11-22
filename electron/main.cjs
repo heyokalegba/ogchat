@@ -41,6 +41,32 @@ function splash(message) {
   return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
 }
 
+/**
+ * Links out of a chat open in the browser. The app's own pages may open in
+ * the app: an attachment, or a chat dragged out into a window of its own,
+ * which gets the size and place it asked for and behaves like the first
+ * window (its own links go out to the browser too).
+ */
+function keepLinksOut(contents) {
+  contents.setWindowOpenHandler(({ url }) => {
+    if (server && url.startsWith(server.url)) {
+      return {
+        action: "allow",
+        overrideBrowserWindowOptions: {
+          minWidth: 480,
+          minHeight: 420,
+          title: "ogchat",
+          backgroundColor: "#151b2e",
+          webPreferences: { contextIsolation: true, sandbox: true },
+        },
+      };
+    }
+    if (/^https?:/i.test(url)) void shell.openExternal(url);
+    return { action: "deny" };
+  });
+}
+app.on("web-contents-created", (_event, contents) => keepLinksOut(contents));
+
 async function open() {
   const dir = projectDir();
   const window = new BrowserWindow({
@@ -55,12 +81,7 @@ async function open() {
     // a Mac, so that is not done.
     webPreferences: { contextIsolation: true, sandbox: true },
   });
-  // Links out of a chat open in the browser; the app's own pages (an attachment, say) may open here.
-  window.webContents.setWindowOpenHandler(({ url }) => {
-    if (server && url.startsWith(server.url)) return { action: "allow" };
-    void shell.openExternal(url);
-    return { action: "deny" };
-  });
+  keepLinksOut(window.webContents);
 
   const fail = (message) => {
     dialog.showErrorBox("ogchat could not start", message);

@@ -7,8 +7,10 @@ import type {
   Role,
   Session,
   SessionMeta,
+  SessionModel,
   SessionSummary,
 } from "@/lib/types";
+import { PROVIDER_CHOICES } from "@/lib/types";
 import { titleFromMessage } from "@/lib/title";
 import { pruneFiles, removeSessionFiles } from "./files";
 import { readJson, writeJsonAtomic } from "./fsjson";
@@ -34,6 +36,8 @@ interface SessionFile {
   titleLocked: boolean;
   /** The project this session is filed under, if any. */
   projectId?: string;
+  /** The model this chat uses, if it has one of its own. */
+  model?: SessionModel;
   createdAt: string;
   updatedAt: string;
   messages: ChatMessage[];
@@ -79,11 +83,23 @@ function parseFile(value: unknown, id: string): SessionFile | null {
     title: f.title,
     titleLocked: f.titleLocked === true,
     ...(isValidId(f.projectId) ? { projectId: f.projectId } : {}),
+    ...(isModel(f.model) ? { model: { provider: f.model.provider, model: f.model.model } } : {}),
     createdAt: f.createdAt,
     updatedAt: f.updatedAt,
     messages: f.messages,
     ...(isSummary(f.summary) ? { summary: f.summary } : {}),
   };
+}
+
+function isModel(value: unknown): value is SessionModel {
+  if (!value || typeof value !== "object") return false;
+  const m = value as Record<string, unknown>;
+  return (
+    (PROVIDER_CHOICES as readonly unknown[]).includes(m.provider) &&
+    typeof m.model === "string" &&
+    m.model.length > 0 &&
+    m.model.length <= 200
+  );
 }
 
 function isSummary(value: unknown): value is SessionSummary {
@@ -120,6 +136,7 @@ function toSession(file: SessionFile): Session {
     updatedAt: file.updatedAt,
     messageCount: file.messages.length,
     projectId: file.projectId ?? null,
+    model: file.model ?? null,
     messages: file.messages,
     ...(file.summary ? { summary: file.summary } : {}),
   };
@@ -133,6 +150,7 @@ export function toMeta(session: SessionMeta): SessionMeta {
     updatedAt: session.updatedAt,
     messageCount: session.messageCount,
     projectId: session.projectId ?? null,
+    model: session.model ?? null,
   };
 }
 
@@ -176,7 +194,11 @@ export function listSessions(query?: string, project?: string | null): SessionMe
   return out.sort(newestFirst);
 }
 
-export function createSession(title?: string | null, projectId?: string | null): Session {
+export function createSession(
+  title?: string | null,
+  projectId?: string | null,
+  model?: SessionModel | null,
+): Session {
   const now = stamp();
   const file: SessionFile = {
     version: 1,
@@ -184,6 +206,7 @@ export function createSession(title?: string | null, projectId?: string | null):
     title: title ?? DEFAULT_TITLE,
     titleLocked: Boolean(title),
     ...(projectId ? { projectId } : {}),
+    ...(model ? { model } : {}),
     createdAt: now,
     updatedAt: now,
     messages: [],
@@ -203,6 +226,16 @@ export function renameSession(id: string, title: string): Session | null {
   if (!file) return null;
   file.title = title;
   file.titleLocked = true;
+  save(file);
+  return toSession(file);
+}
+
+/** Sets the model a session uses, or with null goes back to the one in settings. Not activity. */
+export function setSessionModel(id: string, model: SessionModel | null): Session | null {
+  const file = load(id);
+  if (!file) return null;
+  if (model) file.model = model;
+  else delete file.model;
   save(file);
   return toSession(file);
 }

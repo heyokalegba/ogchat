@@ -29,7 +29,13 @@ import { shelterOf } from "@/lib/weather";
 import { trafficAt } from "./life";
 import { useAmbience } from "./useAmbience";
 import { useWeather } from "./useWeather";
-import type { Project, PublicSettings, ReasoningEffort, SessionMeta } from "@/lib/types";
+import type {
+  Project,
+  PublicSettings,
+  ReasoningEffort,
+  SessionMeta,
+  SessionModel,
+} from "@/lib/types";
 import { SCENES, type SceneId } from "./art";
 import { Backdrop } from "./Backdrop";
 import { DEFAULT_LOOK, loadLook, lookVariables, saveLook, type Look } from "./look";
@@ -38,6 +44,7 @@ import { ProjectPanel } from "./ProjectPanel";
 import { SettingsPanel } from "./SettingsPanel";
 import styles from "./shell.module.css";
 import { Sidebar } from "./Sidebar";
+import { isSoloWindow, useChatWindows, useSoloWindow } from "./useWindows";
 
 const SEARCH_DEBOUNCE_MS = 140;
 const PROJECT_KEY = "ogchat:project";
@@ -50,6 +57,8 @@ function sessionFromUrl(): string | null {
 }
 
 function writeUrl(id: string | null, mode: "push" | "replace"): void {
+  // A window that shows one chat keeps the address it was opened with.
+  if (isSoloWindow()) return;
   const url = id ? `?s=${encodeURIComponent(id)}` : window.location.pathname;
   if (mode === "push") window.history.pushState(null, "", url);
   else window.history.replaceState(null, "", url);
@@ -97,6 +106,10 @@ export function AppShell() {
   useEffect(() => {
     activeIdRef.current = activeId;
   }, [activeId]);
+  /** Whether this window shows one chat on its own: no list, opened from the main window. */
+  const [solo, setSolo] = useState(false);
+  /** The model a chat not yet started will be set to, if one was picked for it. */
+  const [startModel, setStartModel] = useState<SessionModel | null>(null);
 
   const refreshSessions = useCallback(
     async (q: string, signal?: AbortSignal) => {
@@ -116,6 +129,7 @@ export function AppShell() {
   // First load: which session the URL points at, the session list, the provider settings.
   useEffect(() => {
     setActiveId(sessionFromUrl());
+    setSolo(isSoloWindow());
     setLook(loadLook());
     try {
       projectRef.current = window.localStorage.getItem(PROJECT_KEY) || null;
@@ -237,6 +251,7 @@ export function AppShell() {
 
   const open = useCallback((id: string | null) => {
     setActiveId(id);
+    setStartModel(null);
     setOpenToken((n) => n + 1);
     setSidebarOpen(false);
     if (sessionFromUrl() !== id) writeUrl(id, "push");
@@ -273,7 +288,33 @@ export function AppShell() {
     [upsert, refreshProjects],
   );
 
+  // Other windows: this one's chat, if it is a window for one chat; or, in the
+  // main window, the chats that are out in windows of their own.
+  const tellMain = useSoloWindow(activeId, solo);
+  const windows = useChatWindows(ready && !solo, upsert);
+  const onSessionUpdated = useCallback(
+    (session: SessionMeta) => {
+      upsert(session);
+      tellMain(session);
+    },
+    [upsert, tellMain],
+  );
+  const onPopOut = useCallback(
+    (id: string, at?: { x: number; y: number }) => {
+      if (windows.away.has(id)) return windows.bringForward(id);
+      // The chat leaves this window for its own.
+      if (windows.popOut(id, at) && activeIdRef.current === id) open(null);
+    },
+    [windows, open],
+  );
+  const onSelect = useCallback(
+    (id: string) => (windows.away.has(id) ? windows.bringForward(id) : open(id)),
+    [windows, open],
+  );
+
   const onSessionMissing = useCallback((id: string) => {
+    // A window for one chat has nothing to show once the chat is gone.
+    if (isSoloWindow()) return window.close();
     setSessions((current) => current.filter((s) => s.id !== id));
     setActiveId((current) => (current === id ? null : current));
     if (sessionFromUrl() === id) writeUrl(null, "replace");
@@ -299,10 +340,11 @@ export function AppShell() {
         return;
       }
       setSessions((current) => current.filter((s) => s.id !== id));
+      windows.closeWindow(id);
       if (activeIdRef.current === id) open(null);
       refreshProjects();
     },
-    [api, open, refreshSessions, refreshProjects],
+    [api, open, refreshSessions, refreshProjects, windows],
   );
 
   const openSettings = useCallback(() => {
@@ -436,13 +478,37 @@ export function AppShell() {
     }),
   );
 
-  const provider = useMemo(() => (settings ? { ...settings.active } : null), [settings]);
+  // The model the chat on screen uses: its own, or the one a new chat was given, or the settings'.
+  const chosenModel = activeId ? (activeSession?.model ?? null) : startModel;
+  const model: SessionModel | null = useMemo(
+    () =>
+      chosenModel ??
+      (settings ? { provider: settings.active.provider, model: settings.active.model } : null),
+    [chosenModel, settings],
+  );
+  const provider = useMemo(() => {
+    if (!settings || !model) return null;
+    const ready = settings.choices.some((c) => c.provider === model.provider && c.ready);
+    return { ready, model: model.model };
+  }, [settings, model]);
+  const onModelChange = useCallback(
+    (next: SessionModel) => {
+      const id = activeIdRef.current;
+      if (!id) return setStartModel(next);
+      setActiveMeta((current) => (current?.id === id ? { ...current, model: next } : current));
+      setSessions((current) => current.map((s) => (s.id === id ? { ...s, model: next } : s)));
+      api.setSessionModel(id, next).then(onSessionUpdated, () => {
+        void refreshSessions(queryRef.current);
+      });
+    },
+    [api, onSessionUpdated, refreshSessions],
+  );
 
   return (
     <div
       className={`ogchat ${styles.shell} ${look.wallShown ? "" : styles.noWall} ${
         look.chatShown ? "" : styles.sceneOnly
-      }`}
+      } ${solo ? styles.solo : ""}`}
       style={lookVariables(look) as CSSProperties}
     >
       {ready && view && (
@@ -465,30 +531,34 @@ export function AppShell() {
           still={look.still}
         />
       )}
-      <Sidebar
-        sessions={sessions}
-        activeId={activeId}
-        query={query}
-        loaded={loaded}
-        settings={settings}
-        open={sidebarOpen}
-        searchRef={searchRef}
-        onQueryChange={onQueryChange}
-        onSelect={open}
-        onNew={() => open(null)}
-        onRename={onRename}
-        onDelete={onDelete}
-        onOpenSettings={openSettings}
-        projects={projects}
-        projectId={projectId}
-        onProjectChange={onProjectChange}
-        onNewProject={onNewProject}
-        onEditProject={(id) => {
-          setSidebarOpen(false);
-          setEditingProject(id);
-        }}
-        onResize={(width) => changeLook({ sidebarWidth: Math.round(width / 10) * 10 })}
-      />
+      {!solo && (
+        <Sidebar
+          sessions={sessions}
+          away={windows.away}
+          onPopOut={onPopOut}
+          activeId={activeId}
+          query={query}
+          loaded={loaded}
+          settings={settings}
+          open={sidebarOpen}
+          searchRef={searchRef}
+          onQueryChange={onQueryChange}
+          onSelect={onSelect}
+          onNew={() => open(null)}
+          onRename={onRename}
+          onDelete={onDelete}
+          onOpenSettings={openSettings}
+          projects={projects}
+          projectId={projectId}
+          onProjectChange={onProjectChange}
+          onNewProject={onNewProject}
+          onEditProject={(id) => {
+            setSidebarOpen(false);
+            setEditingProject(id);
+          }}
+          onResize={(width) => changeLook({ sidebarWidth: Math.round(width / 10) * 10 })}
+        />
+      )}
       {sidebarOpen && <div className={styles.scrim} onClick={() => setSidebarOpen(false)} />}
 
       <main className={styles.main}>
@@ -553,11 +623,15 @@ export function AppShell() {
               sessionId={activeId}
               openToken={openToken}
               provider={provider}
+              models={settings?.choices}
+              model={model}
+              onModelChange={onModelChange}
+              startModel={startModel}
               projectId={projectId}
               reasoning={settings?.reasoning}
               onReasoningChange={settings ? onReasoningChange : undefined}
               onSessionCreated={onSessionCreated}
-              onSessionUpdated={upsert}
+              onSessionUpdated={onSessionUpdated}
               onSessionMissing={onSessionMissing}
               onOpenSettings={openSettings}
             />

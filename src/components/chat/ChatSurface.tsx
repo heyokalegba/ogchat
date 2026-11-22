@@ -12,7 +12,13 @@ import {
   type KeyboardEvent,
 } from "react";
 import { createApi } from "@/lib/client/api";
-import type { ChatMessage, ReasoningEffort, SessionMeta } from "@/lib/types";
+import type {
+  ChatMessage,
+  ModelChoice,
+  ReasoningEffort,
+  SessionMeta,
+  SessionModel,
+} from "@/lib/types";
 import { BootLine } from "./BootLine";
 import styles from "./chat.module.css";
 import { Composer } from "./Composer";
@@ -33,6 +39,16 @@ export interface ChatSurfaceProps {
   provider?: { ready: boolean; model: string } | null;
   /** The project a new conversation here is filed under, if any. */
   projectId?: string | null;
+  /**
+   * The models this chat can be set to, the one it is set to, and what to do
+   * when another is picked. With these the model's name under the message box
+   * becomes a picker.
+   */
+  models?: ModelChoice[];
+  model?: SessionModel | null;
+  onModelChange?: (model: SessionModel) => void;
+  /** For a conversation not yet saved: the model it starts with, if not the one in settings. */
+  startModel?: SessionModel | null;
   /** How hard the model thinks, and what to do when the composer changes it. */
   reasoning?: ReasoningEffort;
   onReasoningChange?: (next: ReasoningEffort) => void;
@@ -45,6 +61,39 @@ export interface ChatSurfaceProps {
 }
 
 const STICK_PX = 96;
+
+const keyOf = (m: SessionModel) => `${m.provider}:${m.model}`;
+
+/** The model's name, as a list to pick another from. Models whose provider has no key are left out. */
+function ModelPicker(props: {
+  models: ModelChoice[];
+  model: SessionModel;
+  onChange: (model: SessionModel) => void;
+}) {
+  const { models, model } = props;
+  const usable = models.filter((m) => m.ready || keyOf(m) === keyOf(model));
+  const listed = usable.some((m) => keyOf(m) === keyOf(model))
+    ? usable
+    : [{ ...model, label: model.model, ready: true }, ...usable];
+  return (
+    <select
+      className={styles.modelPicker}
+      value={keyOf(model)}
+      aria-label="Model for this chat"
+      title="The model this chat uses. Each chat keeps its own."
+      onChange={(event) => {
+        const picked = listed.find((m) => keyOf(m) === event.target.value);
+        if (picked) props.onChange({ provider: picked.provider, model: picked.model });
+      }}
+    >
+      {listed.map((m) => (
+        <option key={keyOf(m)} value={keyOf(m)}>
+          {m.label}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 /**
  * The chat surface: transcript and composer for one session.
@@ -68,6 +117,7 @@ export function ChatSurface(props: ChatSurfaceProps) {
     openToken,
     api,
     projectId: props.projectId,
+    model: props.startModel,
     onSessionCreated: props.onSessionCreated,
     onSessionUpdated: props.onSessionUpdated,
     onSessionMissing: props.onSessionMissing,
@@ -391,7 +441,17 @@ export function ChatSurface(props: ChatSurfaceProps) {
               (provider.ready ? (
                 <span className={styles.status}>
                   <span className={`${styles.dot} ${busy ? styles.dotBusy : ""}`} />
-                  <span className={styles.statusLabel}>{busy ? "generating" : provider.model}</span>
+                  {busy || !props.models || !props.model || !props.onModelChange ? (
+                    <span className={styles.statusLabel}>
+                      {busy ? "generating" : provider.model}
+                    </span>
+                  ) : (
+                    <ModelPicker
+                      models={props.models}
+                      model={props.model}
+                      onChange={props.onModelChange}
+                    />
+                  )}
                 </span>
               ) : (
                 <button

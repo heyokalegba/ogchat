@@ -17,6 +17,10 @@ export interface SidebarProps {
   searchRef: Ref<HTMLInputElement>;
   onQueryChange: (query: string) => void;
   onSelect: (id: string) => void;
+  /** The chats that are open in windows of their own: shown greyed out. */
+  away?: ReadonlySet<string>;
+  /** Opens a chat in a window of its own, at a point on the screen if it was dragged there. */
+  onPopOut?: (id: string, at?: { x: number; y: number }) => void;
   onNew: () => void;
   onRename: (id: string, title: string) => void;
   onDelete: (id: string) => void;
@@ -71,11 +75,14 @@ function SessionItem(props: {
   /** The name of the session's project, shown when the list mixes projects. */
   tag?: string;
   active: boolean;
+  /** Open in a window of its own. */
+  away: boolean;
+  onPopOut?: (at?: { x: number; y: number }) => void;
   onSelect: () => void;
   onRename: (title: string) => void;
   onDelete: () => void;
 }) {
-  const { session, active } = props;
+  const { session, active, away } = props;
   const [renaming, setRenaming] = useState(false);
   const [title, setTitle] = useState(session.title);
   const [confirming, setConfirming] = useState(false);
@@ -133,12 +140,34 @@ function SessionItem(props: {
   }
 
   return (
-    <li className={`${styles.item} ${active ? styles.itemActive : ""}`}>
+    <li
+      className={`${styles.item} ${active ? styles.itemActive : ""} ${away ? styles.itemAway : ""}`}
+      data-away={away || undefined}
+    >
       <button
         type="button"
         className={styles.itemButton}
         aria-current={active ? "true" : undefined}
-        title={session.title}
+        title={
+          away
+            ? `${session.title}: open in its own window. Click to bring it forward.`
+            : props.onPopOut
+              ? `${session.title}\nDrag out of the list to open it in a window of its own.`
+              : session.title
+        }
+        draggable={Boolean(props.onPopOut) && !away}
+        onDragStart={(event) => {
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", session.title);
+        }}
+        onDragEnd={(event) => {
+          // Let go anywhere outside the list: the chat gets a window of its own, there.
+          const list = event.currentTarget.closest("aside")?.getBoundingClientRect();
+          const { clientX: x, clientY: y } = event;
+          if (!list || (x === 0 && y === 0)) return; // no position to go by
+          const inside = x >= list.left && x <= list.right && y >= list.top && y <= list.bottom;
+          if (!inside) props.onPopOut?.({ x: event.screenX, y: event.screenY });
+        }}
         onClick={props.onSelect}
         onDoubleClick={startRename}
         onKeyDown={(event) => {
@@ -147,7 +176,7 @@ function SessionItem(props: {
       >
         <span className={styles.itemTitle}>{session.title}</span>
         {props.tag && <span className={styles.itemTag}>{props.tag}</span>}
-        <span className={styles.itemAge}>{shortAge(session.updatedAt)}</span>
+        <span className={styles.itemAge}>{away ? "window" : shortAge(session.updatedAt)}</span>
       </button>
       <div className={styles.itemTools} data-pinned={confirming}>
         {confirming ? (
@@ -161,6 +190,21 @@ function SessionItem(props: {
           </button>
         ) : (
           <>
+            {props.onPopOut && (
+              <button
+                type="button"
+                className={styles.itemTool}
+                aria-label={
+                  away
+                    ? `Bring the window for ${session.title} forward`
+                    : `Open ${session.title} in its own window`
+                }
+                title={away ? "Bring its window forward" : "Open in its own window"}
+                onClick={() => props.onPopOut?.()}
+              >
+                <span aria-hidden="true">↗</span>
+              </button>
+            )}
             <button
               type="button"
               className={styles.itemTool}
@@ -334,6 +378,8 @@ export function Sidebar(props: SidebarProps) {
             session={session}
             tag={project ? undefined : projectName(session.projectId)}
             active={session.id === activeId}
+            away={props.away?.has(session.id) ?? false}
+            onPopOut={props.onPopOut ? (at) => props.onPopOut?.(session.id, at) : undefined}
             onSelect={() => props.onSelect(session.id)}
             onRename={(title) => props.onRename(session.id, title)}
             onDelete={() => props.onDelete(session.id)}

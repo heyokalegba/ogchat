@@ -402,7 +402,7 @@
 /* Leave room for the rename / delete tools so the title truncates under them. */
 .shell .item:hover .itemButton,
 .shell .item:focus-within .itemButton {
-  padding-right: 62px;
+  padding-right: 88px;
 }
 
 .shell .itemTool {
@@ -1306,4 +1306,34 @@
   width: 16px;
   height: 16px;
   accent-color: var(--ink, #17171a);
+}
+
+/* A chat that is open in a window of its own: still in the list, set back. */
+.itemAway .itemTitle,
+.item.itemAway:hover .itemTitle {
+  font-style: italic;
+  color: var(--og-on-dark-3);
+}
+
+.itemAway .itemAge {
+  padding: 0 5px;
+  border: 1px dashed rgba(246, 241, 230, 0.35);
+  color: var(--og-on-dark-3);
+}
+
+.itemAway .itemTag {
+  opacity: 0.5;
+}
+
+.shell .itemButton[draggable="true"] {
+  -webkit-user-drag: element;
+}
+
+/* A window that shows one chat: no list beside it. */
+.shell.solo {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.shell.solo .menuButton {
+  display: none;
 }

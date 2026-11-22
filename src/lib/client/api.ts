@@ -10,6 +10,7 @@ import type {
   SessionMeta,
   SettingsCheck,
   StreamEvent,
+  SessionModel,
 } from "@/lib/types";
 import type { DayRecord, Reading } from "@/lib/weather";
 
@@ -53,7 +54,9 @@ export interface ChatApi {
     signal?: AbortSignal,
     project?: string | null,
   ): Promise<SessionMeta[]>;
-  createSession(projectId?: string | null): Promise<Session>;
+  createSession(projectId?: string | null, model?: SessionModel | null): Promise<Session>;
+  /** Sets the model a chat uses; null goes back to the one in settings. */
+  setSessionModel(id: string, model: SessionModel | null): Promise<SessionMeta>;
   /** Files a session under a project; null takes it out of one. */
   moveSession(id: string, projectId: string | null): Promise<SessionMeta>;
   listProjects(): Promise<Project[]>;
@@ -153,10 +156,17 @@ export function createApi(base = "/api"): ChatApi {
       const q = params.size ? `?${params}` : "";
       return (await data<{ sessions: SessionMeta[] }>(`/sessions${q}`, { signal })).sessions;
     },
-    async createSession(projectId) {
+    async createSession(projectId, model) {
       return (
-        await data<{ session: Session }>("/sessions", body("POST", projectId ? { projectId } : {}))
+        await data<{ session: Session }>(
+          "/sessions",
+          body("POST", { ...(projectId ? { projectId } : {}), ...(model ? { model } : {}) }),
+        )
       ).session;
+    },
+    async setSessionModel(id, model) {
+      return (await data<{ session: SessionMeta }>(`/sessions/${id}`, body("PATCH", { model })))
+        .session;
     },
     async moveSession(id, projectId) {
       return (await data<{ session: SessionMeta }>(`/sessions/${id}`, body("PATCH", { projectId })))

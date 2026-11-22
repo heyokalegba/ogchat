@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { POST as sendMessage } from "@/app/api/sessions/[id]/messages/route";
-import { GET as getSession } from "@/app/api/sessions/[id]/route";
+import { GET as getSession, PATCH as patchSession } from "@/app/api/sessions/[id]/route";
 import { POST as createSession } from "@/app/api/sessions/route";
 import { PATCH as patchProject } from "@/app/api/projects/[id]/route";
 import { POST as createProject } from "@/app/api/projects/route";
@@ -688,6 +688,88 @@ describe("Claude and a repository, through the app", () => {
       "[listing the top of the repository]",
     );
     expect(JSON.stringify(saved)).not.toContain("SECRET");
+  });
+
+  it("lets each chat keep a model of its own, whatever settings say", async () => {
+    // Settings: the other provider. This chat: Claude Haiku. Another chat: whatever settings say.
+    await putSettings(
+      req("PUT", "/api/settings", {
+        apiKey: "sk-other-000000",
+        claudeKey: KEY,
+        provider: "compatible",
+      }),
+    );
+    const made = await createSession(
+      req("POST", "/api/sessions", { model: { provider: "claude", model: "claude-haiku-5-5" } }),
+    );
+    const { session } = (await made.json()) as { session: Session };
+    expect(session.model).toEqual({ provider: "claude", model: "claude-haiku-5-5" });
+    const calls = stubNet((call) =>
+      call.url.hostname === "api.anthropic.com"
+        ? claudeStream([{ text: "from claude" }])
+        : new Response(
+            'data: {"choices":[{"delta":{"content":"from the other"}}]}\n\ndata: [DONE]\n\n',
+            {
+              headers: { "content-type": "text/event-stream" },
+            },
+          ),
+    );
+    await events(
+      await sendMessage(
+        req("POST", `/api/sessions/${session.id}/messages`, { content: "hi" }),
+        ctx(session.id),
+      ),
+    );
+    expect(calls.at(-1)!.url.hostname).toBe("api.anthropic.com");
+    expect(calls.at(-1)!.body!.model).toBe("claude-haiku-5-5");
+
+    // Change it on the chat, and the next message goes to the new one.
+    const moved = await patchSession(
+      req("PATCH", `/api/sessions/${session.id}`, {
+        model: { provider: "claude", model: "claude-sonnet-5-5" },
+      }),
+      ctx(session.id),
+    );
+    const after = (await moved.json()) as { session: Session };
+    expect(after.session.model).toEqual({ provider: "claude", model: "claude-sonnet-5-5" });
+    expect(after.session.title).toBe("hi"); // setting a model renames nothing
+    await events(
+      await sendMessage(
+        req("POST", `/api/sessions/${session.id}/messages`, { content: "again" }),
+        ctx(session.id),
+      ),
+    );
+    expect(calls.at(-1)!.body!.model).toBe("claude-sonnet-5-5");
+
+    // A chat with no model of its own follows settings; null puts a chat back to that.
+    const plain = (await (await createSession(req("POST", "/api/sessions"))).json()) as {
+      session: Session;
+    };
+    await events(
+      await sendMessage(
+        req("POST", `/api/sessions/${plain.session.id}/messages`, { content: "hi" }),
+        ctx(plain.session.id),
+      ),
+    );
+    expect(calls.at(-1)!.url.hostname).not.toBe("api.anthropic.com");
+    const cleared = await patchSession(
+      req("PATCH", `/api/sessions/${session.id}`, { model: null }),
+      ctx(session.id),
+    );
+    expect(((await cleared.json()) as { session: Session }).session.model).toBeNull();
+
+    // Nonsense is refused.
+    for (const model of [{ provider: "nope", model: "x" }, { provider: "claude" }, "claude"]) {
+      expect((await createSession(req("POST", "/api/sessions", { model }))).status).toBe(400);
+      expect(
+        (
+          await patchSession(
+            req("PATCH", `/api/sessions/${session.id}`, { model }),
+            ctx(session.id),
+          )
+        ).status,
+      ).toBe(400);
+    }
   });
 
   it("gives Claude no repository tools without a token, or outside a project with one", async () => {

@@ -130,6 +130,7 @@ describe("sessions API", () => {
         updatedAt: session.updatedAt,
         messageCount: 0,
         projectId: null,
+        model: null,
       },
     ]);
   });
@@ -843,7 +844,21 @@ describe("settings API", () => {
       systemPrompt: "",
       contextWindow: 1_000_000,
       provider: "compatible",
-      active: { ready: false, model: "abliterated-model-large-v2" },
+      active: { ready: false, model: "abliterated-model-large-v2", provider: "compatible" },
+      choices: expect.arrayContaining([
+        {
+          provider: "claude",
+          model: "claude-sonnet-5-5",
+          label: "Claude Sonnet 5.5",
+          ready: false,
+        },
+        {
+          provider: "compatible",
+          model: "abliterated-model-large-v2",
+          label: "abliterated-model-large-v2",
+          ready: false,
+        },
+      ]),
       claude: {
         model: "claude-opus-5-5",
         workspace: "",

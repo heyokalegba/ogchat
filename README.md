@@ -598,6 +598,31 @@ continue`. The count is an estimate from the length of the text, near
   and network loss all appear inline with a retry. Your message is saved before the provider is called, so
   a failure never costs you the session.
 
+## A model for each chat
+
+The model's name at the bottom right of the chat, under the message box, is a
+list. Pick another and that chat uses it from the next message on; every chat
+keeps its own, so one can run on Opus, another on Haiku and a third on your
+other provider at the same time. It lists Claude's models if there is a Claude
+key and the other provider's model if that has a key. A new chat starts on
+whichever provider and model is chosen in settings, and you can pick before
+the first message. Chats you never set a model on follow settings.
+
+## A chat in a window of its own
+
+Drag a chat out of the list and let go anywhere outside it: it opens in a
+window that shows only that chat, where you let go. (Or hover over the chat
+and press **↗**.) Open as many as you like and put them side by side, each
+with its own model.
+
+While its window is open the chat stays in the list, greyed out and marked
+`window`; clicking it there brings its window forward instead of opening it
+twice. Close the window and it is an ordinary entry again. Nothing is moved or
+copied: it is the same saved chat, shown somewhere else. What happens in a
+window (a reply, a new title) shows in the list at once, and deleting the chat
+from the list closes its window. In a browser, allow pop-ups for the page if
+it asks.
+
 ## Attaching files
 
 Up to 8 files per message, 20 MB each (8 MB for images).

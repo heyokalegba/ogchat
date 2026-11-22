@@ -9,7 +9,7 @@ import { githubTools, repoBriefing } from "./github";
 import { commandBriefing, commandTool } from "./workspace";
 import { getProject } from "./projects";
 import { streamReply } from "./reply";
-import { resolveSettings } from "./settings";
+import { resolveSettings, settingsFor } from "./settings";
 import {
   appendMessage,
   getSession,
@@ -289,7 +289,8 @@ export async function runTurn(
   const web = turn.session.messages.findLast((m) => m.role === "user")?.web === true;
   try {
     emit({ type: "start", session: toMeta(turn.session), userMessage: turn.userMessage });
-    const settings = resolveSettings();
+    // The chat's own model if it has one, otherwise the one in settings.
+    const settings = settingsFor(turn.session.model);
     const project = turn.session.projectId ? getProject(turn.session.projectId) : null;
     // With Claude, a project tied to a repository, and a GitHub token, Claude gets the repository.
     const repo = settings.provider === "claude" && settings.githubToken ? project?.repo : undefined;
@@ -342,7 +343,7 @@ export async function runTurn(
       } else {
         if (!(err instanceof ProviderError)) console.error("[ogchat] reply failed:", err);
         // The hints about images and web search are about the default provider, not Claude.
-        const hinted = resolveSettings().provider === "compatible";
+        const hinted = settingsFor(turn.session.model).provider === "compatible";
         const error = toChatError(err, hinted && sentImages, hinted && web);
         emit({ type: "error", session: meta(), error, message });
       }
@@ -407,7 +408,7 @@ export async function compressSession(sessionId: string, signal?: AbortSignal): 
   const onAbort = () => generation.controller.abort();
   signal?.addEventListener("abort", onAbort);
   try {
-    const settings = resolveSettings();
+    const settings = settingsFor(session.model);
     const project = session.projectId ? getProject(session.projectId) : null;
     const all = buildProviderMessages(session, settings.systemPrompt, project);
     const lead = all.filter((m) => m.role === "system");

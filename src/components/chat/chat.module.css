@@ -1477,3 +1477,32 @@ a.chip:hover {
     opacity: 0.35;
   }
 }
+
+/* The model's name under the message box, as a list to pick another from. */
+.surface .copyChat {
+  flex: none;
+}
+
+.surface .modelPicker {
+  max-width: 180px;
+  min-width: 0;
+  padding: 0 2px;
+  border: 0;
+  border-bottom: 1px dashed currentColor;
+  border-radius: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.surface .modelPicker:hover,
+.surface .modelPicker:focus-visible {
+  border-bottom-style: solid;
+}
+
+.surface .modelPicker option {
+  color: #17171a;
+  background: #ebe4d4;
+}

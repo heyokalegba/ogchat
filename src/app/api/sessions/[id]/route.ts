@@ -11,8 +11,10 @@ import {
   isValidId,
   moveSession,
   renameSession,
+  setSessionModel,
   toMeta,
 } from "@/lib/server/store";
+import { cleanSessionModel } from "@/lib/server/settings";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -37,8 +39,10 @@ export async function GET(request: Request, { params }: Context): Promise<Respon
 }
 
 /**
- * PATCH /api/sessions/:id { title?, projectId? }  →  { session }
+ * PATCH /api/sessions/:id { title?, projectId?, model? }  →  { session }
  * `projectId` files the session under a project; null takes it out of one.
+ * `model` is { provider, model }, the model this chat uses; null goes back to
+ * the one in settings.
  */
 export async function PATCH(request: Request, { params }: Context): Promise<Response> {
   const blocked = guard(request);
@@ -55,7 +59,14 @@ export async function PATCH(request: Request, { params }: Context): Promise<Resp
       }
       session = moveSession(id, projectId) ?? session;
     }
-    if (body.title !== undefined || body.projectId === undefined) {
+    if (body.model !== undefined) {
+      const model = body.model === null ? null : cleanSessionModel(body.model);
+      if (body.model !== null && !model) {
+        return errorJson(400, "bad_model", "That is not a model a chat can be set to.");
+      }
+      session = setSessionModel(id, model) ?? session;
+    }
+    if (body.title !== undefined || (body.projectId === undefined && body.model === undefined)) {
       const title = cleanTitle(body.title);
       if (!title) return errorJson(400, "bad_title", "Title must not be empty.");
       session = renameSession(id, title) ?? session;

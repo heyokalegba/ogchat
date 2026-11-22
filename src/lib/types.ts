@@ -55,6 +55,21 @@ export interface SessionMeta {
   messageCount: number;
   /** The project this session belongs to, or null for a chat on its own. */
   projectId: string | null;
+  /** The model this chat uses, or null to use whichever is chosen in settings. */
+  model: SessionModel | null;
+}
+
+/** A model, and which of the two providers it is asked through. */
+export interface SessionModel {
+  provider: ProviderChoice;
+  model: string;
+}
+
+/** A model a chat can be set to: what the picker under the message box lists. */
+export interface ModelChoice extends SessionModel {
+  label: string;
+  /** Whether its provider has a key. */
+  ready: boolean;
 }
 
 /**
@@ -125,7 +140,9 @@ export interface PublicSettings {
   /** Which of the two ways to a model is in use: any OpenAI-shaped provider, or Claude. */
   provider: ProviderChoice;
   /** The provider in use, in two words: whether it has a key, and which model it will ask. */
-  active: { ready: boolean; model: string };
+  active: { ready: boolean; model: string; provider: ProviderChoice };
+  /** Every model a chat can be set to: Claude's, and the other provider's. */
+  choices: ModelChoice[];
   /** Claude: the model, and the key (masked, as the other one is). */
   claude: {
     model: string;
