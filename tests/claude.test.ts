@@ -204,6 +204,37 @@ describe("a reply from Claude", () => {
     for (const error of [auth, credit, gone, bad]) expect(error.message).not.toContain("SECRET");
   });
 
+  it("names the workspace when given one, and explains when Anthropic asks for one", async () => {
+    const calls = stubNet(() => claudeStream([{ text: "ok" }]));
+    await collect(
+      streamClaude({
+        apiKey: KEY,
+        model: "claude-haiku-4-5",
+        messages,
+        workspace: " wrkspc_01abc ",
+      }),
+    );
+    expect(calls[0]!.headers.get("anthropic-workspace-id")).toBe("wrkspc_01abc");
+    await collect(streamClaude({ apiKey: KEY, model: "claude-haiku-4-5", messages }));
+    expect(calls[1]!.headers.has("anthropic-workspace-id")).toBe(false);
+    stubNet(() =>
+      Response.json(
+        {
+          type: "error",
+          error: {
+            type: "invalid_request_error",
+            message:
+              "This API key is not scoped to a workspace, so this request must include the anthropic-workspace-id header with the ID of the workspace to use.",
+          },
+        },
+        { status: 400 },
+      ),
+    );
+    await expect(
+      collect(streamClaude({ apiKey: KEY, model: "claude-haiku-4-5", messages })),
+    ).rejects.toThrow(/fill in Workspace id/);
+  });
+
   it("will not start without a key", async () => {
     const calls = stubNet(() => claudeStream([{ text: "x" }]));
     await expect(
@@ -547,6 +578,11 @@ describe("Claude and a repository, through the app", () => {
       claude: { model: "claude-opus-5-5", key: { set: true, source: "settings" } },
       github: { set: true, source: "settings" },
     });
+    expect(settings.claude.workspace).toBe("");
+    expect(
+      (await putSettings(req("PUT", "/api/settings", { claudeWorkspace: "has spaces" }))).status,
+    ).toBe(400);
+    await putSettings(req("PUT", "/api/settings", { claudeWorkspace: "wrkspc_01abc" }));
     await putSettings(
       req("PUT", "/api/settings", { claudeModel: "claude-sonnet-5-5", githubToken: null }),
     );
@@ -555,6 +591,7 @@ describe("Claude and a repository, through the app", () => {
     };
     expect(after.settings.active.model).toBe("claude-sonnet-5-5");
     expect(after.settings.github.set).toBe(false);
+    expect(after.settings.claude.workspace).toBe("wrkspc_01abc");
     expect((await putSettings(req("PUT", "/api/settings", { provider: "nonsense" }))).status).toBe(
       400,
     );

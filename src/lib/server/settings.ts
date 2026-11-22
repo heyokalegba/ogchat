@@ -42,6 +42,8 @@ export interface ResolvedSettings {
   claudeKey: string | null;
   claudeKeySource: KeySource | null;
   claudeModel: string;
+  /** A workspace id, for a key that is not tied to one workspace. "" for none. */
+  claudeWorkspace: string;
   githubToken: string | null;
   githubTokenSource: KeySource | null;
   /** Whether Claude may run commands on this machine. Off unless switched on. */
@@ -58,6 +60,7 @@ interface StoredSettings {
   provider?: ProviderChoice;
   claudeKey?: string;
   claudeModel?: string;
+  claudeWorkspace?: string;
   githubToken?: string;
   runCode?: boolean;
 }
@@ -78,6 +81,8 @@ export interface SettingsPatch {
   /** The Claude key and the GitHub token: saved, removed and left alone as `apiKey` is. */
   claudeKey?: unknown;
   claudeModel?: unknown;
+  /** A workspace id, or "" for none. */
+  claudeWorkspace?: unknown;
   githubToken?: unknown;
   /** true or false. */
   runCode?: unknown;
@@ -119,6 +124,7 @@ function readStored(): StoredSettings {
     provider: isProvider(s.provider) && s.provider !== "compatible" ? s.provider : undefined,
     claudeKey: str(s.claudeKey),
     claudeModel: str(s.claudeModel),
+    claudeWorkspace: str(s.claudeWorkspace),
     githubToken: str(s.githubToken),
     runCode: s.runCode === true ? true : undefined,
     systemPrompt:
@@ -175,6 +181,7 @@ export function resolveSettings(): ResolvedSettings {
     claudeKey: stored.claudeKey ?? env("ANTHROPIC_API_KEY"),
     claudeKeySource: stored.claudeKey ? "settings" : env("ANTHROPIC_API_KEY") ? "env" : null,
     claudeModel: stored.claudeModel ?? DEFAULT_CLAUDE_MODEL,
+    claudeWorkspace: stored.claudeWorkspace ?? env("ANTHROPIC_WORKSPACE_ID") ?? "",
     githubToken: stored.githubToken ?? env("OGCHAT_GITHUB_TOKEN"),
     githubTokenSource: stored.githubToken ? "settings" : env("OGCHAT_GITHUB_TOKEN") ? "env" : null,
     runCode: stored.runCode === true,
@@ -206,6 +213,7 @@ export function publicSettings(): PublicSettings {
     active: { ready: Boolean(activeModel(s).key), model: activeModel(s).model },
     claude: {
       model: s.claudeModel,
+      workspace: s.claudeWorkspace,
       key: {
         set: Boolean(s.claudeKey),
         masked: s.claudeKey ? maskKey(s.claudeKey) : null,
@@ -233,6 +241,19 @@ function cleanKey(input: unknown): string | null {
   }
   if (key.length > 1000) throw new SettingsValidationError("API key is too long.");
   return key;
+}
+
+/** A workspace id as typed: "" for none, an error if it cannot be one. */
+function cleanWorkspace(input: unknown): string {
+  if (input === null || input === undefined) return "";
+  if (typeof input !== "string") throw new SettingsValidationError("Workspace id must be text.");
+  const id = input.trim();
+  if (id && !/^[A-Za-z0-9_-]{1,200}$/.test(id)) {
+    throw new SettingsValidationError(
+      "That does not look like a workspace id. It starts with wrkspc_ and has no spaces.",
+    );
+  }
+  return id;
 }
 
 function cleanModel(input: unknown): string {
@@ -263,6 +284,10 @@ export function previewSettings(patch: SettingsPatch): ResolvedSettings {
     githubToken:
       (patch.githubToken === undefined ? null : cleanKey(patch.githubToken)) ?? current.githubToken,
     runCode: typeof patch.runCode === "boolean" ? patch.runCode : current.runCode,
+    claudeWorkspace:
+      patch.claudeWorkspace === undefined
+        ? current.claudeWorkspace
+        : cleanWorkspace(patch.claudeWorkspace),
   };
 }
 
@@ -346,6 +371,11 @@ export function updateSettings(patch: SettingsPatch): PublicSettings {
     const token = cleanKey(patch.githubToken);
     if (token) stored.githubToken = token;
     else delete stored.githubToken;
+  }
+  if (patch.claudeWorkspace !== undefined) {
+    const workspace = cleanWorkspace(patch.claudeWorkspace);
+    if (workspace) stored.claudeWorkspace = workspace;
+    else delete stored.claudeWorkspace;
   }
   if (patch.runCode !== undefined) {
     if (typeof patch.runCode !== "boolean") {

@@ -50,6 +50,8 @@ export interface ClaudeTurn {
   onThinking?: (text: string) => void;
   /** For tests and proxies: another address for the API, and another fetch. */
   baseUrl?: string | null;
+  /** For a key that is not tied to one workspace: the workspace to use. */
+  workspace?: string | null;
   fetchImpl?: typeof fetch;
 }
 
@@ -61,6 +63,12 @@ export const CLAUDE_MODELS = [
   { id: "claude-fable-5-2", label: "Claude Fable 5.2" },
 ] as const;
 const API = "https://api.anthropic.com";
+/** Some keys cover every workspace of an account; Anthropic then has to be told which one. */
+function workspaceHeader(workspace?: string | null) {
+  const id = workspace?.trim();
+  return id ? { defaultHeaders: { "anthropic-workspace-id": id } } : {};
+}
+
 export const DEFAULT_CLAUDE_MODEL = "claude-opus-5-5";
 
 /** Room for a long answer. Replies are streamed, so a large ceiling costs nothing by itself. */
@@ -162,6 +170,13 @@ function failure(error: unknown, key: string): ProviderError {
         400,
       );
     }
+    if (/workspace/i.test(text) && /not scoped|workspace-id/i.test(text)) {
+      return new ProviderError(
+        "provider_error",
+        "This Claude key is not tied to one workspace, so Anthropic needs to be told which to use. In settings, fill in Workspace id (from the Claude Console, under Workspaces), or make a new API key inside a workspace.",
+        400,
+      );
+    }
     return new ProviderError("provider_error", `Anthropic turned the request down: ${text}`, 400);
   }
   if (error instanceof Anthropic.APIConnectionError) {
@@ -192,6 +207,7 @@ export async function* streamClaude(turn: ClaudeTurn): AsyncGenerator<string, vo
     apiKey: key,
     // Said outright, so a stray ANTHROPIC_BASE_URL in the environment cannot send the key elsewhere.
     baseURL: turn.baseUrl || API,
+    ...workspaceHeader(turn.workspace),
     ...(turn.fetchImpl ? { fetch: turn.fetchImpl } : {}),
   });
   const { system, turns } = toClaudeMessages(turn.messages);
@@ -345,6 +361,8 @@ export async function checkClaude(options: {
   apiKey: string | null;
   model: string;
   baseUrl?: string | null;
+  /** For a key that is not tied to one workspace: the workspace to use. */
+  workspace?: string | null;
   fetchImpl?: typeof fetch;
 }): Promise<{ ok: boolean; detail: string }> {
   const key = options.apiKey?.trim() ?? "";
@@ -354,6 +372,7 @@ export async function checkClaude(options: {
     maxRetries: 0,
     timeout: 20_000,
     baseURL: options.baseUrl || API,
+    ...workspaceHeader(options.workspace),
     ...(options.fetchImpl ? { fetch: options.fetchImpl } : {}),
   });
   try {

@@ -176,6 +176,7 @@ describe("settings persistence", () => {
       claudeKeySource: null,
       claudeModel: "claude-opus-5-5",
       githubToken: null,
+      claudeWorkspace: "",
       githubTokenSource: null,
       runCode: false,
     });
@@ -203,6 +204,7 @@ describe("settings persistence", () => {
       claudeKeySource: null,
       claudeModel: "claude-opus-5-5",
       githubToken: null,
+      claudeWorkspace: "",
       githubTokenSource: null,
       runCode: false,
     });
@@ -236,6 +238,7 @@ describe("settings persistence", () => {
       claudeKeySource: null,
       claudeModel: "claude-opus-5-5",
       githubToken: null,
+      claudeWorkspace: "",
       githubTokenSource: null,
       runCode: false,
     });

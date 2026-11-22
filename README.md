@@ -359,6 +359,13 @@ can go back and forth.
 
 Or put `ANTHROPIC_API_KEY=...` in `.env.local` instead of the settings panel.
 
+If the test says the key is "not scoped to a workspace", the key covers every
+workspace of your account and Anthropic wants to know which one to use. Copy
+the workspace's id (it starts `wrkspc_`) from the Claude Console under
+Workspaces and paste it into **Workspace id** in settings (or set
+`ANTHROPIC_WORKSPACE_ID` in `.env.local`). Making a new API key inside a
+workspace does the same without the id.
+
 | Model               | Good for                      | Cost  |
 | ------------------- | ----------------------------- | ----- |
 | `claude-opus-5-5`   | the default: the hardest work | most  |

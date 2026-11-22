@@ -130,6 +130,8 @@ export interface PublicSettings {
   claude: {
     model: string;
     key: { set: boolean; masked: string | null; source: KeySource | null };
+    /** The workspace id sent with each request, for a key not tied to one. "" for none. */
+    workspace: string;
     /** The models the settings panel offers. Any other id can be typed. */
     models: { id: string; label: string }[];
   };

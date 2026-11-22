@@ -24,6 +24,7 @@ export function streamReply(
     return streamClaude({
       apiKey: settings.claudeKey,
       model: settings.claudeModel,
+      workspace: settings.claudeWorkspace,
       messages,
       effort,
       webSearch: options.webSearch,

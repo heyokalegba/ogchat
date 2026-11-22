@@ -30,6 +30,7 @@ export async function POST(request: Request): Promise<Response> {
       claudeKey: body.claudeKey,
       claudeModel: body.claudeModel,
       githubToken: body.githubToken,
+      claudeWorkspace: body.claudeWorkspace,
       runCode: body.runCode,
     });
     if (settings.provider === "claude") {
@@ -37,6 +38,7 @@ export async function POST(request: Request): Promise<Response> {
       const claude = await checkClaude({
         apiKey: settings.claudeKey,
         model: settings.claudeModel,
+        workspace: settings.claudeWorkspace,
         baseUrl: process.env.OGCHAT_ANTHROPIC_URL?.trim() || null,
       });
       const steps: SettingsCheckStep[] = [

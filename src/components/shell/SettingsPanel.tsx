@@ -43,6 +43,7 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
   const [githubToken, setGithubToken] = useState("");
   const [dropGithub, setDropGithub] = useState(false);
   const [runCode, setRunCode] = useState(settings.runCode.enabled);
+  const [workspace, setWorkspace] = useState(settings.claude.workspace);
   const listed = settings.claude.models.some((one) => one.id === claudeModel);
   const pick = (next: ProviderChoice) => {
     setProvider(next);
@@ -51,7 +52,7 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
   /** What is in the form for Claude and GitHub, as a save or a test would send it. */
   const claudeFields = () => ({
     provider,
-    ...(provider === "claude" ? { runCode } : {}),
+    ...(provider === "claude" ? { runCode, claudeWorkspace: workspace.trim() } : {}),
     ...(provider === "claude" ? { claudeModel } : {}),
     ...(claudeKey.trim()
       ? { claudeKey: claudeKey.trim() }
@@ -405,6 +406,26 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
                   From console.anthropic.com, under API keys. Saved to{" "}
                   <code>data/settings.json</code> on this machine only, and sent to Anthropic and
                   nowhere else.
+                </p>
+              </div>
+
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor="ogchat-claude-workspace">
+                  Workspace id
+                </label>
+                <input
+                  id="ogchat-claude-workspace"
+                  className={styles.textInput}
+                  value={workspace}
+                  placeholder="wrkspc_… (usually empty)"
+                  autoComplete="off"
+                  spellCheck={false}
+                  onChange={(event) => setWorkspace(event.target.value)}
+                />
+                <p className={styles.help}>
+                  Leave empty unless the test says the key is &quot;not scoped to a workspace&quot;.
+                  Then paste the id of the workspace to use, from the Claude Console under
+                  Workspaces. It is an id, not a secret.
                 </p>
               </div>
 

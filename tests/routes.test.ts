@@ -846,6 +846,7 @@ describe("settings API", () => {
       active: { ready: false, model: "abliterated-model-large-v2" },
       claude: {
         model: "claude-opus-5-5",
+        workspace: "",
         key: { set: false, masked: null, source: null },
         models: expect.arrayContaining([{ id: "claude-opus-5-5", label: "Claude Opus 5.5" }]),
       },
