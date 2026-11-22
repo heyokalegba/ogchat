@@ -42,6 +42,7 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
   const [dropClaudeKey, setDropClaudeKey] = useState(false);
   const [githubToken, setGithubToken] = useState("");
   const [dropGithub, setDropGithub] = useState(false);
+  const [runCode, setRunCode] = useState(settings.runCode.enabled);
   const listed = settings.claude.models.some((one) => one.id === claudeModel);
   const pick = (next: ProviderChoice) => {
     setProvider(next);
@@ -50,6 +51,7 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
   /** What is in the form for Claude and GitHub, as a save or a test would send it. */
   const claudeFields = () => ({
     provider,
+    ...(provider === "claude" ? { runCode } : {}),
     ...(provider === "claude" ? { claudeModel } : {}),
     ...(claudeKey.trim()
       ? { claudeKey: claudeKey.trim() }
@@ -446,6 +448,35 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
                   repositories you choose, with <code>Contents</code> and <code>Pull requests</code>{" "}
                   set to read and write. Claude writes only to a branch of its own and opens pull
                   requests; it cannot touch your main branch or merge.
+                </p>
+              </div>
+
+              <div className={styles.field}>
+                <label className={styles.checkRow} htmlFor="ogchat-run-code">
+                  <input
+                    id="ogchat-run-code"
+                    type="checkbox"
+                    checked={runCode}
+                    onChange={(event) => setRunCode(event.target.checked)}
+                  />
+                  <span className={styles.label}>Let Claude run code</span>
+                </label>
+                <p className={styles.help}>
+                  Off unless you switch it on. Claude can then run commands on this computer: tests,
+                  a build, a script. They run in a folder kept for each chat, which holds a copy of
+                  the project&apos;s repository if it has one.{" "}
+                  {settings.runCode.sandbox === "macos" ? (
+                    <>
+                      Each command runs inside the Mac&apos;s sandbox: it can write only in that
+                      folder and cannot read your files or ogchat&apos;s keys. It can use the
+                      network. Press <code>test</code> to see the sandbox hold.
+                    </>
+                  ) : (
+                    <>
+                      <strong>This system has no sandbox for them</strong>: a command runs as you,
+                      with your access to everything.
+                    </>
+                  )}
                 </p>
               </div>
             </>

@@ -135,6 +135,8 @@ export interface PublicSettings {
   };
   /** The GitHub token Claude's repository tools use (masked). */
   github: { set: boolean; masked: string | null; source: KeySource | null };
+  /** Whether Claude may run commands here, and whether this system can fence them in. */
+  runCode: { enabled: boolean; sandbox: "macos" | "none" };
 }
 
 export const PROVIDER_CHOICES = ["compatible", "claude"] as const;
@@ -142,7 +144,7 @@ export type ProviderChoice = (typeof PROVIDER_CHOICES)[number];
 
 /** One line of a settings test: what was checked and what was found. */
 export interface SettingsCheckStep {
-  id: "settings" | "key" | "model" | "reply" | "github";
+  id: "settings" | "key" | "model" | "reply" | "github" | "code";
   /** true: fine. false: this is what is wrong. null: could not tell, or worth a look. */
   ok: boolean | null;
   title: string;

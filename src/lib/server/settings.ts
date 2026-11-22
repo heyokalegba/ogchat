@@ -10,6 +10,7 @@ import { CLAUDE_MODELS, DEFAULT_CLAUDE_MODEL } from "@/lib/provider/claude";
 import { maskKey } from "@/lib/provider/redact";
 import { readJson, writeJsonAtomic } from "./fsjson";
 import { settingsFile } from "./paths";
+import { sandboxKind } from "./workspace";
 
 /**
  * Provider settings. Resolution order, per field:
@@ -43,6 +44,8 @@ export interface ResolvedSettings {
   claudeModel: string;
   githubToken: string | null;
   githubTokenSource: KeySource | null;
+  /** Whether Claude may run commands on this machine. Off unless switched on. */
+  runCode: boolean;
 }
 
 interface StoredSettings {
@@ -56,6 +59,7 @@ interface StoredSettings {
   claudeKey?: string;
   claudeModel?: string;
   githubToken?: string;
+  runCode?: boolean;
 }
 
 export interface SettingsPatch {
@@ -75,6 +79,8 @@ export interface SettingsPatch {
   claudeKey?: unknown;
   claudeModel?: unknown;
   githubToken?: unknown;
+  /** true or false. */
+  runCode?: unknown;
 }
 
 export class SettingsValidationError extends Error {}
@@ -114,6 +120,7 @@ function readStored(): StoredSettings {
     claudeKey: str(s.claudeKey),
     claudeModel: str(s.claudeModel),
     githubToken: str(s.githubToken),
+    runCode: s.runCode === true ? true : undefined,
     systemPrompt:
       typeof s.systemPrompt === "string" && s.systemPrompt.trim()
         ? s.systemPrompt.slice(0, MAX_SYSTEM_PROMPT_CHARS)
@@ -170,6 +177,7 @@ export function resolveSettings(): ResolvedSettings {
     claudeModel: stored.claudeModel ?? DEFAULT_CLAUDE_MODEL,
     githubToken: stored.githubToken ?? env("OGCHAT_GITHUB_TOKEN"),
     githubTokenSource: stored.githubToken ? "settings" : env("OGCHAT_GITHUB_TOKEN") ? "env" : null,
+    runCode: stored.runCode === true,
   };
 }
 
@@ -210,6 +218,7 @@ export function publicSettings(): PublicSettings {
       masked: s.githubToken ? maskKey(s.githubToken) : null,
       source: s.githubTokenSource,
     },
+    runCode: { enabled: s.runCode, sandbox: sandboxKind() },
   };
 }
 
@@ -253,6 +262,7 @@ export function previewSettings(patch: SettingsPatch): ResolvedSettings {
       patch.claudeModel === undefined ? current.claudeModel : cleanModel(patch.claudeModel),
     githubToken:
       (patch.githubToken === undefined ? null : cleanKey(patch.githubToken)) ?? current.githubToken,
+    runCode: typeof patch.runCode === "boolean" ? patch.runCode : current.runCode,
   };
 }
 
@@ -336,6 +346,13 @@ export function updateSettings(patch: SettingsPatch): PublicSettings {
     const token = cleanKey(patch.githubToken);
     if (token) stored.githubToken = token;
     else delete stored.githubToken;
+  }
+  if (patch.runCode !== undefined) {
+    if (typeof patch.runCode !== "boolean") {
+      throw new SettingsValidationError("Running code is either on or off.");
+    }
+    if (patch.runCode) stored.runCode = true;
+    else delete stored.runCode;
   }
 
   writeStored(stored);

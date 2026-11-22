@@ -6,6 +6,7 @@ import { FileRejected, ingestFile, saveFile, type IngestedFile } from "./files";
 import { beginGeneration, endGeneration, type Generation } from "./generations";
 import { BadRequest, readBody } from "./http";
 import { githubTools, repoBriefing } from "./github";
+import { commandBriefing, commandTool } from "./workspace";
 import { getProject } from "./projects";
 import { streamReply } from "./reply";
 import { resolveSettings } from "./settings";
@@ -292,8 +293,25 @@ export async function runTurn(
     const project = turn.session.projectId ? getProject(turn.session.projectId) : null;
     // With Claude, a project tied to a repository, and a GitHub token, Claude gets the repository.
     const repo = settings.provider === "claude" && settings.githubToken ? project?.repo : undefined;
-    const tools = repo ? githubTools({ token: settings.githubToken!, repo, sessionId }) : undefined;
-    const system = [settings.systemPrompt, repo ? repoBriefing(repo, sessionId) : ""]
+    // And, if that has been switched on, a way to run commands in a folder kept for the chat.
+    const running = settings.provider === "claude" && settings.runCode;
+    const given = [
+      ...(repo ? githubTools({ token: settings.githubToken!, repo, sessionId }) : []),
+      ...(running
+        ? [
+            commandTool({
+              sessionId,
+              repo: repo ? { name: repo, token: settings.githubToken! } : null,
+            }),
+          ]
+        : []),
+    ];
+    const tools = given.length ? given : undefined;
+    const system = [
+      settings.systemPrompt,
+      repo ? repoBriefing(repo, sessionId) : "",
+      running ? commandBriefing(repo ?? null) : "",
+    ]
       .filter((part) => part.trim())
       .join("\n\n");
     const messages = buildProviderMessages(turn.session, system, project);

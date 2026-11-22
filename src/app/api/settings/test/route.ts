@@ -1,3 +1,4 @@
+import { checkRunning } from "@/lib/server/workspace";
 import { checkProvider } from "@/lib/provider/adapter";
 import { checkClaude } from "@/lib/provider/claude";
 import { checkGitHub } from "@/lib/server/github";
@@ -29,6 +30,7 @@ export async function POST(request: Request): Promise<Response> {
       claudeKey: body.claudeKey,
       claudeModel: body.claudeModel,
       githubToken: body.githubToken,
+      runCode: body.runCode,
     });
     if (settings.provider === "claude") {
       // Claude: ask Anthropic about the model (which costs nothing), and GitHub who the token is.
@@ -61,7 +63,23 @@ export async function POST(request: Request): Promise<Response> {
           detail: "Claude can chat, but cannot read or change a repository until a token is added.",
         });
       }
-      return json({ check: { ok: claude.ok, steps }, keySource: settings.claudeKeySource });
+      if (settings.runCode) {
+        // Running code: try it, and see that the sandbox holds.
+        const running = await checkRunning();
+        steps.push({
+          id: "code",
+          ok: running.ok,
+          title:
+            running.ok === false
+              ? "Running code is not safe here"
+              : running.ok
+                ? "Running code is fenced in"
+                : "Running code has no sandbox here",
+          detail: running.detail,
+        });
+      }
+      const ok = claude.ok && steps.every((step) => step.ok !== false);
+      return json({ check: { ok, steps }, keySource: settings.claudeKeySource });
     }
     const check = await checkProvider({
       config: { baseUrl: settings.baseUrl, apiKey: settings.apiKey, model: settings.model },

@@ -8,7 +8,8 @@
  *   OGCHAT_GITHUB_URL=http://127.0.0.1:8789 npm run dev
  *
  * Any key and any token are accepted. Claude "thinks", looks at the top of
- * the repository if it has been given one, then answers. The repository has
+ * the repository if it has been given one (or runs a command, if it may
+ * and has no repository), then answers. The repository has
  * two files and takes writes on any branch.
  */
 import http from "node:http";
@@ -87,6 +88,14 @@ const server = http.createServer(async (req, res) => {
     const answered =
       Array.isArray(last?.content) && last.content.some((part) => part.type === "tool_result");
     const hasRepo = (body.tools ?? []).some((tool) => tool.name === "list_files");
+    const canRun = (body.tools ?? []).some((tool) => tool.name === "run_command");
+    if (canRun && !hasRepo && !answered) {
+      return stream(
+        res,
+        [{ tool: "run_command", id: "toolu_run", input: { command: "echo $((6*7)); uname -s" } }],
+        "tool_use",
+      );
+    }
     if (hasRepo && !answered) {
       return stream(
         res,
@@ -105,9 +114,7 @@ const server = http.createServer(async (req, res) => {
       [
         ...(answered ? [] : [{ thinking: "A short answer will do." }]),
         {
-          text: found
-            ? `Here is what the repository holds:\n\n${found}`
-            : "Mock Claude here. Hello.",
+          text: found ? `Here is what came back:\n\n${found}` : "Mock Claude here. Hello.",
         },
       ],
       "end_turn",

@@ -850,6 +850,7 @@ describe("settings API", () => {
         models: expect.arrayContaining([{ id: "claude-opus-5-5", label: "Claude Opus 5.5" }]),
       },
       github: { set: false, masked: null, source: null },
+      runCode: { enabled: false, sandbox: "none" },
     });
   });
 

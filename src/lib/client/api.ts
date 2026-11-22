@@ -42,6 +42,7 @@ export interface SettingsUpdate {
   claudeKey?: string | null;
   claudeModel?: string;
   githubToken?: string | null;
+  runCode?: boolean;
 }
 
 export interface ChatApi {

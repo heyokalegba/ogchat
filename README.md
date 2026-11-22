@@ -4,7 +4,7 @@ A personal AI chat interface that runs entirely on your machine. Multi-session
 chat with streaming replies, file attachments, local history, and one
 configurable provider: any OpenAI-compatible one, or Claude on your own
 Anthropic API key, which can also [work on a GitHub repository](#claude-and-a-github-repository)
-you point it at. No accounts, no cloud, no telemetry.
+you point it at and, if you allow it, [run code](#letting-claude-run-code). No accounts, no cloud, no telemetry.
 Besides your provider it talks to a public weather service, if you leave that
 on, asked what the weather is in New York (see
 [Weather](#the-weather-is-new-yorks)); and to GitHub, only if you give it a
@@ -412,6 +412,43 @@ to the browser, to Anthropic, or anywhere but `api.github.com`. Claude is told
 the repository's name, never the token. The limit on what can go wrong is the
 token itself, which is why it should cover only the repositories you chose.
 
+### Letting Claude run code
+
+Off unless you switch it on: **Let Claude run code**, in settings under the
+GitHub token. Claude then has one more tool, `run_command`, which runs a shell
+command on your computer and reads what it printed. In a project with a
+repository it runs in a copy of that repository, so it can run the tests after
+changing something; in any other chat it has a scratch folder.
+
+This is the one part of ogchat where a model acts on your machine, so it is
+fenced:
+
+- Every chat has a folder of its own, `data/workspaces/<chat id>`. Commands
+  start there and it is their home directory. Deleting the chat deletes it.
+- On a Mac each command runs inside the system sandbox (`sandbox-exec`). It can
+  write only in that folder and the temporary folders. It cannot read your home
+  folder (documents, SSH keys, browser data), apart from where programming
+  tools are installed (`~/.nvm`, `~/.cargo/bin` and the like), and it cannot
+  read ogchat's settings, chats or `.env.local`. If the sandbox does not start,
+  the command is not run. **test** in settings runs three harmless commands and
+  tells you whether the fence held.
+- On Linux and Windows there is no sandbox: commands run as you. The settings
+  panel says so.
+- Commands get a bare environment: no API key, no token.
+- A command is stopped after two minutes unless Claude asks for longer (ten at
+  most), and when you stop the reply.
+- Commands can use the network (to install packages). So a command can send
+  out what it can read, which is the repository copy. Do not switch this on for
+  a repository whose contents you would not want leaving the machine.
+
+The copy of the repository is fetched with your GitHub token before each
+command: the chat's `ogchat/...` branch once it exists, otherwise the default
+branch. It is for running things. What a command changes there is not sent to
+GitHub; Claude still saves changes with `write_file`, one commit each. Installed
+packages and build output stay between commands. `git` must be installed.
+
+What Claude runs shows under **thoughts** (`[running: npm test]`).
+
 Reading a repository is token-hungry: each file Claude opens is added to the
 conversation and sent again with every step. For exploring, Sonnet or Haiku is
 the economical choice; switch to Opus for the hard part.
@@ -605,6 +642,7 @@ src/
     provider/adapter.ts            the only module that talks to an OpenAI-shaped provider
     provider/claude.ts             the only module that talks to Claude (Anthropic's SDK)
     server/github.ts               the repository tools Claude is given, and the only module that talks to GitHub
+    server/workspace.ts            running commands for Claude: the per-chat folder, the sandbox, the repository copy
     daylight.ts                    sun, moon and clock over Brooklyn
     server/                        persistence, projects, settings, turn handling, request guard
     client/api.ts                  browser client for the routes above

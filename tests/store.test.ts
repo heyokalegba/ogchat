@@ -177,6 +177,7 @@ describe("settings persistence", () => {
       claudeModel: "claude-opus-5-5",
       githubToken: null,
       githubTokenSource: null,
+      runCode: false,
     });
   });
 
@@ -203,6 +204,7 @@ describe("settings persistence", () => {
       claudeModel: "claude-opus-5-5",
       githubToken: null,
       githubTokenSource: null,
+      runCode: false,
     });
     const file = path.join(data.dir(), "settings.json");
     expect(fs.statSync(file).mode & 0o777).toBe(0o600);
@@ -235,6 +237,7 @@ describe("settings persistence", () => {
       claudeModel: "claude-opus-5-5",
       githubToken: null,
       githubTokenSource: null,
+      runCode: false,
     });
     expect(settings.publicSettings().apiKey).toEqual({
       set: true,

@@ -13,6 +13,7 @@ import { titleFromMessage } from "@/lib/title";
 import { pruneFiles, removeSessionFiles } from "./files";
 import { readJson, writeJsonAtomic } from "./fsjson";
 import { sessionsDir } from "./paths";
+import { removeWorkspace } from "./workspace";
 
 /**
  * Session persistence: one JSON file per session under <data>/sessions.
@@ -221,6 +222,7 @@ export function deleteSession(id: string): boolean {
   try {
     fs.unlinkSync(fileFor(id));
     removeSessionFiles(id);
+    removeWorkspace(id);
     return true;
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") return false;
