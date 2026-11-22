@@ -10,7 +10,7 @@ import type {
   SessionModel,
   SessionSummary,
 } from "@/lib/types";
-import { PROVIDER_CHOICES } from "@/lib/types";
+import { PROVIDER_CHOICES, REASONING_EFFORTS, type ReasoningEffort } from "@/lib/types";
 import { titleFromMessage } from "@/lib/title";
 import { pruneFiles, removeSessionFiles } from "./files";
 import { readJson, writeJsonAtomic } from "./fsjson";
@@ -38,6 +38,8 @@ interface SessionFile {
   projectId?: string;
   /** The model this chat uses, if it has one of its own. */
   model?: SessionModel;
+  /** How hard it thinks, if this chat has a level of its own. */
+  reasoning?: ReasoningEffort;
   createdAt: string;
   updatedAt: string;
   messages: ChatMessage[];
@@ -84,11 +86,16 @@ function parseFile(value: unknown, id: string): SessionFile | null {
     titleLocked: f.titleLocked === true,
     ...(isValidId(f.projectId) ? { projectId: f.projectId } : {}),
     ...(isModel(f.model) ? { model: { provider: f.model.provider, model: f.model.model } } : {}),
+    ...(isEffort(f.reasoning) ? { reasoning: f.reasoning } : {}),
     createdAt: f.createdAt,
     updatedAt: f.updatedAt,
     messages: f.messages,
     ...(isSummary(f.summary) ? { summary: f.summary } : {}),
   };
+}
+
+export function isEffort(value: unknown): value is ReasoningEffort {
+  return (REASONING_EFFORTS as readonly unknown[]).includes(value);
 }
 
 function isModel(value: unknown): value is SessionModel {
@@ -137,6 +144,7 @@ function toSession(file: SessionFile): Session {
     messageCount: file.messages.length,
     projectId: file.projectId ?? null,
     model: file.model ?? null,
+    reasoning: file.reasoning ?? null,
     messages: file.messages,
     ...(file.summary ? { summary: file.summary } : {}),
   };
@@ -151,6 +159,7 @@ export function toMeta(session: SessionMeta): SessionMeta {
     messageCount: session.messageCount,
     projectId: session.projectId ?? null,
     model: session.model ?? null,
+    reasoning: session.reasoning ?? null,
   };
 }
 
@@ -198,6 +207,7 @@ export function createSession(
   title?: string | null,
   projectId?: string | null,
   model?: SessionModel | null,
+  reasoning?: ReasoningEffort | null,
 ): Session {
   const now = stamp();
   const file: SessionFile = {
@@ -207,6 +217,7 @@ export function createSession(
     titleLocked: Boolean(title),
     ...(projectId ? { projectId } : {}),
     ...(model ? { model } : {}),
+    ...(reasoning ? { reasoning } : {}),
     createdAt: now,
     updatedAt: now,
     messages: [],
@@ -236,6 +247,16 @@ export function setSessionModel(id: string, model: SessionModel | null): Session
   if (!file) return null;
   if (model) file.model = model;
   else delete file.model;
+  save(file);
+  return toSession(file);
+}
+
+/** Sets how hard a session's model thinks, or with null goes back to the level in settings. */
+export function setSessionReasoning(id: string, reasoning: ReasoningEffort | null): Session | null {
+  const file = load(id);
+  if (!file) return null;
+  if (reasoning) file.reasoning = reasoning;
+  else delete file.reasoning;
   save(file);
   return toSession(file);
 }

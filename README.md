@@ -608,6 +608,11 @@ key and the other provider's model if that has a key. A new chat starts on
 whichever provider and model is chosen in settings, and you can pick before
 the first message. Chats you never set a model on follow settings.
 
+The **think** button beside the message box works the same way: it sets how
+hard that chat's model thinks (auto, low, medium, high, max) and each chat
+keeps its own, in the main window or in a window of its own. The level in
+settings is the one a chat starts from.
+
 ## A chat in a window of its own
 
 Drag a chat out of the list and let go anywhere outside it: it opens in a

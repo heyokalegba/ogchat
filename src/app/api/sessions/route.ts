@@ -3,7 +3,7 @@ import { guard } from "@/lib/server/guard";
 import { BadRequest, errorJson, json, readBody } from "@/lib/server/http";
 import { projectExists } from "@/lib/server/projects";
 import { cleanSessionModel } from "@/lib/server/settings";
-import { createSession, isValidId, listSessions } from "@/lib/server/store";
+import { createSession, isEffort, isValidId, listSessions } from "@/lib/server/store";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +23,7 @@ export async function GET(request: Request): Promise<Response> {
   return json({ sessions: listSessions(query, project) });
 }
 
-/** POST /api/sessions { title?, projectId?, model? }  →  201 { session } */
+/** POST /api/sessions { title?, projectId?, model?, reasoning? }  →  201 { session } */
 export async function POST(request: Request): Promise<Response> {
   const blocked = guard(request);
   if (blocked) return blocked;
@@ -41,7 +41,11 @@ export async function POST(request: Request): Promise<Response> {
     if (body.model != null && !model) {
       return errorJson(400, "bad_model", "That is not a model a chat can be set to.");
     }
-    return json({ session: createSession(title, projectId, model) }, 201);
+    if (body.reasoning != null && !isEffort(body.reasoning)) {
+      return errorJson(400, "bad_reasoning", "That is not a thinking level.");
+    }
+    const reasoning = isEffort(body.reasoning) ? body.reasoning : null;
+    return json({ session: createSession(title, projectId, model, reasoning) }, 201);
   } catch (err) {
     if (err instanceof BadRequest) return errorJson(400, "bad_request", err.message);
     throw err;

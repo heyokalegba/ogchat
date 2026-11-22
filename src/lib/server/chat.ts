@@ -321,7 +321,7 @@ export async function runTurn(
     );
     const stream = streamReply(settings, messages, {
       signal: generation.controller.signal,
-      reasoning: settings.reasoning,
+      reasoning: turn.session.reasoning ?? settings.reasoning,
       webSearch: web,
       tools,
       onThinking: (text) => {

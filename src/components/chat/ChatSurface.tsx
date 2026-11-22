@@ -49,6 +49,8 @@ export interface ChatSurfaceProps {
   onModelChange?: (model: SessionModel) => void;
   /** For a conversation not yet saved: the model it starts with, if not the one in settings. */
   startModel?: SessionModel | null;
+  /** Likewise the thinking level a conversation not yet saved starts with. */
+  startReasoning?: ReasoningEffort | null;
   /** How hard the model thinks, and what to do when the composer changes it. */
   reasoning?: ReasoningEffort;
   onReasoningChange?: (next: ReasoningEffort) => void;
@@ -118,6 +120,7 @@ export function ChatSurface(props: ChatSurfaceProps) {
     api,
     projectId: props.projectId,
     model: props.startModel,
+    startReasoning: props.startReasoning,
     onSessionCreated: props.onSessionCreated,
     onSessionUpdated: props.onSessionUpdated,
     onSessionMissing: props.onSessionMissing,

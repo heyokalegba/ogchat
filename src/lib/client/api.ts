@@ -54,7 +54,13 @@ export interface ChatApi {
     signal?: AbortSignal,
     project?: string | null,
   ): Promise<SessionMeta[]>;
-  createSession(projectId?: string | null, model?: SessionModel | null): Promise<Session>;
+  createSession(
+    projectId?: string | null,
+    model?: SessionModel | null,
+    reasoning?: ReasoningEffort | null,
+  ): Promise<Session>;
+  /** Sets how hard a chat's model thinks; null goes back to the level in settings. */
+  setSessionReasoning(id: string, reasoning: ReasoningEffort | null): Promise<SessionMeta>;
   /** Sets the model a chat uses; null goes back to the one in settings. */
   setSessionModel(id: string, model: SessionModel | null): Promise<SessionMeta>;
   /** Files a session under a project; null takes it out of one. */
@@ -156,11 +162,19 @@ export function createApi(base = "/api"): ChatApi {
       const q = params.size ? `?${params}` : "";
       return (await data<{ sessions: SessionMeta[] }>(`/sessions${q}`, { signal })).sessions;
     },
-    async createSession(projectId, model) {
+    async setSessionReasoning(id, reasoning) {
+      return (await data<{ session: SessionMeta }>(`/sessions/${id}`, body("PATCH", { reasoning })))
+        .session;
+    },
+    async createSession(projectId, model, reasoning) {
       return (
         await data<{ session: Session }>(
           "/sessions",
-          body("POST", { ...(projectId ? { projectId } : {}), ...(model ? { model } : {}) }),
+          body("POST", {
+            ...(projectId ? { projectId } : {}),
+            ...(model ? { model } : {}),
+            ...(reasoning ? { reasoning } : {}),
+          }),
         )
       ).session;
     },

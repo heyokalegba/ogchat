@@ -11,7 +11,9 @@ import {
   isValidId,
   moveSession,
   renameSession,
+  isEffort,
   setSessionModel,
+  setSessionReasoning,
   toMeta,
 } from "@/lib/server/store";
 import { cleanSessionModel } from "@/lib/server/settings";
@@ -39,10 +41,11 @@ export async function GET(request: Request, { params }: Context): Promise<Respon
 }
 
 /**
- * PATCH /api/sessions/:id { title?, projectId?, model? }  →  { session }
+ * PATCH /api/sessions/:id { title?, projectId?, model?, reasoning? }  →  { session }
  * `projectId` files the session under a project; null takes it out of one.
  * `model` is { provider, model }, the model this chat uses; null goes back to
- * the one in settings.
+ * the one in settings. `reasoning` is this chat's thinking level, or null for
+ * the level in settings.
  */
 export async function PATCH(request: Request, { params }: Context): Promise<Response> {
   const blocked = guard(request);
@@ -66,7 +69,16 @@ export async function PATCH(request: Request, { params }: Context): Promise<Resp
       }
       session = setSessionModel(id, model) ?? session;
     }
-    if (body.title !== undefined || (body.projectId === undefined && body.model === undefined)) {
+    if (body.reasoning !== undefined) {
+      if (body.reasoning !== null && !isEffort(body.reasoning)) {
+        return errorJson(400, "bad_reasoning", "That is not a thinking level.");
+      }
+      session =
+        setSessionReasoning(id, isEffort(body.reasoning) ? body.reasoning : null) ?? session;
+    }
+    const only =
+      body.projectId === undefined && body.model === undefined && body.reasoning === undefined;
+    if (body.title !== undefined || only) {
       const title = cleanTitle(body.title);
       if (!title) return errorJson(400, "bad_title", "Title must not be empty.");
       session = renameSession(id, title) ?? session;

@@ -57,6 +57,8 @@ export interface SessionMeta {
   projectId: string | null;
   /** The model this chat uses, or null to use whichever is chosen in settings. */
   model: SessionModel | null;
+  /** How hard this chat's model thinks, or null to use the level in settings. */
+  reasoning: ReasoningEffort | null;
 }
 
 /** A model, and which of the two providers it is asked through. */

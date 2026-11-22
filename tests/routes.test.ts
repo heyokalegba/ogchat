@@ -131,6 +131,7 @@ describe("sessions API", () => {
         messageCount: 0,
         projectId: null,
         model: null,
+        reasoning: null,
       },
     ]);
   });

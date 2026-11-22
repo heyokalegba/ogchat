@@ -758,6 +758,51 @@ describe("Claude and a repository, through the app", () => {
     );
     expect(((await cleared.json()) as { session: Session }).session.model).toBeNull();
 
+    // The same goes for how hard it thinks: each chat has its own level.
+    await patchSession(
+      req("PATCH", `/api/sessions/${session.id}`, {
+        model: { provider: "claude", model: "claude-opus-5-5" },
+        reasoning: "low",
+      }),
+      ctx(session.id),
+    );
+    await events(
+      await sendMessage(
+        req("POST", `/api/sessions/${session.id}/messages`, { content: "think less" }),
+        ctx(session.id),
+      ),
+    );
+    expect(calls.at(-1)!.body!.output_config).toEqual({ effort: "low" });
+    const eager = (await (
+      await createSession(
+        req("POST", "/api/sessions", {
+          model: { provider: "claude", model: "claude-opus-5-5" },
+          reasoning: "max",
+        }),
+      )
+    ).json()) as { session: Session };
+    expect(eager.session.reasoning).toBe("max");
+    await events(
+      await sendMessage(
+        req("POST", `/api/sessions/${eager.session.id}/messages`, { content: "think hard" }),
+        ctx(eager.session.id),
+      ),
+    );
+    expect(calls.at(-1)!.body!.output_config).toEqual({ effort: "max" });
+    const reset = await patchSession(
+      req("PATCH", `/api/sessions/${session.id}`, { reasoning: null }),
+      ctx(session.id),
+    );
+    expect(((await reset.json()) as { session: Session }).session.reasoning).toBeNull();
+    expect(
+      (
+        await patchSession(
+          req("PATCH", `/api/sessions/${session.id}`, { reasoning: "lots" }),
+          ctx(session.id),
+        )
+      ).status,
+    ).toBe(400);
+
     // Nonsense is refused.
     for (const model of [{ provider: "nope", model: "x" }, { provider: "claude" }, "claude"]) {
       expect((await createSession(req("POST", "/api/sessions", { model }))).status).toBe(400);

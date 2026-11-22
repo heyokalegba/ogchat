@@ -110,6 +110,7 @@ export function AppShell() {
   const [solo, setSolo] = useState(false);
   /** The model a chat not yet started will be set to, if one was picked for it. */
   const [startModel, setStartModel] = useState<SessionModel | null>(null);
+  const [startReasoning, setStartReasoning] = useState<ReasoningEffort | null>(null);
 
   const refreshSessions = useCallback(
     async (q: string, signal?: AbortSignal) => {
@@ -252,6 +253,7 @@ export function AppShell() {
   const open = useCallback((id: string | null) => {
     setActiveId(id);
     setStartModel(null);
+    setStartReasoning(null);
     setOpenToken((n) => n + 1);
     setSidebarOpen(false);
     if (sessionFromUrl() !== id) writeUrl(id, "push");
@@ -354,13 +356,21 @@ export function AppShell() {
     api.getSettings().then(setSettings, () => {});
   }, [api]);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
-  /** The composer's thinking button: applied at once, saved in the background. */
+  /**
+   * The composer's thinking button: this chat's own level, applied at once and
+   * saved with the chat. The level in settings is what a chat starts from.
+   */
   const onReasoningChange = useCallback(
     (reasoning: ReasoningEffort) => {
-      setSettings((current) => (current ? { ...current, reasoning } : current));
-      api.saveSettings({ reasoning }).then(setSettings, () => {});
+      const id = activeIdRef.current;
+      if (!id) return setStartReasoning(reasoning);
+      setActiveMeta((current) => (current?.id === id ? { ...current, reasoning } : current));
+      setSessions((current) => current.map((s) => (s.id === id ? { ...s, reasoning } : s)));
+      api.setSessionReasoning(id, reasoning).then(onSessionUpdated, () => {
+        void refreshSessions(queryRef.current);
+      });
     },
-    [api],
+    [api, onSessionUpdated, refreshSessions],
   );
 
   const changeLook = useCallback((patch: Partial<Look>) => {
@@ -627,8 +637,11 @@ export function AppShell() {
               model={model}
               onModelChange={onModelChange}
               startModel={startModel}
+              startReasoning={startReasoning}
               projectId={projectId}
-              reasoning={settings?.reasoning}
+              reasoning={
+                (activeId ? activeSession?.reasoning : startReasoning) ?? settings?.reasoning
+              }
               onReasoningChange={settings ? onReasoningChange : undefined}
               onSessionCreated={onSessionCreated}
               onSessionUpdated={onSessionUpdated}
