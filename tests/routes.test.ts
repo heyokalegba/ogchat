@@ -1295,6 +1295,48 @@ describe("the context window", () => {
     expect(await settings()).toMatchObject({ contextWindow: 1_000_000 });
   });
 
+  it("can be stopped while the summary is written, and gives up by itself if it never comes", async () => {
+    await useKey();
+    stubProvider(() => sseResponse(["a reply"]));
+    const session = await create();
+    await send(session.id, { content: "hello" });
+    // A provider that never answers: only stopping ends the wait.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        (_input: unknown, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            const stop = () => reject(new DOMException("stopped", "AbortError"));
+            if (init?.signal?.aborted) stop();
+            init?.signal?.addEventListener("abort", stop);
+          }),
+      ),
+    );
+    const waiting = compress(session.id);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(
+      (
+        (await (
+          await stopSession(req("POST", `/api/sessions/${session.id}/stop`, {}), ctx(session.id))
+        ).json()) as { stopped: boolean }
+      ).stopped,
+    ).toBe(true);
+    const stopped = await waiting;
+    expect(stopped.status).toBe(499);
+    expect(((await stopped.json()) as { error: { code: string } }).error.code).toBe("aborted");
+
+    vi.stubEnv("OGCHAT_COMPRESS_TIMEOUT_MS", "40");
+    const late = await compress(session.id);
+    expect(late.status).toBe(504);
+    expect(((await late.json()) as { error: { code: string } }).error.code).toBe(
+      "compress_timeout",
+    );
+    // Nothing was changed, and the chat is free again.
+    const now = await detail(session.id);
+    expect(now.session.summary).toBeUndefined();
+    expect(now.generating).toBe(false);
+  });
+
   it("compresses: the model summarises, and the summary is sent in place of what it covers", async () => {
     await useKey();
     let turn = 0;

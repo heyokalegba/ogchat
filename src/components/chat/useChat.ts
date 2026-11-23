@@ -604,7 +604,8 @@ export function useChat(options: UseChatOptions) {
         setContext(result.context);
       } catch (err) {
         if (epochRef.current !== epoch) return;
-        setError({ ...describe(err), retry: null });
+        // Stopped on purpose: nothing went wrong, and nothing was changed.
+        if (describe(err).code !== "aborted") setError({ ...describe(err), retry: null });
       } finally {
         compressingRef.current = false;
         if (epochRef.current === epoch) setCompressing(false);
@@ -612,6 +613,12 @@ export function useChat(options: UseChatOptions) {
     },
     [api],
   );
+
+  /** Gives up on a summary that is being written. The conversation is left as it was. */
+  const stopCompress = useCallback(() => {
+    const id = activeIdRef.current;
+    if (id && compressingRef.current) void api.stop(id).catch(() => {});
+  }, [api]);
 
   const dismissError = useCallback(() => setError(null), []);
 
@@ -629,6 +636,7 @@ export function useChat(options: UseChatOptions) {
     summary,
     compressing,
     compress,
+    stopCompress,
     draft,
     setDraft,
     files,

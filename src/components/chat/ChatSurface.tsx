@@ -428,6 +428,7 @@ export function ChatSurface(props: ChatSurfaceProps) {
                 compressing={chat.compressing}
                 canCompress={idle && sinceSummary >= 2}
                 onCompress={() => void chat.compress()}
+                onStop={chat.stopCompress}
               />
             )}
             {messages.length > 0 && (

@@ -598,6 +598,13 @@ continue`. The count is an estimate from the length of the text, near
   and network loss all appear inline with a retry. Your message is saved before the provider is called, so
   a failure never costs you the session.
 
+Compressing waits on the model, which has to read the whole conversation and
+write the summary: on a long chat with a large model that can take a minute or
+more. The button counts the seconds while it works and stops it if pressed
+(nothing is changed). It gives up by itself after four minutes. With Claude the
+summary is written with thinking kept low, which is most of the wait; for a
+quicker one still, set the chat to Sonnet or Haiku before compressing.
+
 ## A model for each chat
 
 The model's name at the bottom right of the chat, under the message box, is a

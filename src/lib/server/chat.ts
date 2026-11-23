@@ -22,6 +22,9 @@ import {
 /** Turn handling: validate the request, persist the user's side, then stream the reply. */
 
 export const MAX_MESSAGE_CHARS = 400_000;
+/** The longest a summary is waited for. Overridable for tests. */
+const compressTimeoutMs = () => Number(process.env.OGCHAT_COMPRESS_TIMEOUT_MS) || 240_000;
+
 /** How much of a reply's reasoning is kept with it. */
 const MAX_THINKING_CHARS = 200_000;
 
@@ -407,6 +410,12 @@ export async function compressSession(sessionId: string, signal?: AbortSignal): 
   }
   const onAbort = () => generation.controller.abort();
   signal?.addEventListener("abort", onAbort);
+  // A summary that has not come in this long is not coming: give up rather than wait for ever.
+  let late = false;
+  const timer = setTimeout(() => {
+    late = true;
+    generation.controller.abort();
+  }, compressTimeoutMs());
   try {
     const settings = settingsFor(session.model);
     const project = session.projectId ? getProject(session.projectId) : null;
@@ -435,7 +444,10 @@ export async function compressSession(sessionId: string, signal?: AbortSignal): 
     let text = "";
     const stream = streamReply(settings, [...lead, ...kept, ask], {
       signal: generation.controller.signal,
-      // A summary wants care more than cleverness; the provider's own default is left alone.
+      // A summary wants care more than cleverness. Claude is asked to keep its thinking
+      // short, which is most of the wait on a long conversation; the other provider's
+      // own default is left alone.
+      reasoning: settings.provider === "claude" ? "low" : undefined,
     });
     for await (const piece of stream) text += piece;
     if (!text.trim()) {
@@ -453,12 +465,20 @@ export async function compressSession(sessionId: string, signal?: AbortSignal): 
     return setSummary(sessionId, { text: text.trim(), upTo: last.id }) ?? now;
   } catch (err) {
     if (err instanceof ChatRequestError) throw err;
+    if (late) {
+      throw new ChatRequestError(
+        504,
+        "compress_timeout",
+        "The summary took too long and was given up on. Nothing was changed. Try again, or set this chat to a quicker model first.",
+      );
+    }
     if (err instanceof ProviderError) {
       const { message } = toChatError(err);
       throw new ChatRequestError(err.code === "aborted" ? 499 : 502, err.code, message);
     }
     throw err;
   } finally {
+    clearTimeout(timer);
     signal?.removeEventListener("abort", onAbort);
     endGeneration(sessionId, generation);
   }

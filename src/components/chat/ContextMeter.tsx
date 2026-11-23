@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ContextUse, SessionSummary } from "@/lib/types";
 import styles from "./chat.module.css";
 import { Markdown } from "./Markdown";
@@ -45,8 +45,19 @@ export function ContextMeter(props: {
   /** Whether compressing is possible right now: idle, and enough said to be worth it. */
   canCompress: boolean;
   onCompress: () => void;
+  /** Gives up on a summary that is being written. */
+  onStop?: () => void;
 }) {
   const { use, compressing, canCompress, onCompress } = props;
+  // How long the summary has been in the writing, so that a long wait does not look like a stall.
+  const [waited, setWaited] = useState(0);
+  useEffect(() => {
+    if (!compressing) return;
+    setWaited(0);
+    const began = Date.now();
+    const timer = setInterval(() => setWaited(Math.round((Date.now() - began) / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, [compressing]);
   const level = contextLevel(use);
   const share = use.limit > 0 ? use.tokens / use.limit : 0;
   const percent = share > 0 && share < 0.01 ? "<1" : String(Math.min(999, Math.round(share * 100)));
@@ -65,15 +76,26 @@ export function ContextMeter(props: {
         </span>
         {ADVICE[level] && <span className={styles.meterAdvice}>{ADVICE[level]}</span>}
       </span>
-      <button
-        type="button"
-        className={styles.meterButton}
-        disabled={!canCompress || compressing}
-        onClick={onCompress}
-        title="Have the model write a summary of this conversation and carry on from that. It frees most of the context window; the messages stay here to read."
-      >
-        {compressing ? "compressing…" : "compress"}
-      </button>
+      {compressing && props.onStop ? (
+        <button
+          type="button"
+          className={styles.meterButton}
+          onClick={props.onStop}
+          title="The model is reading the whole conversation and writing a summary of it, which on a long one can take a minute or more. Press to give up; nothing will have changed."
+        >
+          compressing {waited}s · stop
+        </button>
+      ) : (
+        <button
+          type="button"
+          className={styles.meterButton}
+          disabled={!canCompress || compressing}
+          onClick={onCompress}
+          title="Have the model write a summary of this conversation and carry on from that. It frees most of the context window; the messages stay here to read."
+        >
+          {compressing ? "compressing…" : "compress"}
+        </button>
+      )}
     </span>
   );
 }
