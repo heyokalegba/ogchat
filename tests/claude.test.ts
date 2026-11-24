@@ -674,6 +674,7 @@ describe("Claude and a repository, through the app", () => {
       "read_file",
       "search_code",
       "write_file",
+      "edit_file",
       "delete_file",
       "open_pull_request",
     ]);

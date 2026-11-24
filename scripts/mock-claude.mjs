@@ -123,6 +123,12 @@ const server = http.createServer(async (req, res) => {
 
   // ---- GitHub
   if (path === "/user") return send(res, 200, { login: "mock-user" });
+  if (path === "/user/repos") {
+    return send(res, 200, [
+      { full_name: "octo/widgets", private: false, default_branch: "main" },
+      { full_name: "octo/secret-plans", private: true, default_branch: "trunk" },
+    ]);
+  }
   const repo = path.match(/^\/repos\/[^/]+\/[^/]+(\/.*)?$/);
   if (repo) {
     const rest = repo[1] ?? "";
@@ -137,6 +143,12 @@ const server = http.createServer(async (req, res) => {
       branches.add(String(body.ref).replace("refs/heads/", ""));
       return send(res, 201, { ref: body.ref });
     }
+    if (rest === "/branches")
+      return send(
+        res,
+        200,
+        [...branches].map((name) => ({ name })),
+      );
     if (rest === "/pulls") {
       return send(res, req.method === "POST" ? 201 : 200, {
         number: 1,

@@ -9,6 +9,7 @@ import type {
   SessionMeta,
   SessionModel,
   SessionSummary,
+  SessionWork,
 } from "@/lib/types";
 import { PROVIDER_CHOICES, REASONING_EFFORTS, type ReasoningEffort } from "@/lib/types";
 import { titleFromMessage } from "@/lib/title";
@@ -40,6 +41,10 @@ interface SessionFile {
   model?: SessionModel;
   /** How hard it thinks, if this chat has a level of its own. */
   reasoning?: ReasoningEffort;
+  /** Where it works, if that was chosen for this chat: repository, branch, environment. */
+  repo?: string;
+  branch?: string;
+  environmentId?: string;
   createdAt: string;
   updatedAt: string;
   messages: ChatMessage[];
@@ -87,6 +92,9 @@ function parseFile(value: unknown, id: string): SessionFile | null {
     ...(isValidId(f.projectId) ? { projectId: f.projectId } : {}),
     ...(isModel(f.model) ? { model: { provider: f.model.provider, model: f.model.model } } : {}),
     ...(isEffort(f.reasoning) ? { reasoning: f.reasoning } : {}),
+    ...(typeof f.repo === "string" && f.repo ? { repo: f.repo } : {}),
+    ...(typeof f.branch === "string" && f.branch ? { branch: f.branch } : {}),
+    ...(isValidId(f.environmentId) ? { environmentId: f.environmentId } : {}),
     createdAt: f.createdAt,
     updatedAt: f.updatedAt,
     messages: f.messages,
@@ -145,6 +153,9 @@ function toSession(file: SessionFile): Session {
     projectId: file.projectId ?? null,
     model: file.model ?? null,
     reasoning: file.reasoning ?? null,
+    repo: file.repo ?? null,
+    branch: file.branch ?? null,
+    environmentId: file.environmentId ?? null,
     messages: file.messages,
     ...(file.summary ? { summary: file.summary } : {}),
   };
@@ -160,6 +171,9 @@ export function toMeta(session: SessionMeta): SessionMeta {
     projectId: session.projectId ?? null,
     model: session.model ?? null,
     reasoning: session.reasoning ?? null,
+    repo: session.repo ?? null,
+    branch: session.branch ?? null,
+    environmentId: session.environmentId ?? null,
   };
 }
 
@@ -208,6 +222,7 @@ export function createSession(
   projectId?: string | null,
   model?: SessionModel | null,
   reasoning?: ReasoningEffort | null,
+  work?: Partial<SessionWork> | null,
 ): Session {
   const now = stamp();
   const file: SessionFile = {
@@ -218,6 +233,9 @@ export function createSession(
     ...(projectId ? { projectId } : {}),
     ...(model ? { model } : {}),
     ...(reasoning ? { reasoning } : {}),
+    ...(work?.repo ? { repo: work.repo } : {}),
+    ...(work?.repo && work.branch ? { branch: work.branch } : {}),
+    ...(work?.environmentId ? { environmentId: work.environmentId } : {}),
     createdAt: now,
     updatedAt: now,
     messages: [],
@@ -247,6 +265,32 @@ export function setSessionModel(id: string, model: SessionModel | null): Session
   if (!file) return null;
   if (model) file.model = model;
   else delete file.model;
+  save(file);
+  return toSession(file);
+}
+
+/**
+ * Sets where a session works. Each of repository, branch and environment is
+ * changed only if given; null clears it. A branch belongs to a repository:
+ * changing the repository drops the branch unless a new one comes with it.
+ * The values are checked by the caller.
+ */
+export function setSessionWork(id: string, work: Partial<SessionWork>): Session | null {
+  const file = load(id);
+  if (!file) return null;
+  if (work.repo !== undefined) {
+    if (work.repo !== (file.repo ?? null)) delete file.branch;
+    if (work.repo) file.repo = work.repo;
+    else delete file.repo;
+  }
+  if (work.branch !== undefined) {
+    if (work.branch) file.branch = work.branch;
+    else delete file.branch;
+  }
+  if (work.environmentId !== undefined) {
+    if (work.environmentId) file.environmentId = work.environmentId;
+    else delete file.environmentId;
+  }
   save(file);
   return toSession(file);
 }

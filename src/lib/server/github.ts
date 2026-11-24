@@ -1,4 +1,5 @@
 import type { ClaudeTool } from "@/lib/provider/claude";
+import type { RepoChoice } from "@/lib/types";
 
 /**
  * A GitHub repository, as Claude gets to use it.
@@ -152,6 +153,58 @@ export async function checkGitHub(
   }
 }
 
+/** A branch name that is safe to hand to GitHub and to git. Null if it is not one. */
+export function parseBranch(input: unknown): string | null {
+  if (typeof input !== "string") return null;
+  const name = input.trim();
+  const ok =
+    /^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$/.test(name) &&
+    !name.includes("..") &&
+    !name.includes("//") &&
+    !name.endsWith("/") &&
+    !name.endsWith(".lock");
+  return ok ? name : null;
+}
+
+/** The repositories the token can reach, most recently pushed first. */
+export async function listRepos(token: string): Promise<RepoChoice[]> {
+  const gh = client(token);
+  const found: RepoChoice[] = [];
+  for (let page = 1; page <= 3; page++) {
+    const batch = await gh.json<
+      { full_name: string; private: boolean; default_branch: string; archived?: boolean }[]
+    >("GET", `/user/repos?per_page=100&sort=pushed&page=${page}`);
+    for (const repo of batch) {
+      if (!repo.archived && parseRepo(repo.full_name)) {
+        found.push({
+          name: repo.full_name,
+          private: repo.private,
+          defaultBranch: repo.default_branch,
+        });
+      }
+    }
+    if (batch.length < 100) break;
+  }
+  return found;
+}
+
+/** A repository's branches (the first hundred), and which one is its default. */
+export async function listBranches(
+  token: string,
+  repo: string,
+): Promise<{ branches: string[]; defaultBranch: string }> {
+  const gh = client(token);
+  const [about, branches] = await Promise.all([
+    gh.json<{ default_branch: string }>("GET", `/repos/${repo}`),
+    gh.json<{ name: string }[]>("GET", `/repos/${repo}/branches?per_page=100`),
+  ]);
+  const names = branches.map((b) => b.name).filter((name) => !name.startsWith("ogchat/"));
+  return {
+    defaultBranch: about.default_branch,
+    branches: [about.default_branch, ...names.filter((n) => n !== about.default_branch)],
+  };
+}
+
 /** The branch a chat's changes go to. */
 export function workBranch(sessionId: string): string {
   return `ogchat/${sessionId.slice(0, 8)}`;
@@ -175,11 +228,13 @@ export function githubTools(options: {
   token: string;
   repo: string;
   sessionId: string;
+  /** The branch the chat's work starts from; the repository's default if not given. */
+  baseBranch?: string | null;
 }): ClaudeTool[] {
   const { token, repo } = options;
   const branch = workBranch(options.sessionId);
   // Found out once a chat, when first needed.
-  let base: string | null = null;
+  let base: string | null = options.baseBranch ?? null;
   let branched: boolean | null = null;
 
   const defaultBranch = async (gh: Client) => {
@@ -342,6 +397,54 @@ export function githubTools(options: {
       },
     ),
     tool(
+      "edit_file",
+      `Change part of a file in the GitHub repository ${repo} without sending the whole file: give the exact text to replace and what to put in its place. The text must appear in the file exactly once, so include enough of the surrounding lines to make it unique. Committed to the branch ${branch}. Prefer this to write_file for a change to an existing file.`,
+      {
+        path: { type: "string", description: "File path inside the repository." },
+        old_text: {
+          type: "string",
+          description: "The exact text to replace, as it is in the file now.",
+        },
+        new_text: { type: "string", description: "What to put in its place." },
+        message: { type: "string", description: "A one-line commit message." },
+      },
+      ["path", "old_text", "new_text", "message"],
+      (input) => `editing ${String(input.path)}`,
+      async (gh, input) => {
+        const path = repoPath(input.path);
+        const from = String(input.old_text);
+        if (!from) return "Give the text to replace.";
+        const ref = await readRef(gh);
+        const response = await gh.call(
+          "GET",
+          `/repos/${repo}/contents/${path}?ref=${encodeURIComponent(ref)}`,
+          undefined,
+          "application/vnd.github.raw+json",
+        );
+        if (response.status === 404) return "There is no file at that path.";
+        if (!response.ok)
+          throw new GitHubError(`GitHub answered ${response.status}.`, response.status);
+        const body = await response.text();
+        const count = body.split(from).length - 1;
+        if (count === 0)
+          return "That text is not in the file. Read the file again and copy the text exactly, spaces and line breaks included.";
+        if (count > 1)
+          return `That text appears ${count} times in the file. Include more of the lines around it so that it is unique.`;
+        const content = body.replace(from, () => String(input.new_text));
+        if (content.length > MAX_WRITE_CHARS)
+          throw new GitHubError("That file is too large to write.");
+        await ensureBranch(gh);
+        const sha = await shaOf(gh, path);
+        await gh.json("PUT", `/repos/${repo}/contents/${path}`, {
+          message: String(input.message).split("\n")[0]!.slice(0, 200) || "Edit file",
+          content: Buffer.from(content, "utf8").toString("base64"),
+          branch,
+          ...(sha ? { sha } : {}),
+        });
+        return `Edited ${String(input.path)} on branch ${branch}.`;
+      },
+    ),
+    tool(
       "delete_file",
       `Delete a file from the GitHub repository ${repo}, on the branch ${branch} only.`,
       {
@@ -407,13 +510,18 @@ export function githubTools(options: {
 }
 
 /** What Claude is told about the repository it has been given, ahead of the conversation. */
-export function repoBriefing(repo: string, sessionId: string): string {
+export function repoBriefing(repo: string, sessionId: string, baseBranch?: string | null): string {
   return [
-    `You are connected to the GitHub repository ${repo} through the tools list_files, read_file, search_code, write_file, delete_file and open_pull_request.`,
+    `You are connected to the GitHub repository ${repo} through the tools list_files, read_file, search_code, edit_file, write_file, delete_file and open_pull_request.`,
+    baseBranch
+      ? `This chat works from the branch ${baseBranch}: that is what you read until you have written something, and what a pull request goes into.`
+      : "",
     "Look before you answer: read the files a question is about instead of guessing at them, and read a file before you change it.",
-    `Anything you write or delete is committed straight away to the branch ${workBranch(sessionId)}. You cannot write to the default branch. Give write_file the whole file, not a fragment.`,
+    `Anything you write or delete is committed straight away to the branch ${workBranch(sessionId)}. You cannot write to any other branch. To change an existing file use edit_file with the exact text to replace; use write_file for a new file or a complete rewrite, and give it the whole file.`,
     "Make only the changes that were asked for. Say plainly which files you changed.",
     "Open a pull request only when the user asks for one or agrees to it; merging it is theirs to do.",
     "Earlier turns of this conversation carry only what was said, not the files you read: read a file again if you need its contents.",
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }

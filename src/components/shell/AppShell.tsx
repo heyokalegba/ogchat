@@ -30,12 +30,17 @@ import { trafficAt } from "./life";
 import { useAmbience } from "./useAmbience";
 import { useWeather } from "./useWeather";
 import type {
+  Environment,
   Project,
   PublicSettings,
   ReasoningEffort,
+  RepoChoice,
   SessionMeta,
   SessionModel,
+  SessionWork,
 } from "@/lib/types";
+import { EnvironmentsPanel } from "./EnvironmentsPanel";
+import { WorkBar } from "./WorkBar";
 import { SCENES, type SceneId } from "./art";
 import { Backdrop } from "./Backdrop";
 import { DEFAULT_LOOK, loadLook, lookVariables, saveLook, type Look } from "./look";
@@ -63,6 +68,8 @@ function writeUrl(id: string | null, mode: "push" | "replace"): void {
   if (mode === "push") window.history.pushState(null, "", url);
   else window.history.replaceState(null, "", url);
 }
+
+const NO_WORK: SessionWork = { repo: null, branch: null, environmentId: null };
 
 function newestFirst(a: SessionMeta, b: SessionMeta): number {
   return b.updatedAt.localeCompare(a.updatedAt) || b.createdAt.localeCompare(a.createdAt);
@@ -111,6 +118,12 @@ export function AppShell() {
   /** The model a chat not yet started will be set to, if one was picked for it. */
   const [startModel, setStartModel] = useState<SessionModel | null>(null);
   const [startReasoning, setStartReasoning] = useState<ReasoningEffort | null>(null);
+  /** Where a chat not yet started will work, as far as that has been picked for it. */
+  const [startWork, setStartWork] = useState<SessionWork>(NO_WORK);
+  /** What there is to pick from: the token's repositories, and the environments. */
+  const [repos, setRepos] = useState<RepoChoice[] | null>(null);
+  const [environments, setEnvironments] = useState<Environment[]>([]);
+  const [environmentsOpen, setEnvironmentsOpen] = useState(false);
 
   const refreshSessions = useCallback(
     async (q: string, signal?: AbortSignal) => {
@@ -153,6 +166,7 @@ export function AppShell() {
       () => {},
     );
     api.getSettings().then(setSettings, () => {});
+    api.listEnvironments().then(setEnvironments, () => {});
     api.getWorld().then(
       (world) => setBuiltAt(Date.parse(world.builtAt)),
       () => {},
@@ -254,6 +268,7 @@ export function AppShell() {
     setActiveId(id);
     setStartModel(null);
     setStartReasoning(null);
+    setStartWork(NO_WORK);
     setOpenToken((n) => n + 1);
     setSidebarOpen(false);
     if (sessionFromUrl() !== id) writeUrl(id, "push");
@@ -367,6 +382,35 @@ export function AppShell() {
       setActiveMeta((current) => (current?.id === id ? { ...current, reasoning } : current));
       setSessions((current) => current.map((s) => (s.id === id ? { ...s, reasoning } : s)));
       api.setSessionReasoning(id, reasoning).then(onSessionUpdated, () => {
+        void refreshSessions(queryRef.current);
+      });
+    },
+    [api, onSessionUpdated, refreshSessions],
+  );
+
+  // The repositories the GitHub token reaches: asked for once there is a token, and again if it changes.
+  const tokenMark = settings?.github.set ? settings.github.masked : null;
+  useEffect(() => {
+    setRepos(null);
+    if (!tokenMark) return;
+    let current = true;
+    api.listRepos().then(
+      (list) => current && setRepos(list),
+      () => current && setRepos([]),
+    );
+    return () => {
+      current = false;
+    };
+  }, [api, tokenMark]);
+
+  /** The bar above the message box: this chat's repository, branch and environment. */
+  const onWorkChange = useCallback(
+    (patch: Partial<SessionWork>) => {
+      const id = activeIdRef.current;
+      if (!id) return setStartWork((current) => ({ ...current, ...patch }));
+      setActiveMeta((current) => (current?.id === id ? { ...current, ...patch } : current));
+      setSessions((current) => current.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+      api.setSessionWork(id, patch).then(onSessionUpdated, () => {
         void refreshSessions(queryRef.current);
       });
     },
@@ -638,6 +682,23 @@ export function AppShell() {
               onModelChange={onModelChange}
               startModel={startModel}
               startReasoning={startReasoning}
+              startWork={startWork}
+              above={
+                settings && model?.provider === "claude" && provider?.ready ? (
+                  <WorkBar
+                    api={api}
+                    github={settings.github.set}
+                    runCode={settings.runCode.enabled}
+                    repos={repos}
+                    environments={environments}
+                    work={activeId ? (activeSession ?? NO_WORK) : startWork}
+                    projectRepo={titleProject?.repo ?? null}
+                    onChange={onWorkChange}
+                    onOpenSettings={openSettings}
+                    onEditEnvironments={() => setEnvironmentsOpen(true)}
+                  />
+                ) : null
+              }
               projectId={projectId}
               reasoning={
                 (activeId ? activeSession?.reasoning : startReasoning) ?? settings?.reasoning
@@ -698,6 +759,16 @@ export function AppShell() {
             if (projectRef.current === id) onProjectChange(null);
             else void refreshSessions(queryRef.current);
           }}
+        />
+      )}
+
+      {environmentsOpen && (
+        <EnvironmentsPanel
+          api={api}
+          environments={environments}
+          startId={(activeId ? activeSession?.environmentId : startWork.environmentId) ?? null}
+          onClose={() => setEnvironmentsOpen(false)}
+          onChanged={setEnvironments}
         />
       )}
 

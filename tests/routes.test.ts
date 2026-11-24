@@ -132,6 +132,9 @@ describe("sessions API", () => {
         projectId: null,
         model: null,
         reasoning: null,
+        repo: null,
+        branch: null,
+        environmentId: null,
       },
     ]);
   });

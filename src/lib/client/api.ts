@@ -10,7 +10,10 @@ import type {
   SessionMeta,
   SettingsCheck,
   StreamEvent,
+  Environment,
+  RepoChoice,
   SessionModel,
+  SessionWork,
 } from "@/lib/types";
 import type { DayRecord, Reading } from "@/lib/weather";
 
@@ -58,7 +61,17 @@ export interface ChatApi {
     projectId?: string | null,
     model?: SessionModel | null,
     reasoning?: ReasoningEffort | null,
+    work?: Partial<SessionWork> | null,
   ): Promise<Session>;
+  /** Sets where a chat works: its repository, branch and environment. Null clears one. */
+  setSessionWork(id: string, work: Partial<SessionWork>): Promise<SessionMeta>;
+  /** The repositories the GitHub token in settings can reach. */
+  listRepos(): Promise<RepoChoice[]>;
+  listBranches(repo: string): Promise<{ branches: string[]; defaultBranch: string }>;
+  listEnvironments(): Promise<Environment[]>;
+  createEnvironment(input: Partial<Omit<Environment, "id">>): Promise<Environment>;
+  updateEnvironment(id: string, input: Partial<Omit<Environment, "id">>): Promise<Environment>;
+  deleteEnvironment(id: string): Promise<void>;
   /** Sets how hard a chat's model thinks; null goes back to the level in settings. */
   setSessionReasoning(id: string, reasoning: ReasoningEffort | null): Promise<SessionMeta>;
   /** Sets the model a chat uses; null goes back to the one in settings. */
@@ -166,7 +179,32 @@ export function createApi(base = "/api"): ChatApi {
       return (await data<{ session: SessionMeta }>(`/sessions/${id}`, body("PATCH", { reasoning })))
         .session;
     },
-    async createSession(projectId, model, reasoning) {
+    async setSessionWork(id, work) {
+      return (await data<{ session: SessionMeta }>(`/sessions/${id}`, body("PATCH", work))).session;
+    },
+    async listRepos() {
+      return (await data<{ repos: RepoChoice[] }>("/github/repos")).repos;
+    },
+    listBranches(repo) {
+      return data<{ branches: string[]; defaultBranch: string }>(
+        `/github/branches?repo=${encodeURIComponent(repo)}`,
+      );
+    },
+    async listEnvironments() {
+      return (await data<{ environments: Environment[] }>("/environments")).environments;
+    },
+    async createEnvironment(input) {
+      return (await data<{ environment: Environment }>("/environments", body("POST", input)))
+        .environment;
+    },
+    async updateEnvironment(id, input) {
+      return (await data<{ environment: Environment }>(`/environments/${id}`, body("PATCH", input)))
+        .environment;
+    },
+    async deleteEnvironment(id) {
+      await call(`/environments/${id}`, body("DELETE"));
+    },
+    async createSession(projectId, model, reasoning, work) {
       return (
         await data<{ session: Session }>(
           "/sessions",
@@ -174,6 +212,9 @@ export function createApi(base = "/api"): ChatApi {
             ...(projectId ? { projectId } : {}),
             ...(model ? { model } : {}),
             ...(reasoning ? { reasoning } : {}),
+            ...(work?.repo ? { repo: work.repo } : {}),
+            ...(work?.repo && work.branch ? { branch: work.branch } : {}),
+            ...(work?.environmentId ? { environmentId: work.environmentId } : {}),
           }),
         )
       ).session;

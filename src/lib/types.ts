@@ -59,6 +59,34 @@ export interface SessionMeta {
   model: SessionModel | null;
   /** How hard this chat's model thinks, or null to use the level in settings. */
   reasoning: ReasoningEffort | null;
+  /** The GitHub repository this chat works on ("owner/name"), or null for its project's, if any. */
+  repo: string | null;
+  /** The branch its work starts from, or null for the repository's default branch. */
+  branch: string | null;
+  /** The environment its commands run in, or null for the default one. */
+  environmentId: string | null;
+}
+
+/** Where a chat works: what the bar above the message box sets. */
+export type SessionWork = Pick<SessionMeta, "repo" | "branch" | "environmentId">;
+
+/** A named set-up for the folder Claude runs commands in. */
+export interface Environment {
+  id: string;
+  name: string;
+  /** Whether its commands may use the network. */
+  network: "full" | "none";
+  /** A shell script run once when a chat's workspace is first used. "" for none. */
+  setup: string;
+  /** Variables its commands are given. */
+  vars: Record<string, string>;
+}
+
+/** A repository the GitHub token can reach. */
+export interface RepoChoice {
+  name: string;
+  private: boolean;
+  defaultBranch: string;
 }
 
 /** A model, and which of the two providers it is asked through. */

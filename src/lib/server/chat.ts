@@ -7,6 +7,7 @@ import { beginGeneration, endGeneration, type Generation } from "./generations";
 import { BadRequest, readBody } from "./http";
 import { githubTools, repoBriefing } from "./github";
 import { commandBriefing, commandTool } from "./workspace";
+import { environmentFor } from "./environments";
 import { getProject } from "./projects";
 import { streamReply } from "./reply";
 import { resolveSettings, settingsFor } from "./settings";
@@ -296,16 +297,23 @@ export async function runTurn(
     const settings = settingsFor(turn.session.model);
     const project = turn.session.projectId ? getProject(turn.session.projectId) : null;
     // With Claude, a project tied to a repository, and a GitHub token, Claude gets the repository.
-    const repo = settings.provider === "claude" && settings.githubToken ? project?.repo : undefined;
+    // The repository is the chat's own if it has picked one, otherwise its project's.
+    const repo =
+      settings.provider === "claude" && settings.githubToken
+        ? (turn.session.repo ?? project?.repo)
+        : undefined;
+    const baseBranch = turn.session.repo ? turn.session.branch : null;
+    const environment = environmentFor(turn.session.environmentId);
     // And, if that has been switched on, a way to run commands in a folder kept for the chat.
     const running = settings.provider === "claude" && settings.runCode;
     const given = [
-      ...(repo ? githubTools({ token: settings.githubToken!, repo, sessionId }) : []),
+      ...(repo ? githubTools({ token: settings.githubToken!, repo, sessionId, baseBranch }) : []),
       ...(running
         ? [
             commandTool({
               sessionId,
-              repo: repo ? { name: repo, token: settings.githubToken! } : null,
+              repo: repo ? { name: repo, token: settings.githubToken!, baseBranch } : null,
+              environment,
             }),
           ]
         : []),
@@ -313,8 +321,8 @@ export async function runTurn(
     const tools = given.length ? given : undefined;
     const system = [
       settings.systemPrompt,
-      repo ? repoBriefing(repo, sessionId) : "",
-      running ? commandBriefing(repo ?? null) : "",
+      repo ? repoBriefing(repo, sessionId, baseBranch) : "",
+      running ? commandBriefing(repo ?? null, environment) : "",
     ]
       .filter((part) => part.trim())
       .join("\n\n");

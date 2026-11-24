@@ -1337,3 +1337,106 @@
 .shell.solo .menuButton {
   display: none;
 }
+
+/* ------------------------------------------------- where a chat works */
+
+/* Above the message box: the chat's repository, branch and environment. */
+.workBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  width: 100%;
+  max-width: var(--og-measure, 1240px);
+  margin: 0 auto;
+  padding: 0 24px 6px;
+  font-family: var(--og-font-mono);
+  font-size: calc(12px * var(--og-type));
+  color: var(--og-ink);
+}
+
+.workField {
+  display: inline-flex;
+  align-items: stretch;
+  min-width: 0;
+  border: var(--og-line) solid var(--og-ink);
+  background: rgba(235, 228, 212, 0.92);
+}
+
+.workLabel {
+  display: grid;
+  place-items: center;
+  padding: 0 7px;
+  font-weight: 700;
+  color: #ebe4d4;
+  background: var(--og-ink);
+}
+
+.shell .workInput,
+.shell .workSelect {
+  width: 220px;
+  min-width: 0;
+  height: 24px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+}
+
+.shell .workBranch {
+  width: 130px;
+}
+
+.shell .workSelect {
+  width: auto;
+  max-width: 200px;
+  cursor: pointer;
+}
+
+.shell .workInput::placeholder {
+  color: rgba(23, 23, 26, 0.55);
+}
+
+.shell .workInput[aria-invalid="true"] {
+  color: #8f2a1f;
+  text-decoration: underline wavy;
+}
+
+.shell .workInput:focus-visible,
+.shell .workSelect:focus-visible {
+  outline: 2px solid var(--og-ink);
+  outline-offset: 1px;
+}
+
+.shell .workLink {
+  padding: 2px 7px;
+  font: inherit;
+  color: var(--og-ink);
+  background: rgba(235, 228, 212, 0.78);
+  text-decoration: underline dotted;
+}
+
+.shell .workLink:hover {
+  color: #ebe4d4;
+  background: var(--og-ink);
+}
+
+/* A list to choose from, with a button beside it. */
+.workRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.workRow .textInput {
+  flex: 1;
+}
+
+.codeArea {
+  min-height: 96px;
+  font-family: var(--og-font-mono);
+  font-size: 13px;
+  white-space: pre;
+}

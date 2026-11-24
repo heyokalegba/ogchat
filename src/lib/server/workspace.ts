@@ -1,8 +1,10 @@
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { ClaudeTool } from "@/lib/provider/claude";
+import type { Environment } from "@/lib/types";
 import { workBranch } from "./github";
 import { dataDir, settingsFile } from "./paths";
 
@@ -121,6 +123,8 @@ export function sandboxProfile(options: {
   secrets: string[];
   /** Further folders that may be read (where node itself lives, say). */
   readable: string[];
+  /** False to cut the command off from the network. */
+  network?: boolean;
 }): string {
   const q = (p: string) => {
     if (/["\\\n]/.test(p)) throw new Error("A path here cannot be written into the sandbox rules.");
@@ -152,11 +156,12 @@ export function sandboxProfile(options: {
     `(allow file-read* ${mine.map((p) => `(subpath ${p})`).join(" ")})`,
     // The repository copy's git data: readable, never writable.
     `(allow file-read* (subpath ${q(ws.git)}))`,
+    ...(options.network === false ? ["(deny network*)"] : []),
     "",
   ].join("\n");
 }
 
-function profileFor(ws: Workspace): string {
+function profileFor(ws: Workspace, network: boolean): string {
   const home = real(os.homedir());
   const node = real(path.dirname(path.dirname(process.execPath)));
   const data = real(dataDir());
@@ -170,6 +175,7 @@ function profileFor(ws: Workspace): string {
   return sandboxProfile({
     ws: realWs,
     home,
+    network,
     // The whole data folder (settings, chats, other chats' workspaces) and the project's env files.
     secrets: [data, real(settingsFile()), path.join(real(process.cwd()), ".env.local")],
     // Where the node running ogchat lives, if that is under the home folder.
@@ -178,7 +184,7 @@ function profileFor(ws: Workspace): string {
 }
 
 /** The environment a command gets: enough to find tools, and nothing of yours. */
-function commandEnv(ws: Workspace): Record<string, string> {
+function commandEnv(ws: Workspace, vars: Record<string, string> = {}): Record<string, string> {
   const dirs = [
     path.dirname(process.execPath),
     ...(process.env.PATH ?? "").split(path.delimiter),
@@ -190,6 +196,8 @@ function commandEnv(ws: Workspace): Record<string, string> {
     "/sbin",
   ].filter(Boolean);
   return {
+    // The environment's own variables first: the ones below are not theirs to change.
+    ...vars,
     PATH: [...new Set(dirs)].join(path.delimiter),
     HOME: ws.home,
     TMPDIR: ws.tmp,
@@ -218,7 +226,15 @@ function clip(output: string): string {
 export function runCommand(
   ws: Workspace,
   command: string,
-  options: { seconds?: number; signal?: AbortSignal; sandbox?: Sandbox } = {},
+  options: {
+    seconds?: number;
+    signal?: AbortSignal;
+    sandbox?: Sandbox;
+    /** Variables the command is given, from its environment. */
+    vars?: Record<string, string>;
+    /** False to cut it off from the network. Only the Mac sandbox can do that. */
+    network?: boolean;
+  } = {},
 ): Promise<CommandResult> {
   prepare(ws);
   const sandbox = options.sandbox ?? sandboxKind();
@@ -228,14 +244,16 @@ export function runCommand(
   );
   const shell = ["/bin/bash", "-c", command];
   const [file, ...args] =
-    sandbox === "macos" ? ["/usr/bin/sandbox-exec", "-p", profileFor(ws), ...shell] : shell;
+    sandbox === "macos"
+      ? ["/usr/bin/sandbox-exec", "-p", profileFor(ws, options.network !== false), ...shell]
+      : shell;
   return new Promise((resolve) => {
     let output = "";
     let stopped: CommandResult["stopped"] = null;
     let done = false;
     const child = spawn(file!, args, {
       cwd: ws.work,
-      env: commandEnv(ws) as unknown as NodeJS.ProcessEnv,
+      env: commandEnv(ws, options.vars) as unknown as NodeJS.ProcessEnv,
       detached: true, // a process group of its own, so that everything it started can be stopped
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -328,7 +346,14 @@ function git(ws: Workspace, token: string, args: string[], signal?: AbortSignal)
  */
 export async function syncRepo(
   ws: Workspace,
-  options: { token: string; repo: string; sessionId: string; signal?: AbortSignal },
+  options: {
+    token: string;
+    repo: string;
+    sessionId: string;
+    /** The branch the chat works from; the repository's default if not given. */
+    baseBranch?: string | null;
+    signal?: AbortSignal;
+  },
 ): Promise<string> {
   prepare(ws);
   const { token, signal } = options;
@@ -349,8 +374,10 @@ export async function syncRepo(
       signal,
     ))
   ) {
-    from = "the default branch";
-    if (!(await git(ws, token, ["fetch", "--quiet", "--depth", "1", remote, "HEAD"], signal))) {
+    const base = options.baseBranch;
+    from = base ? `the branch ${base}` : "the default branch";
+    const ref = base ? `refs/heads/${base}` : "HEAD";
+    if (!(await git(ws, token, ["fetch", "--quiet", "--depth", "1", remote, ref], signal))) {
       throw new Error(
         `The repository ${options.repo} could not be copied here. The GitHub token may not cover it.`,
       );
@@ -364,12 +391,55 @@ export async function syncRepo(
   return from;
 }
 
+// ------------------------------------------------------------------- the setup
+
+/**
+ * Runs an environment's setup script in a workspace, once: the first time
+ * the workspace is used with it, and again only if the script has been
+ * changed since. It is given the network whatever the environment says,
+ * since installing things is what it is for. Returns a note for Claude if
+ * it ran, or nothing if it had already.
+ */
+export async function runSetup(
+  ws: Workspace,
+  environment: Environment,
+  signal?: AbortSignal,
+): Promise<string> {
+  prepare(ws);
+  const stamp = path.join(ws.root, "setup.json");
+  const mark = createHash("sha256").update(environment.setup).digest("hex");
+  try {
+    if ((JSON.parse(fs.readFileSync(stamp, "utf8")) as { mark?: string }).mark === mark) return "";
+  } catch {
+    // never run here
+  }
+  const script = path.join(ws.tmp, "ogchat-setup.sh");
+  fs.writeFileSync(script, `${environment.setup}\n`);
+  const result = await runCommand(ws, `bash '${script.replaceAll("'", "'\\''")}'`, {
+    seconds: MAX_SECONDS,
+    signal,
+    vars: environment.vars,
+    network: true,
+  });
+  fs.rmSync(script, { force: true });
+  if (result.code === 0) {
+    fs.writeFileSync(stamp, JSON.stringify({ mark, at: new Date().toISOString() }));
+    return `[the environment "${environment.name}" was set up first: its setup script ran and finished]\n`;
+  }
+  const how = result.stopped
+    ? "was stopped before it finished"
+    : `failed with exit code ${result.code}`;
+  return `[the setup script of the environment "${environment.name}" ${how}; it will be tried again next time. Its output:\n${result.output.trim().slice(-3000)}]\n`;
+}
+
 // -------------------------------------------------------------------- the tool
 
 /** The run_command tool for one chat. With `repo`, the workspace holds a copy of that repository. */
 export function commandTool(options: {
   sessionId: string;
-  repo?: { name: string; token: string } | null;
+  repo?: { name: string; token: string; baseBranch?: string | null } | null;
+  /** The environment the chat picked: its setup script, variables and network. */
+  environment?: Environment | null;
 }): ClaudeTool {
   const ws = workspaceFor(options.sessionId);
   const repo = options.repo ?? null;
@@ -412,13 +482,21 @@ export function commandTool(options: {
           token: repo.token,
           repo: repo.name,
           sessionId: options.sessionId,
+          baseBranch: repo.baseBranch,
           signal,
         });
         note = `[the copy is at ${from}]\n`;
       }
+      const environment = options.environment ?? null;
+      if (environment?.setup) {
+        const setup = await runSetup(ws, environment, signal);
+        if (setup) note += setup;
+      }
       const result = await runCommand(ws, String(input.command), {
         seconds: typeof input.timeout_seconds === "number" ? input.timeout_seconds : undefined,
         signal,
+        vars: environment?.vars,
+        network: environment?.network !== "none",
       });
       const how =
         result.stopped === "timeout"
@@ -431,14 +509,19 @@ export function commandTool(options: {
   };
 }
 
-export function commandBriefing(repo: string | null): string {
+export function commandBriefing(repo: string | null, environment?: Environment | null): string {
   return [
+    environment && environment.id !== "default"
+      ? `Commands run in the environment "${environment.name}"${environment.network === "none" ? ", which has no network access: nothing can be downloaded or installed from a command" : ""}.`
+      : "",
     "You can run shell commands on the user's computer with run_command. They run in a folder kept for this chat, with no access to the user's own files.",
     repo
       ? `That folder holds a copy of ${repo}. Use it to check your work: after changing code with write_file, run the project's tests or build if it has them, and say what the result was. Editing files with a command does not save them; only write_file does.`
       : "Use it when running something settles a question better than reasoning about it.",
     "Report what a command actually printed. If it failed, say so and show the relevant part.",
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 /**

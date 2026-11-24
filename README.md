@@ -419,6 +419,43 @@ to the browser, to Anthropic, or anywhere but `api.github.com`. Claude is told
 the repository's name, never the token. The limit on what can go wrong is the
 token itself, which is why it should cover only the repositories you chose.
 
+### Picking the repository, branch and environment for a chat
+
+With Claude as the chat's model, a bar sits just above the message box:
+
+- **repo**: the repository this chat works on. Click it for the list of
+  repositories your token reaches, or type `owner/name`. No project is needed.
+  Left empty, a chat in a project uses the project's repository.
+- **branch**: the branch the work starts from, and the one a pull request goes
+  into. Empty means the repository's default branch. Claude's own changes still
+  go only to the chat's `ogchat/...` branch.
+- **env**: the environment its commands run in (shown once _Let Claude run
+  code_ is on).
+
+Each chat keeps its own, so two chats, or two windows, can be at work on
+different repositories at once. Set them before the first message or change
+them later.
+
+An **environment** is a named set-up for the folder commands run in. Choose
+_edit environments…_ in the env list to make one:
+
+- **Setup script**: shell commands run once in a chat's folder, inside its
+  copy of the repository, before Claude's first command there (`npm install`,
+  `pip install -r requirements.txt`). Run again if you change the script.
+- **Variables**: `NAME=value` lines given to the setup script and to every
+  command. Kept in `data/environments.json`, readable only by you. Claude can
+  see them by running a command, so put a key there only if you mean it to be
+  used.
+- **Network**: allowed, or none. With none, commands cannot reach the network,
+  so nothing they read can be sent anywhere; the setup script still can, to
+  install what they need. This is enforced by the Mac sandbox and cannot be on
+  other systems.
+
+The `Default` environment has no setup, no variables, and the network.
+
+Claude also has `edit_file`, which changes one piece of a file by giving the
+text to replace: quicker and far cheaper than sending a whole file back.
+
 ### Letting Claude run code
 
 Off unless you switch it on: **Let Claude run code**, in settings under the
@@ -687,6 +724,7 @@ src/
     provider/claude.ts             the only module that talks to Claude (Anthropic's SDK)
     server/github.ts               the repository tools Claude is given, and the only module that talks to GitHub
     server/workspace.ts            running commands for Claude: the per-chat folder, the sandbox, the repository copy
+    server/environments.ts         environments: a setup script, variables and a network switch for a chat's folder
     daylight.ts                    sun, moon and clock over Brooklyn
     server/                        persistence, projects, settings, turn handling, request guard
     client/api.ts                  browser client for the routes above

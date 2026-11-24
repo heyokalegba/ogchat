@@ -14,9 +14,11 @@ import {
   isEffort,
   setSessionModel,
   setSessionReasoning,
+  setSessionWork,
   toMeta,
 } from "@/lib/server/store";
 import { cleanSessionModel } from "@/lib/server/settings";
+import { parseWork } from "@/lib/server/work";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -45,7 +47,8 @@ export async function GET(request: Request, { params }: Context): Promise<Respon
  * `projectId` files the session under a project; null takes it out of one.
  * `model` is { provider, model }, the model this chat uses; null goes back to
  * the one in settings. `reasoning` is this chat's thinking level, or null for
- * the level in settings.
+ * the level in settings. `repo`, `branch` and `environmentId` say where the chat
+ * works; null or "" clears one.
  */
 export async function PATCH(request: Request, { params }: Context): Promise<Response> {
   const blocked = guard(request);
@@ -76,8 +79,15 @@ export async function PATCH(request: Request, { params }: Context): Promise<Resp
       session =
         setSessionReasoning(id, isEffort(body.reasoning) ? body.reasoning : null) ?? session;
     }
+    const work = parseWork(body);
+    if (typeof work === "string") return errorJson(400, "bad_work", work);
+    const placed = Object.keys(work).length > 0;
+    if (placed) session = setSessionWork(id, work) ?? session;
     const only =
-      body.projectId === undefined && body.model === undefined && body.reasoning === undefined;
+      body.projectId === undefined &&
+      body.model === undefined &&
+      body.reasoning === undefined &&
+      !placed;
     if (body.title !== undefined || only) {
       const title = cleanTitle(body.title);
       if (!title) return errorJson(400, "bad_title", "Title must not be empty.");

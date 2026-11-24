@@ -10,6 +10,7 @@ import {
   useState,
   type DragEvent,
   type KeyboardEvent,
+  type ReactNode,
 } from "react";
 import { createApi } from "@/lib/client/api";
 import type {
@@ -18,6 +19,7 @@ import type {
   ReasoningEffort,
   SessionMeta,
   SessionModel,
+  SessionWork,
 } from "@/lib/types";
 import { BootLine } from "./BootLine";
 import styles from "./chat.module.css";
@@ -51,6 +53,10 @@ export interface ChatSurfaceProps {
   startModel?: SessionModel | null;
   /** Likewise the thinking level a conversation not yet saved starts with. */
   startReasoning?: ReasoningEffort | null;
+  /** Likewise where it works: repository, branch, environment. */
+  startWork?: Partial<SessionWork> | null;
+  /** Shown just above the message box: the shell puts the repository and environment pickers here. */
+  above?: ReactNode;
   /** How hard the model thinks, and what to do when the composer changes it. */
   reasoning?: ReasoningEffort;
   onReasoningChange?: (next: ReasoningEffort) => void;
@@ -121,6 +127,7 @@ export function ChatSurface(props: ChatSurfaceProps) {
     projectId: props.projectId,
     model: props.startModel,
     startReasoning: props.startReasoning,
+    startWork: props.startWork,
     onSessionCreated: props.onSessionCreated,
     onSessionUpdated: props.onSessionUpdated,
     onSessionMissing: props.onSessionMissing,
@@ -402,6 +409,7 @@ export function ChatSurface(props: ChatSurfaceProps) {
         </div>
       </div>
 
+      {props.above}
       <Composer
         value={chat.draft}
         onChange={chat.setDraft}

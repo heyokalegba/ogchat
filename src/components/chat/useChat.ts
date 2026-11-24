@@ -13,6 +13,7 @@ import type {
   SessionMeta,
   SessionModel,
   SessionSummary,
+  SessionWork,
   StreamEvent,
 } from "@/lib/types";
 
@@ -53,6 +54,8 @@ export interface UseChatOptions {
   model?: SessionModel | null;
   /** The thinking level a new conversation is set to, if not the one in settings. */
   startReasoning?: ReasoningEffort | null;
+  /** Where a new conversation works: its repository, branch and environment, if picked. */
+  startWork?: Partial<SessionWork> | null;
   onSessionCreated?: (session: SessionMeta) => void;
   onSessionUpdated?: (session: SessionMeta) => void;
   onSessionMissing?: (sessionId: string) => void;
@@ -63,8 +66,8 @@ const WEB_KEY = "ogchat:web";
 const STOP_GRACE_MS = 2500;
 
 function metaOf(session: Session): SessionMeta {
-  const { id, title, createdAt, updatedAt, messageCount, projectId, model, reasoning } = session;
-  return { id, title, createdAt, updatedAt, messageCount, projectId, model, reasoning };
+  const { messages: _messages, summary: _summary, ...meta } = session;
+  return meta;
 }
 
 /** Requests the server refused because of what was sent; sending the same thing again cannot work. */
@@ -388,6 +391,7 @@ export function useChat(options: UseChatOptions) {
             callbacks.current.projectId ?? null,
             callbacks.current.model ?? null,
             callbacks.current.startReasoning ?? null,
+            callbacks.current.startWork ?? null,
           );
           if (epochRef.current !== epoch) {
             // The user moved on before the session existed; do not leave an empty one behind.
