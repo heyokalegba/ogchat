@@ -41,8 +41,10 @@ export interface ClaudeTurn {
   model: string;
   /** The conversation as the other adapter takes it: a system message first, if any. */
   messages: ProviderMessage[];
-  /** "low" | "medium" | "high" | "max", or null to leave it to the model. */
+  /** "low" | "medium" | "high" | "xhigh" | "max", or null to leave it to the model. */
   effort?: string | null;
+  /** Called with the id of the model that is answering, as the API reports it. */
+  onModel?: (id: string) => void;
   /** Let Claude search the web (Anthropic runs the search and bills it). */
   webSearch?: boolean;
   tools?: ClaudeTool[];
@@ -56,12 +58,8 @@ export interface ClaudeTurn {
 }
 
 /** Current Claude models, for the settings panel to offer. Any other id can be typed. */
-export const CLAUDE_MODELS = [
-  { id: "claude-opus-5-5", label: "Claude Opus 5.5" },
-  { id: "claude-sonnet-5-5", label: "Claude Sonnet 5.5" },
-  { id: "claude-haiku-5-5", label: "Claude Haiku 5.5" },
-  { id: "claude-fable-5-2", label: "Claude Fable 5.2" },
-] as const;
+export { CLAUDE_MODELS } from "@/lib/models";
+type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 const API = "https://api.anthropic.com";
 /** Some keys cover every workspace of an account; Anthropic then has to be told which one. */
 function workspaceHeader(workspace?: string | null) {
@@ -237,9 +235,7 @@ export async function* streamClaude(turn: ClaudeTurn): AsyncGenerator<string, vo
       ...(tools.length ? { tools } : {}),
       // Thinking is on for every current model; this asks to be shown a summary of it.
       ...(old ? {} : { thinking: { type: "adaptive", display: "summarized" } }),
-      ...(turn.effort && !old
-        ? { output_config: { effort: turn.effort as "low" | "medium" | "high" | "max" } }
-        : {}),
+      ...(turn.effort && !old ? { output_config: { effort: turn.effort as Effort } } : {}),
       // If the model declines on policy grounds, the API may pass the request to another.
       ...(fallback ? { betas: [FALLBACK_BETA], fallbacks: "default" as const } : {}),
     };
@@ -249,6 +245,10 @@ export async function* streamClaude(turn: ClaudeTurn): AsyncGenerator<string, vo
     try {
       const stream = client.beta.messages.stream(params, { signal: turn.signal });
       for await (const event of stream) {
+        // Which model took it: the one asked for, or another if a declined request was handed on.
+        if (event.type === "message_start" && event.message?.model) {
+          turn.onModel?.(event.message.model);
+        }
         if (event.type !== "content_block_delta") continue;
         if (event.delta.type === "text_delta") {
           said += event.delta.text;

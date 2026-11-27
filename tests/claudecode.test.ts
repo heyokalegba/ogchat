@@ -153,6 +153,28 @@ describe("a turn with Claude Code", () => {
     expect(run!.args.join(" ")).not.toContain("skip-permissions");
   });
 
+  it("is given Fable 5.2 by its full id, and says which model an alias came to", async () => {
+    const runs = logged();
+    const base = { setup: setup(), messages: [user("hi")], cwd: temp() };
+    const pinned: string[] = [];
+    await collect(
+      streamClaudeCode({
+        ...base,
+        model: "claude-fable-5-2",
+        effort: "xhigh",
+        onModel: (id) => pinned.push(id),
+      }),
+    );
+    const alias: string[] = [];
+    await collect(streamClaudeCode({ ...base, model: "fable", onModel: (id) => alias.push(id) }));
+    const [one] = runs();
+    expect(one!.args.join(" ")).toContain("--model claude-fable-5-2");
+    expect(one!.args.join(" ")).toContain("--effort xhigh");
+    expect(pinned[0]).toBe("claude-fable-5-2");
+    // The fake, like an older Claude Code, takes "fable" to be Fable 5.1.
+    expect(alias[0]).toBe("claude-fable-5-1");
+  });
+
   it("carries a session on, and is given no more than its permission allows", async () => {
     const runs = logged();
     const base = {
@@ -328,7 +350,7 @@ describe("Claude Code, through the app", () => {
     expect(settings.choices).toContainEqual({
       provider: "claudecode",
       model: "opus",
-      label: "Claude Code · Opus",
+      label: "Claude Code · Opus (its newest)",
       ready: true,
     });
     const check = async (body: unknown) =>
@@ -377,6 +399,13 @@ describe("Claude Code, through the app", () => {
     ).toMatchObject({
       content: "Looking at it.\n\nDone (new).",
       thinking: expect.stringContaining("[reading README.md]"),
+      // The alias it was set to, and the model Claude Code said that meant.
+      ranOn: {
+        provider: "claudecode",
+        requested: "sonnet",
+        model: "claude-sonnet-5-5",
+        effort: "max",
+      },
     });
     await send(session.id, "and again");
     const [one, two] = runs();

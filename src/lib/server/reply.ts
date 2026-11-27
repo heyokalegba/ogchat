@@ -3,7 +3,31 @@ import { streamClaude, type ClaudeTool } from "@/lib/provider/claude";
 import path from "node:path";
 import { streamClaudeCode } from "./claudecode";
 import { dataDir } from "./paths";
-import { codeSetup, type ResolvedSettings } from "./settings";
+import { activeModel, codeSetup, type ResolvedSettings } from "./settings";
+import type { RanOn } from "@/lib/types";
+
+/**
+ * The thinking level that is really sent for a turn, or null for none. Claude
+ * Haiku 4.5 takes no effort at all, and the OpenAI shape has no "xhigh", so it
+ * goes as "high" there.
+ */
+export function effortSent(settings: ResolvedSettings, reasoning?: string | null): string | null {
+  if (!reasoning || reasoning === "default") return null;
+  if (settings.provider === "claude" && /^claude-haiku-4/.test(settings.claudeModel)) return null;
+  if (settings.provider === "compatible" && reasoning === "xhigh") return "high";
+  return reasoning;
+}
+
+/** What a turn is about to be sent to, before the provider has said anything. */
+export function ranOnFor(settings: ResolvedSettings, reasoning?: string | null): RanOn {
+  const requested = activeModel(settings).model;
+  return {
+    provider: settings.provider,
+    requested,
+    model: requested,
+    effort: effortSent(settings, reasoning),
+  };
+}
 
 /**
  * One reply from whichever provider is chosen in settings: any
@@ -19,6 +43,8 @@ export function streamReply(
     reasoning?: string;
     webSearch?: boolean;
     onThinking?: (text: string) => void;
+    /** Called with the model the provider says is answering, when it says. */
+    onModel?: (id: string) => void;
     tools?: ClaudeTool[];
     /**
      * For Claude Code: the folder it works in, the session of its own to
@@ -33,7 +59,7 @@ export function streamReply(
     };
   } = {},
 ): AsyncGenerator<string, void, void> {
-  const effort = !options.reasoning || options.reasoning === "default" ? null : options.reasoning;
+  const effort = effortSent(settings, options.reasoning);
   if (settings.provider === "claudecode") {
     return streamClaudeCode({
       setup: codeSetup(settings),
@@ -47,6 +73,7 @@ export function streamReply(
       oneOff: !options.code,
       signal: options.signal,
       onThinking: options.onThinking,
+      onModel: options.onModel,
     });
   }
   if (settings.provider === "claude") {
@@ -60,6 +87,7 @@ export function streamReply(
       tools: options.tools,
       signal: options.signal,
       onThinking: options.onThinking,
+      onModel: options.onModel,
       // For trials against a stand-in, and for anyone who reaches Anthropic through a proxy.
       baseUrl: process.env.OGCHAT_ANTHROPIC_URL?.trim() || null,
     });

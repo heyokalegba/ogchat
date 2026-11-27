@@ -16,16 +16,7 @@ import { PendingFiles } from "./Attachments";
 import { BlockCaret } from "./BlockCaret";
 import styles from "./chat.module.css";
 import { GlobeIcon, PaperclipIcon, SendIcon, StopIcon } from "./icons";
-
-/** The thinking levels the composer steps through. "low" is in settings for those who want it. */
-const THINKING: ReasoningEffort[] = ["default", "medium", "high", "max"];
-const THINKING_LABEL: Record<ReasoningEffort, string> = {
-  default: "auto",
-  low: "low",
-  medium: "medium",
-  high: "high",
-  max: "max",
-};
+import { ThinkingMenu } from "./ThinkingMenu";
 
 export interface ComposerProps {
   value: string;
@@ -36,6 +27,8 @@ export interface ComposerProps {
   busy: boolean;
   /** Sending is not possible right now (for example while the session loads). Typing still is. */
   canSend: boolean;
+  /** While a reply is coming, a message can be queued to go when it is done. */
+  canQueue?: boolean;
   inputRef: Ref<HTMLTextAreaElement>;
   /** Files queued to go out with the next message. */
   files: File[];
@@ -47,6 +40,10 @@ export interface ComposerProps {
   /** How hard the model thinks. The control is left out when no handler is given. */
   reasoning?: ReasoningEffort;
   onReasoningChange?: (next: ReasoningEffort) => void;
+  /** The level recommended for the chat's model, marked in the list. */
+  recommendedReasoning?: ReasoningEffort | null;
+  /** What Auto comes to for the chat's model. */
+  autoMeans?: string | null;
   footer?: ReactNode;
 }
 
@@ -54,14 +51,17 @@ export interface ComposerProps {
  * Enter sends, Shift+Enter inserts a newline, Escape stops a reply in progress.
  * Files are attached with the paperclip, by pasting, or by dropping them on the chat.
  * Pasting a lot of text attaches it as a text file rather than filling the box.
- * The globe lets the next message search the web; "think" sets how hard the
- * model reasons before it answers.
+ * The globe lets the next message search the web; "think" opens the thinking
+ * effort levels (Auto, Low, Medium, High, Extra, Max).
  */
 export function Composer(props: ComposerProps) {
   const { value, onChange, onSubmit, onStop, busy, canSend, inputRef, footer } = props;
   const { files, onAddFiles, onRemoveFile, web, onToggleWeb, onReasoningChange } = props;
   const reasoning = props.reasoning ?? "default";
-  const ready = canSend && !busy && (value.trim().length > 0 || files.length > 0);
+  const filled = value.trim().length > 0 || files.length > 0;
+  // While a reply is coming, Enter queues the message instead of sending it.
+  const queueing = busy && Boolean(props.canQueue) && filled;
+  const ready = (canSend && !busy && filled) || queueing;
   const textarea = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
   useImperativeHandle(inputRef, () => textarea.current as HTMLTextAreaElement, []);
@@ -145,19 +145,12 @@ export function Composer(props: ComposerProps) {
             }}
           />
           {onReasoningChange && (
-            <button
-              type="button"
-              className={`${styles.chip} ${reasoning === "default" ? "" : styles.chipOn}`}
-              onClick={() => {
-                const at = THINKING.indexOf(reasoning);
-                onReasoningChange(THINKING[(at + 1) % THINKING.length]!);
-              }}
-              aria-label={`Thinking: ${THINKING_LABEL[reasoning]}. Press to change.`}
-              title="How hard the model thinks before answering: auto, medium, high, max"
-            >
-              <span className={styles.chipPrefix}>think: </span>
-              {THINKING_LABEL[reasoning]}
-            </button>
+            <ThinkingMenu
+              value={reasoning}
+              onChange={onReasoningChange}
+              recommended={props.recommendedReasoning}
+              autoMeans={props.autoMeans}
+            />
           )}
           <button
             type="button"
@@ -180,6 +173,16 @@ export function Composer(props: ComposerProps) {
           >
             <PaperclipIcon />
           </button>
+          {queueing && (
+            <button
+              type="submit"
+              className={styles.send}
+              aria-label="Queue message"
+              title="Queue: it is sent when this reply is done (Enter)"
+            >
+              <SendIcon />
+            </button>
+          )}
           {busy ? (
             <button
               type="button"

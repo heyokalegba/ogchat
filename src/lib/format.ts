@@ -21,6 +21,15 @@ export function clockTime(iso: string, now = new Date()): string {
   return `${MONTHS[d.getMonth()]} ${d.getDate()}${year} ${time}`;
 }
 
+/** A stretch of time as a stopwatch shows it: "0:07", "2:41", "1:02:09". */
+export function stopwatch(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
+}
+
 /** Compact age for the session list: "now", "5m", "3h", "2d", "nov 12". */
 export function shortAge(iso: string, now = new Date()): string {
   const d = new Date(iso);

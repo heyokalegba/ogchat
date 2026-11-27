@@ -3,12 +3,12 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ApiError, type ChatApi } from "@/lib/client/api";
 import {
-  REASONING_EFFORTS,
   type PublicSettings,
   type ProviderChoice,
   type ReasoningEffort,
   type SettingsCheck,
 } from "@/lib/types";
+import { EFFORT_BLURB, EFFORT_LEVELS } from "@/lib/models";
 import { CloseIcon } from "../chat/icons";
 import styles from "./shell.module.css";
 
@@ -383,8 +383,9 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
                 )}
                 <p className={styles.help}>
                   Opus is the most capable of the usual three and costs the most per message; Sonnet
-                  is about half the price; Haiku is far cheaper and quicker. What you pay is by the
-                  token, on your Anthropic account.
+                  is about half the price; Haiku is far cheaper and quicker. Fable 5.2 is the newest
+                  Fable; Fable 5.1 stays listed for chats that want the earlier one. What you pay is
+                  by the token, on your Anthropic account.
                 </p>
               </div>
 
@@ -622,9 +623,9 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
               value={reasoning}
               onChange={(event) => setReasoning(event.target.value as ReasoningEffort)}
             >
-              {REASONING_EFFORTS.map((effort) => (
-                <option key={effort} value={effort}>
-                  {effort === "default" ? "auto (the provider decides)" : effort}
+              {EFFORT_LEVELS.map((level) => (
+                <option key={level.id} value={level.id}>
+                  {level.name} — {level.hint}
                 </option>
               ))}
             </select>
@@ -633,7 +634,8 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
               the message box.{" "}
               {provider !== "compatible" ? (
                 <>
-                  With Claude, auto leaves it to the model, and its thoughts are shown in summary.
+                  {EFFORT_BLURB} Extra is the API&apos;s <code>xhigh</code>. With Claude, auto
+                  leaves it to the model&apos;s own default, and its thoughts are shown in summary.
                 </>
               ) : (
                 <>

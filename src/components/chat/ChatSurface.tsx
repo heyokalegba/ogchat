@@ -13,6 +13,7 @@ import {
   type ReactNode,
 } from "react";
 import { createApi } from "@/lib/client/api";
+import { describeRanOn, effortFacts, effortName, modelName } from "@/lib/models";
 import type {
   ChatMessage,
   ModelChoice,
@@ -29,6 +30,7 @@ import { copyText } from "./Markdown";
 import { MessageView, StreamingMessage } from "./Message";
 import "./theme.css";
 import { useChat } from "./useChat";
+import { Elapsed } from "./Elapsed";
 
 export interface ChatSurfaceProps {
   /** Session to show; null starts a new conversation that is saved on first send. */
@@ -133,6 +135,14 @@ export function ChatSurface(props: ChatSurfaceProps) {
     onSessionMissing: props.onSessionMissing,
   });
   const { messages, phase, streamText, thinking, thinkingText, error, openCount } = chat;
+  // What the thinking list knows about this chat's model: its default and recommended levels.
+  const facts = props.model ? effortFacts(props.model.provider, props.model.model) : null;
+  const autoMeans =
+    props.model?.provider === "claudecode"
+      ? "Claude Code's own default applies"
+      : facts && props.model
+        ? `${modelName(props.model.model).replace(/^Claude /, "")} runs at ${effortName(facts.default)}`
+        : null;
 
   // Dragging files over the chat: enter/leave fire for every child, so count them.
   const [dropping, setDropping] = useState(false);
@@ -352,7 +362,13 @@ export function ChatSurface(props: ChatSurfaceProps) {
                 </Fragment>
               ))}
               {busy && (
-                <StreamingMessage text={streamText} thinking={thinking} thought={thinkingText} />
+                <StreamingMessage
+                  text={streamText}
+                  thinking={thinking}
+                  thought={thinkingText}
+                  ranOn={chat.ranOn}
+                  startedAt={chat.startedAt}
+                />
               )}
             </div>
 
@@ -409,6 +425,57 @@ export function ChatSurface(props: ChatSurfaceProps) {
         </div>
       </div>
 
+      {chat.queued.length > 0 && (
+        <div className={styles.queue} role="list" aria-label="Queued messages">
+          {chat.queued.map((item) => (
+            <div key={item.id} className={styles.queueItem} role="listitem">
+              <span className={`${styles.tag} ${styles.tagUser}`}>
+                {chat.queuePaused ? "held" : "queued"}&gt;
+              </span>
+              <span className={styles.queueText} title={item.content}>
+                {item.content || item.files.map((file) => file.name).join(", ")}
+              </span>
+              {item.files.length > 0 && item.content && (
+                <span className={styles.queueMeta}>
+                  +{item.files.length} file{item.files.length === 1 ? "" : "s"}
+                </span>
+              )}
+              {idle && chat.queuePaused && (
+                <button
+                  type="button"
+                  className={styles.action}
+                  onClick={() => chat.sendQueued(item.id)}
+                >
+                  send now
+                </button>
+              )}
+              <button
+                type="button"
+                className={styles.action}
+                title="Take it out of the queue and back into the message box"
+                onClick={() => {
+                  chat.unqueue(item.id, true);
+                  inputRef.current?.focus();
+                }}
+              >
+                edit
+              </button>
+              <button
+                type="button"
+                className={styles.action}
+                onClick={() => chat.unqueue(item.id, false)}
+              >
+                remove
+              </button>
+            </div>
+          ))}
+          <p className={styles.queueNote}>
+            {chat.queuePaused
+              ? "Held, because the last reply was stopped or did not finish. Send one to carry on."
+              : "Sent one at a time, each when the reply before it is done."}
+          </p>
+        </div>
+      )}
       {props.above}
       <Composer
         value={chat.draft}
@@ -417,6 +484,7 @@ export function ChatSurface(props: ChatSurfaceProps) {
         onStop={onStop}
         busy={busy}
         canSend={idle}
+        canQueue={busy}
         inputRef={inputRef}
         files={chat.files}
         onAddFiles={chat.addFiles}
@@ -425,10 +493,14 @@ export function ChatSurface(props: ChatSurfaceProps) {
         onToggleWeb={() => chat.setWeb(!chat.web)}
         reasoning={props.reasoning}
         onReasoningChange={props.onReasoningChange}
+        recommendedReasoning={facts?.recommended ?? null}
+        autoMeans={autoMeans}
         footer={
           <div className={styles.hints}>
             <span className={styles.hintKeys}>
-              {busy ? "esc to stop" : "enter to send · shift+enter for a newline"}
+              {busy
+                ? "enter to queue a message · esc to stop"
+                : "enter to send · shift+enter for a newline"}
             </span>
             {chat.context && messages.length > 0 && (
               <ContextMeter
@@ -455,7 +527,21 @@ export function ChatSurface(props: ChatSurfaceProps) {
                   <span className={`${styles.dot} ${busy ? styles.dotBusy : ""}`} />
                   {busy || !props.models || !props.model || !props.onModelChange ? (
                     <span className={styles.statusLabel}>
-                      {busy ? "generating" : provider.model}
+                      {busy ? (
+                        <>
+                          {chat.ranOn
+                            ? `generating · ${describeRanOn(chat.ranOn).short}`
+                            : "generating"}
+                          {chat.startedAt ? (
+                            <>
+                              {" · "}
+                              <Elapsed since={chat.startedAt} />
+                            </>
+                          ) : null}
+                        </>
+                      ) : (
+                        modelName(provider.model)
+                      )}
                     </span>
                   ) : (
                     <ModelPicker

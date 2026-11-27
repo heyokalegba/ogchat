@@ -24,7 +24,7 @@ type Context = { params: Promise<{ id: string }> };
 
 const notFound = () => errorJson(404, "not_found", "Session not found.");
 
-/** GET /api/sessions/:id  →  { session, generating, partial, thinking, context } */
+/** GET /api/sessions/:id  →  { session, generating, partial, thinking, ranOn, context } */
 export async function GET(request: Request, { params }: Context): Promise<Response> {
   const blocked = guard(request);
   if (blocked) return blocked;
@@ -37,6 +37,8 @@ export async function GET(request: Request, { params }: Context): Promise<Respon
     generating: Boolean(generation),
     partial: generation?.partial ?? "",
     thinking: generation?.thinking ?? "",
+    ranOn: generation?.ranOn ?? null,
+    startedAt: generation ? new Date(generation.startedAt).toISOString() : null,
     context: contextOf(session),
   };
   return json(detail);

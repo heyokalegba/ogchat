@@ -168,3 +168,21 @@
     transition-duration: 1ms !important;
   }
 }
+
+/*
+ * Plain: black text on a white page, for long stretches of focused work. The
+ * app shell sets data-look="plain"; the tokens are set again on the chat
+ * surface too, which declares its own.
+ */
+.ogchat[data-look="plain"],
+[data-look="plain"] .ogchat {
+  --og-white: #ffffff;
+  --og-brick: #ffffff;
+  --og-text: #000000;
+  --og-text-2: #3a3a3a;
+  --og-text-3: #5c5c5c;
+  --og-yellow: #f1f1f1;
+  --og-blue-pale: #eaeef2;
+  --og-wall-text: #000000;
+  --og-halo: none;
+}

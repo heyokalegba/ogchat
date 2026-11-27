@@ -10,7 +10,7 @@ import { commandBriefing, commandTool } from "./workspace";
 import { environmentFor } from "./environments";
 import { codeBriefing, codeFolder, githubEnv } from "./claudecode";
 import { getProject } from "./projects";
-import { streamReply } from "./reply";
+import { ranOnFor, streamReply } from "./reply";
 import { resolveSettings, settingsFor } from "./settings";
 import {
   appendMessage,
@@ -287,6 +287,8 @@ export async function runTurn(
         partial,
         // What it reasoned on the way, kept with the reply for anyone curious.
         thinking: generation.thinking.slice(0, MAX_THINKING_CHARS),
+        ranOn: generation.ranOn,
+        durationMs: Date.now() - generation.startedAt,
       })?.message ?? null
     );
   };
@@ -385,15 +387,26 @@ export async function runTurn(
     sentImages = messages.some(
       (m) => Array.isArray(m.content) && m.content.some((part) => part.type === "image_url"),
     );
+    const reasoning = turn.session.reasoning ?? settings.reasoning;
+    // Which model and thinking level this is going to, said before anything comes back.
+    const ranOn = ranOnFor(settings, reasoning);
+    generation.ranOn = ranOn;
+    emit({ type: "model", ranOn });
     const stream = streamReply(settings, messages, {
       signal: generation.controller.signal,
-      reasoning: turn.session.reasoning ?? settings.reasoning,
+      reasoning,
       webSearch: web,
       tools,
       code,
       onThinking: (text) => {
         generation.thinking += text;
         emit({ type: "thinking", text });
+      },
+      // An alias resolved, or a declined request handed to another model: say which.
+      onModel: (id) => {
+        if (generation.ranOn?.model === id) return;
+        generation.ranOn = { ...ranOn, model: id };
+        emit({ type: "model", ranOn: generation.ranOn });
       },
     });
     for await (const text of stream) {

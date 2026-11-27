@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import type {
   Attachment,
   ChatMessage,
+  RanOn,
   Role,
   Session,
   SessionMeta,
@@ -369,6 +370,8 @@ export interface NewMessage {
   attachments?: Attachment[];
   web?: boolean;
   thinking?: string;
+  ranOn?: RanOn;
+  durationMs?: number;
 }
 
 /**
@@ -391,6 +394,10 @@ export function appendMessage(
     ...(input.attachments?.length ? { attachments: input.attachments } : {}),
     ...(input.web ? { web: true } : {}),
     ...(input.thinking?.trim() ? { thinking: input.thinking } : {}),
+    ...(input.ranOn ? { ranOn: { ...input.ranOn } } : {}),
+    ...(input.durationMs !== undefined && input.durationMs >= 0
+      ? { durationMs: Math.round(input.durationMs) }
+      : {}),
   };
   if (input.role === "user" && !file.titleLocked && !file.messages.some((m) => m.role === "user")) {
     file.title = titleFromMessage(input.content || input.attachments?.[0]?.name || "");

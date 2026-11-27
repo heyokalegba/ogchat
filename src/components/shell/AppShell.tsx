@@ -564,8 +564,9 @@ export function AppShell() {
         look.chatShown ? "" : styles.sceneOnly
       } ${solo ? styles.solo : ""}`}
       style={lookVariables(look) as CSSProperties}
+      data-look={look.plain ? "plain" : undefined}
     >
-      {ready && view && (
+      {ready && view && !look.plain && (
         <Backdrop
           scene={look.scene}
           view={view}
@@ -630,33 +631,50 @@ export function AppShell() {
             {activeId ? (activeTitle ?? "session") : "new session"}
           </div>
           <div className={styles.topTools}>
-            <div className={styles.sceneSwitch} role="group" aria-label="Scene">
-              {SCENE_IDS.map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  className={`${styles.sceneButton} ${id === look.scene ? styles.sceneActive : ""}`}
-                  aria-pressed={id === look.scene}
-                  title={SCENES[id].config.hint}
-                  onClick={() => changeLook({ scene: id })}
-                >
-                  {SCENES[id].config.label}
-                </button>
-              ))}
-            </div>
             <button
               type="button"
-              className={`${styles.lookButton} ${look.chatShown ? "" : styles.lookButtonOpen}`}
-              aria-pressed={!look.chatShown}
+              className={`${styles.lookButton} ${look.plain ? styles.lookButtonOpen : ""}`}
+              aria-pressed={look.plain}
               title={
-                look.chatShown
-                  ? "Put the chat away and just look at the scene"
-                  : "Bring the chat back (Esc)"
+                look.plain
+                  ? "Back to the scene and the wall"
+                  : "Plain: black text on white, nothing behind it, for focused work"
               }
-              onClick={() => changeLook({ chatShown: !look.chatShown })}
+              onClick={() => changeLook({ plain: !look.plain, chatShown: true })}
             >
-              {look.chatShown ? "hide chat" : "show chat"}
+              {look.plain ? "scene" : "plain"}
             </button>
+            {!look.plain && (
+              <div className={styles.sceneSwitch} role="group" aria-label="Scene">
+                {SCENE_IDS.map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={`${styles.sceneButton} ${id === look.scene ? styles.sceneActive : ""}`}
+                    aria-pressed={id === look.scene}
+                    title={SCENES[id].config.hint}
+                    onClick={() => changeLook({ scene: id })}
+                  >
+                    {SCENES[id].config.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {!look.plain && (
+              <button
+                type="button"
+                className={`${styles.lookButton} ${look.chatShown ? "" : styles.lookButtonOpen}`}
+                aria-pressed={!look.chatShown}
+                title={
+                  look.chatShown
+                    ? "Put the chat away and just look at the scene"
+                    : "Bring the chat back (Esc)"
+                }
+                onClick={() => changeLook({ chatShown: !look.chatShown })}
+              >
+                {look.chatShown ? "hide chat" : "show chat"}
+              </button>
+            )}
             <button
               type="button"
               className={`${styles.lookButton} ${lookOpen ? styles.lookButtonOpen : ""}`}

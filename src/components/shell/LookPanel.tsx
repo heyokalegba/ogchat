@@ -413,6 +413,36 @@ export function LookPanel({
 
       <section className={styles.lookSection}>
         <div className={styles.lookRow}>
+          <span className={styles.lookLabel} id="ogchat-plain">
+            page
+          </span>
+          <div className={styles.sceneSwitch} role="group" aria-labelledby="ogchat-plain">
+            <button
+              type="button"
+              className={`${styles.sceneButton} ${look.plain ? "" : styles.sceneActive}`}
+              aria-pressed={!look.plain}
+              onClick={() => onChange({ plain: false })}
+            >
+              scene
+            </button>
+            <button
+              type="button"
+              className={`${styles.sceneButton} ${look.plain ? styles.sceneActive : ""}`}
+              aria-pressed={look.plain}
+              title="Black text on white, with nothing behind it: for focused work"
+              onClick={() => onChange({ plain: true, chatShown: true })}
+            >
+              plain
+            </button>
+          </div>
+        </div>
+        <p className={styles.lookNote}>
+          Plain is black text on a white page. Text size and sidebar width still apply.
+        </p>
+      </section>
+
+      <section className={styles.lookSection}>
+        <div className={styles.lookRow}>
           <span className={styles.lookLabel} id="ogchat-wall-shown">
             wall
           </span>
