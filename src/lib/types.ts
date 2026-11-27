@@ -194,7 +194,7 @@ export interface PublicSettings {
     found: boolean;
     path: string;
     configDir: string;
-    permission: "plan" | "edit" | "run";
+    permission: "plan" | "edit" | "run" | "auto";
     model: string;
   };
   /** Whether Claude may run commands here, and whether this system can fence them in. */

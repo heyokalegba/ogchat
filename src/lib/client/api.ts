@@ -48,7 +48,7 @@ export interface SettingsUpdate {
   githubToken?: string | null;
   runCode?: boolean;
   claudeWorkspace?: string;
-  claudeCodePermission?: "plan" | "edit" | "run";
+  claudeCodePermission?: "plan" | "edit" | "run" | "auto";
   claudeCodeConfigDir?: string;
   claudeCodePath?: string;
 }

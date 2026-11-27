@@ -104,7 +104,7 @@ export interface SettingsPatch {
   githubToken?: unknown;
   /** true or false. */
   runCode?: unknown;
-  /** Claude Code: paths ("" for the usual ones), "plan" | "edit" | "run", and a model alias. */
+  /** Claude Code: paths ("" for the usual ones), "plan" | "edit" | "run" | "auto", and a model alias. */
   claudeCodePath?: unknown;
   claudeCodeConfigDir?: unknown;
   claudeCodePermission?: unknown;

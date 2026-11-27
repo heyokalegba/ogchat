@@ -26,8 +26,15 @@ import { workspaceFor } from "./workspace";
  * compressed), a new session is started and told what was said so far.
  */
 
-export type CodePermission = "plan" | "edit" | "run";
-export const CODE_PERMISSIONS: readonly CodePermission[] = ["plan", "edit", "run"];
+/**
+ * What Claude Code may do in a chat: "plan" (look only), "edit" (change
+ * files), "run" (change files and run shell commands), or "auto" (Claude
+ * Code's own auto mode: it judges each action itself and goes ahead with
+ * what it finds safe, across all of its tools). None of them ever stops to
+ * ask; what a level does not cover is refused.
+ */
+export type CodePermission = "plan" | "edit" | "run" | "auto";
+export const CODE_PERMISSIONS: readonly CodePermission[] = ["plan", "edit", "run", "auto"];
 
 /** The models offered for a Claude Code chat: its own aliases. "default" is whatever it would pick. */
 export const CODE_MODELS = [
@@ -254,7 +261,7 @@ export function codeBriefing(options: {
       : options.permission === "edit"
         ? "You can read and edit files here, but shell commands are not permitted in this chat. If something needs running (tests, an install, git), say which command and the user can switch that on in ogchat's settings."
         : "",
-    environment?.setup && options.permission === "run"
+    environment?.setup && (options.permission === "run" || options.permission === "auto")
       ? `This chat's environment ("${environment.name}") has a setup script. If the project's dependencies are not installed yet, run it first:\n${environment.setup}`
       : "",
   ]
@@ -388,7 +395,7 @@ export async function* streamClaudeCode(turn: CodeTurn): AsyncGenerator<string, 
     "--verbose",
     "--include-partial-messages",
     "--permission-mode",
-    permission === "plan" ? "plan" : "acceptEdits",
+    permission === "plan" ? "plan" : permission === "auto" ? "auto" : "acceptEdits",
     ...(permission === "run" ? ["--allowedTools", "Bash"] : []),
     ...(turn.model && turn.model !== "default" ? ["--model", turn.model] : []),
     ...(turn.effort ? ["--effort", turn.effort] : []),
