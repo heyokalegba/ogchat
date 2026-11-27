@@ -879,6 +879,104 @@ a.chip:hover {
   background: var(--og-ink);
 }
 
+/* The thinking effort list: opens above its button, like Claude's own effort picker. */
+.thinkWrap {
+  position: relative;
+  flex: none;
+  display: flex;
+}
+
+.thinkMenu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 12px);
+  z-index: 20;
+  width: min(320px, calc(100vw - 32px));
+  padding: 10px 6px 6px;
+  border: var(--og-line) solid var(--og-ink);
+  background: var(--og-white);
+  color: var(--og-text);
+  box-shadow: var(--og-shadow);
+  font-family: var(--og-font-sans);
+  animation: og-arrive 160ms var(--og-ease) both;
+}
+
+.thinkBlurb {
+  margin: 0 8px 8px;
+  font-size: calc(12.5px * var(--og-type));
+  line-height: 1.4;
+  color: var(--og-text-2);
+}
+
+.thinkItem {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.thinkItem:hover,
+.thinkItem:focus-visible {
+  outline: none;
+  background: var(--og-blue-pale);
+}
+
+.thinkItemOn .thinkName {
+  color: var(--og-accent);
+}
+
+.thinkMark {
+  flex: none;
+  width: 14px;
+  font-family: var(--og-font-mono);
+  font-size: calc(12px * var(--og-type));
+  line-height: 1.6;
+}
+
+.thinkText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.thinkName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--og-font-mono);
+  font-size: calc(13px * var(--og-type));
+  font-weight: 700;
+}
+
+.thinkBadge {
+  padding: 0 5px;
+  border: 1px solid var(--og-ink);
+  font-size: calc(10.5px * var(--og-type));
+  font-weight: 700;
+  color: var(--og-ink);
+  background: var(--og-blue-pale);
+}
+
+.thinkHint {
+  font-size: calc(12.5px * var(--og-type));
+  line-height: 1.35;
+  color: var(--og-text-2);
+}
+
+.thinkWarning {
+  margin-top: 2px;
+  font-size: calc(12px * var(--og-type));
+  line-height: 1.35;
+  color: var(--og-accent);
+}
+
 .surface .send:hover:not(:disabled) {
   background: var(--og-accent);
 }

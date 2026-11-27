@@ -581,11 +581,16 @@ because ogchat sends those as text.
 
 ### Thinking, web search and a system prompt
 
-- **Thinking.** The `think` button by the message box steps through auto,
-  medium, high, xhigh (extra high) and max; settings has the same choice, plus
-  low. It is sent to Claude as `effort`, to Claude Code as `--effort`, and to
-  the other provider as `reasoning_effort`, which has no xhigh, so that goes as
-  high. Auto sends nothing. On
+- **Thinking.** The `think` button by the message box opens the effort levels
+  as Claude's own apps show them: **Low, Medium, High, Extra and Max**, with
+  Auto first. Extra is the API's `xhigh`. The level Claude recommends for the
+  chat's model is marked _Recommended_ (High on Fable 5.2 and 5.1, Medium on
+  Opus, Sonnet and Haiku 5.5), Auto says what the model runs at when no level
+  is sent, and Max carries Claude's warning about long, costly replies.
+  Settings has the same choice as the default for new chats. It is sent to
+  Claude as `effort`, to Claude Code as `--effort`, and to the other provider
+  as `reasoning_effort`, which has no `xhigh`, so Extra goes there as high.
+  Auto sends nothing. On
   `abliterated-model-large-v2` medium and high are the same level, and auto
   means max.
 - **Web search.** The globe by the message box lets the next message search the
@@ -688,7 +693,7 @@ continue`. The count is an estimate from the length of the text, near
   steps. Click away and it becomes an outline, as in a terminal window that
   is not the active one. `BlockCaret.tsx` draws it.
 - Every reply says, beside its time, which model wrote it and at which thinking
-  level: `Fable 5.2 · think: high`, or `Claude Code · Fable 5.1 · think: auto`.
+  level: `Fable 5.2 · think: extra`, or `Claude Code · Fable 5.1 · think: auto`.
   It is the model the provider reports, so a Claude Code alias shows the model
   it stood for, and a request Claude declined and handed on reads
   `Opus 5.5 (in place of Fable 5.2)`. Hover it for the full id, the way it was

@@ -13,7 +13,7 @@ import {
   type ReactNode,
 } from "react";
 import { createApi } from "@/lib/client/api";
-import { describeRanOn, modelName } from "@/lib/models";
+import { describeRanOn, effortFacts, effortName, modelName } from "@/lib/models";
 import type {
   ChatMessage,
   ModelChoice,
@@ -134,6 +134,14 @@ export function ChatSurface(props: ChatSurfaceProps) {
     onSessionMissing: props.onSessionMissing,
   });
   const { messages, phase, streamText, thinking, thinkingText, error, openCount } = chat;
+  // What the thinking list knows about this chat's model: its default and recommended levels.
+  const facts = props.model ? effortFacts(props.model.provider, props.model.model) : null;
+  const autoMeans =
+    props.model?.provider === "claudecode"
+      ? "Claude Code's own default applies"
+      : facts && props.model
+        ? `${modelName(props.model.model).replace(/^Claude /, "")} runs at ${effortName(facts.default)}`
+        : null;
 
   // Dragging files over the chat: enter/leave fire for every child, so count them.
   const [dropping, setDropping] = useState(false);
@@ -431,6 +439,8 @@ export function ChatSurface(props: ChatSurfaceProps) {
         onToggleWeb={() => chat.setWeb(!chat.web)}
         reasoning={props.reasoning}
         onReasoningChange={props.onReasoningChange}
+        recommendedReasoning={facts?.recommended ?? null}
+        autoMeans={autoMeans}
         footer={
           <div className={styles.hints}>
             <span className={styles.hintKeys}>

@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { CLAUDE_MODELS, CODE_MODELS, describeRanOn, effortName, modelName } from "@/lib/models";
+import {
+  CLAUDE_MODELS,
+  CODE_MODELS,
+  EFFORT_LEVELS,
+  describeRanOn,
+  effortFacts,
+  effortName,
+  modelName,
+} from "@/lib/models";
 
 describe("model names", () => {
   it("offers Fable 5.2 and 5.1, through the API and pinned in Claude Code", () => {
@@ -19,11 +27,34 @@ describe("model names", () => {
     expect(modelName("abliterated-model-large-v2")).toBe("abliterated-model-large-v2");
   });
 
-  it("names thinking levels", () => {
+  it("names thinking levels as Claude's apps do, with Extra for xhigh", () => {
+    expect(EFFORT_LEVELS.map((level) => level.name)).toEqual([
+      "Auto",
+      "Low",
+      "Medium",
+      "High",
+      "Extra",
+      "Max",
+    ]);
+    expect(EFFORT_LEVELS.find((level) => level.id === "max")?.warning).toMatch(/sparingly/);
     expect(effortName(null)).toBe("auto");
     expect(effortName("default")).toBe("auto");
-    expect(effortName("xhigh")).toBe("extra high");
+    expect(effortName("xhigh")).toBe("extra");
     expect(effortName("max")).toBe("max");
+  });
+
+  it("knows each model's default and recommended level", () => {
+    expect(effortFacts("claude", "claude-fable-5-2")).toEqual({
+      default: "high",
+      recommended: "high",
+    });
+    expect(effortFacts("claude", "claude-opus-5-5")).toEqual({
+      default: "medium",
+      recommended: "medium",
+    });
+    expect(effortFacts("claudecode", "fable")?.recommended).toBe("high");
+    expect(effortFacts("claude", "claude-unknown-9")).toBeNull();
+    expect(effortFacts("compatible", "claude-opus-5-5")).toBeNull();
   });
 });
 
@@ -49,7 +80,7 @@ describe("what a reply says it was written by", () => {
     });
     expect(short).toBe("Opus 5.5 (in place of Fable 5.2) · think: auto");
     expect(full).toContain("handed the request on");
-    expect(full).toContain("Thinking: auto");
+    expect(full).toContain("Thinking: auto (no level sent; Opus 5.5 defaults to medium).");
   });
 
   it("through Claude Code, before and after an alias is resolved", () => {
@@ -59,14 +90,14 @@ describe("what a reply says it was written by", () => {
       model: "fable",
       effort: "xhigh",
     });
-    expect(before.short).toBe("Claude Code · fable (its newest) · think: extra high");
+    expect(before.short).toBe("Claude Code · fable (its newest) · think: extra");
     const after = describeRanOn({
       provider: "claudecode",
       requested: "fable",
       model: "claude-fable-5-1",
       effort: "xhigh",
     });
-    expect(after.short).toBe("Claude Code · Fable 5.1 · think: extra high");
+    expect(after.short).toBe("Claude Code · Fable 5.1 · think: extra");
     expect(after.full).toContain('Chosen by Claude Code from "fable".');
     const pinned = describeRanOn({
       provider: "claudecode",
