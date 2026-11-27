@@ -32,6 +32,9 @@ export async function PUT(request: Request): Promise<Response> {
       claudeModel: body.claudeModel,
       githubToken: body.githubToken,
       claudeWorkspace: body.claudeWorkspace,
+      claudeCodePermission: body.claudeCodePermission,
+      claudeCodeConfigDir: body.claudeCodeConfigDir,
+      claudeCodePath: body.claudeCodePath,
       runCode: body.runCode,
     });
     return json({ settings });

@@ -8,12 +8,15 @@ import { BadRequest, readBody } from "./http";
 import { githubTools, repoBriefing } from "./github";
 import { commandBriefing, commandTool } from "./workspace";
 import { environmentFor } from "./environments";
+import { codeBriefing, codeFolder, githubEnv } from "./claudecode";
 import { getProject } from "./projects";
 import { streamReply } from "./reply";
 import { resolveSettings, settingsFor } from "./settings";
 import {
   appendMessage,
+  getCodeSession,
   getSession,
+  setCodeSession,
   pruneSessionFiles,
   setSummary,
   toMeta,
@@ -326,7 +329,59 @@ export async function runTurn(
     ]
       .filter((part) => part.trim())
       .join("\n\n");
-    const messages = buildProviderMessages(turn.session, system, project);
+    // Claude Code works differently: it is the program on this computer, in a folder of
+    // the chat's (a clone of its repository, if it has one), with a session of its own
+    // that is carried on from message to message.
+    let code:
+      | {
+          cwd: string;
+          resume: string | null;
+          onSession: (id: string) => void;
+          vars: Record<string, string>;
+        }
+      | undefined;
+    let codeId: string | null = null;
+    let codeSystem = "";
+    if (settings.provider === "claudecode") {
+      const codeRepo = turn.session.repo ?? project?.repo ?? null;
+      const cwd = await codeFolder({
+        sessionId,
+        repo: codeRepo,
+        baseBranch,
+        token: settings.githubToken,
+        signal: generation.controller.signal,
+      });
+      const kept = getCodeSession(sessionId);
+      const before = turn.session.messages.at(-2)?.id ?? null;
+      const summaryAt = turn.session.summary?.at ?? null;
+      const resume =
+        kept && kept.cwd === cwd && kept.after === before && kept.summaryAt === summaryAt
+          ? kept.id
+          : null;
+      codeId = resume;
+      code = {
+        cwd,
+        resume,
+        onSession: (id) => {
+          codeId = id;
+        },
+        vars: { ...environment.vars, ...githubEnv(settings.githubToken) },
+      };
+      codeSystem = [
+        settings.systemPrompt,
+        codeBriefing({
+          sessionId,
+          repo: codeRepo,
+          baseBranch,
+          permission: settings.claudeCodePermission,
+          environment,
+          hasToken: Boolean(settings.githubToken),
+        }),
+      ]
+        .filter((part) => part.trim())
+        .join("\n\n");
+    }
+    const messages = buildProviderMessages(turn.session, code ? codeSystem : system, project);
     sentImages = messages.some(
       (m) => Array.isArray(m.content) && m.content.some((part) => part.type === "image_url"),
     );
@@ -335,6 +390,7 @@ export async function runTurn(
       reasoning: turn.session.reasoning ?? settings.reasoning,
       webSearch: web,
       tools,
+      code,
       onThinking: (text) => {
         generation.thinking += text;
         emit({ type: "thinking", text });
@@ -345,6 +401,15 @@ export async function runTurn(
       emit({ type: "delta", text });
     }
     const message = persist(false);
+    // Remember which Claude Code session this reply belongs to, to carry on from it.
+    if (code && codeId && message) {
+      setCodeSession(sessionId, {
+        id: codeId,
+        after: message.id,
+        cwd: code.cwd,
+        summaryAt: turn.session.summary?.at ?? null,
+      });
+    }
     emit({ type: "done", session: meta(), message, stopped: false });
   } catch (err) {
     try {

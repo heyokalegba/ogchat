@@ -13,6 +13,13 @@ import { maskKey } from "@/lib/provider/redact";
 import { readJson, writeJsonAtomic } from "./fsjson";
 import { settingsFile } from "./paths";
 import { sandboxKind } from "./workspace";
+import {
+  CODE_MODELS,
+  CODE_PERMISSIONS,
+  findClaudeCode,
+  type CodePermission,
+  type CodeSetup,
+} from "./claudecode";
 
 /**
  * Provider settings. Resolution order, per field:
@@ -50,6 +57,11 @@ export interface ResolvedSettings {
   githubTokenSource: KeySource | null;
   /** Whether Claude may run commands on this machine. Off unless switched on. */
   runCode: boolean;
+  /** Claude Code: where it is (null: found by itself), where its sign-in is kept, what it may do. */
+  claudeCodePath: string | null;
+  claudeCodeConfigDir: string | null;
+  claudeCodePermission: CodePermission;
+  claudeCodeModel: string;
 }
 
 interface StoredSettings {
@@ -65,6 +77,10 @@ interface StoredSettings {
   claudeWorkspace?: string;
   githubToken?: string;
   runCode?: boolean;
+  claudeCodePath?: string;
+  claudeCodeConfigDir?: string;
+  claudeCodePermission?: CodePermission;
+  claudeCodeModel?: string;
 }
 
 export interface SettingsPatch {
@@ -78,7 +94,7 @@ export interface SettingsPatch {
   contextWindow?: unknown;
   /** A string replaces the saved key; null or "" removes it; undefined leaves it alone. */
   apiKey?: unknown;
-  /** "compatible" or "claude". */
+  /** "compatible", "claude" or "claudecode". */
   provider?: unknown;
   /** The Claude key and the GitHub token: saved, removed and left alone as `apiKey` is. */
   claudeKey?: unknown;
@@ -88,6 +104,11 @@ export interface SettingsPatch {
   githubToken?: unknown;
   /** true or false. */
   runCode?: unknown;
+  /** Claude Code: paths ("" for the usual ones), "plan" | "edit" | "run", and a model alias. */
+  claudeCodePath?: unknown;
+  claudeCodeConfigDir?: unknown;
+  claudeCodePermission?: unknown;
+  claudeCodeModel?: unknown;
 }
 
 export class SettingsValidationError extends Error {}
@@ -129,6 +150,10 @@ function readStored(): StoredSettings {
     claudeWorkspace: str(s.claudeWorkspace),
     githubToken: str(s.githubToken),
     runCode: s.runCode === true ? true : undefined,
+    claudeCodePath: str(s.claudeCodePath),
+    claudeCodeConfigDir: str(s.claudeCodeConfigDir),
+    claudeCodePermission: isPermission(s.claudeCodePermission) ? s.claudeCodePermission : undefined,
+    claudeCodeModel: str(s.claudeCodeModel),
     systemPrompt:
       typeof s.systemPrompt === "string" && s.systemPrompt.trim()
         ? s.systemPrompt.slice(0, MAX_SYSTEM_PROMPT_CHARS)
@@ -187,11 +212,28 @@ export function resolveSettings(): ResolvedSettings {
     githubToken: stored.githubToken ?? env("OGCHAT_GITHUB_TOKEN"),
     githubTokenSource: stored.githubToken ? "settings" : env("OGCHAT_GITHUB_TOKEN") ? "env" : null,
     runCode: stored.runCode === true,
+    claudeCodePath: stored.claudeCodePath ?? null,
+    claudeCodeConfigDir: stored.claudeCodeConfigDir ?? null,
+    claudeCodePermission: stored.claudeCodePermission ?? "edit",
+    claudeCodeModel: stored.claudeCodeModel ?? "default",
+  };
+}
+
+/** Claude Code as these settings have it: where it is, where it is signed in, what it may do. */
+export function codeSetup(s: ResolvedSettings): CodeSetup {
+  return {
+    path: s.claudeCodePath,
+    configDir: s.claudeCodeConfigDir,
+    permission: s.claudeCodePermission,
   };
 }
 
 /** The key and the model the chosen provider uses: what a turn is sent with. */
 export function activeModel(s: ResolvedSettings): { key: string | null; model: string } {
+  // Claude Code has no key of ogchat's: it is ready if the program is there.
+  if (s.provider === "claudecode") {
+    return { key: findClaudeCode(s.claudeCodePath), model: s.claudeCodeModel };
+  }
   return s.provider === "claude"
     ? { key: s.claudeKey, model: s.claudeModel }
     : { key: s.apiKey, model: s.model };
@@ -212,6 +254,12 @@ function modelChoices(s: ResolvedSettings): ModelChoice[] {
       ready: Boolean(s.claudeKey),
     })),
     { provider: "compatible" as const, model: s.model, label: s.model, ready: Boolean(s.apiKey) },
+    ...CODE_MODELS.map((m) => ({
+      provider: "claudecode" as const,
+      model: m.id,
+      label: m.label,
+      ready: Boolean(findClaudeCode(s.claudeCodePath)),
+    })),
   ];
 }
 
@@ -228,6 +276,9 @@ export function cleanSessionModel(input: unknown): SessionModel | null {
 export function settingsFor(model: SessionModel | null | undefined): ResolvedSettings {
   const s = resolveSettings();
   if (!model) return s;
+  if (model.provider === "claudecode") {
+    return { ...s, provider: "claudecode", claudeCodeModel: model.model };
+  }
   return model.provider === "claude"
     ? { ...s, provider: "claude", claudeModel: model.model }
     : { ...s, provider: "compatible", model: model.model };
@@ -270,6 +321,13 @@ export function publicSettings(): PublicSettings {
       source: s.githubTokenSource,
     },
     runCode: { enabled: s.runCode, sandbox: sandboxKind() },
+    claudeCode: {
+      found: Boolean(findClaudeCode(s.claudeCodePath)),
+      path: s.claudeCodePath ?? "",
+      configDir: s.claudeCodeConfigDir ?? "",
+      permission: s.claudeCodePermission,
+      model: s.claudeCodeModel,
+    },
   };
 }
 
@@ -297,6 +355,22 @@ function cleanWorkspace(input: unknown): string {
     );
   }
   return id;
+}
+
+function isPermission(value: unknown): value is CodePermission {
+  return (CODE_PERMISSIONS as readonly unknown[]).includes(value);
+}
+
+/** A file or folder path as typed: null for none, an error if it cannot be one. */
+function cleanPath(input: unknown): string | null {
+  if (input === null || input === undefined || input === "") return null;
+  if (typeof input !== "string") throw new SettingsValidationError("A path must be text.");
+  const value = input.trim();
+  if (!value) return null;
+  if (value.length > 500 || /[\0\n\r]/.test(value) || !/^(~|\/)/.test(value)) {
+    throw new SettingsValidationError("Give a full path, starting with / or ~.");
+  }
+  return value;
 }
 
 function cleanModel(input: unknown): string {
@@ -327,6 +401,19 @@ export function previewSettings(patch: SettingsPatch): ResolvedSettings {
     githubToken:
       (patch.githubToken === undefined ? null : cleanKey(patch.githubToken)) ?? current.githubToken,
     runCode: typeof patch.runCode === "boolean" ? patch.runCode : current.runCode,
+    claudeCodePath:
+      patch.claudeCodePath === undefined ? current.claudeCodePath : cleanPath(patch.claudeCodePath),
+    claudeCodeConfigDir:
+      patch.claudeCodeConfigDir === undefined
+        ? current.claudeCodeConfigDir
+        : cleanPath(patch.claudeCodeConfigDir),
+    claudeCodePermission: isPermission(patch.claudeCodePermission)
+      ? patch.claudeCodePermission
+      : current.claudeCodePermission,
+    claudeCodeModel:
+      patch.claudeCodeModel === undefined
+        ? current.claudeCodeModel
+        : cleanModel(patch.claudeCodeModel),
     claudeWorkspace:
       patch.claudeWorkspace === undefined
         ? current.claudeWorkspace
@@ -419,6 +506,26 @@ export function updateSettings(patch: SettingsPatch): PublicSettings {
     const workspace = cleanWorkspace(patch.claudeWorkspace);
     if (workspace) stored.claudeWorkspace = workspace;
     else delete stored.claudeWorkspace;
+  }
+  for (const field of ["claudeCodePath", "claudeCodeConfigDir"] as const) {
+    if (patch[field] === undefined) continue;
+    const value = cleanPath(patch[field]);
+    if (value) stored[field] = value;
+    else delete stored[field];
+  }
+  if (patch.claudeCodePermission !== undefined) {
+    if (!isPermission(patch.claudeCodePermission)) {
+      throw new SettingsValidationError(
+        `What Claude Code may do must be one of: ${CODE_PERMISSIONS.join(", ")}.`,
+      );
+    }
+    if (patch.claudeCodePermission === "edit") delete stored.claudeCodePermission;
+    else stored.claudeCodePermission = patch.claudeCodePermission;
+  }
+  if (patch.claudeCodeModel !== undefined) {
+    const model = cleanModel(patch.claudeCodeModel);
+    if (model === "default") delete stored.claudeCodeModel;
+    else stored.claudeCodeModel = model;
   }
   if (patch.runCode !== undefined) {
     if (typeof patch.runCode !== "boolean") {

@@ -184,16 +184,29 @@ export interface PublicSettings {
   };
   /** The GitHub token Claude's repository tools use (masked). */
   github: { set: boolean; masked: string | null; source: KeySource | null };
+  /**
+   * Claude Code: the program on this computer, used with whichever account it
+   * is signed in to in the terminal. Whether it was found, where its sign-in
+   * is kept ("" for its usual place), and what it may do in a chat's folder:
+   * "plan" (look only), "edit" (change files) or "run" (change files and run commands).
+   */
+  claudeCode: {
+    found: boolean;
+    path: string;
+    configDir: string;
+    permission: "plan" | "edit" | "run";
+    model: string;
+  };
   /** Whether Claude may run commands here, and whether this system can fence them in. */
   runCode: { enabled: boolean; sandbox: "macos" | "none" };
 }
 
-export const PROVIDER_CHOICES = ["compatible", "claude"] as const;
+export const PROVIDER_CHOICES = ["compatible", "claude", "claudecode"] as const;
 export type ProviderChoice = (typeof PROVIDER_CHOICES)[number];
 
 /** One line of a settings test: what was checked and what was found. */
 export interface SettingsCheckStep {
-  id: "settings" | "key" | "model" | "reply" | "github" | "code";
+  id: "settings" | "key" | "model" | "reply" | "github" | "code" | "claudecode";
   /** true: fine. false: this is what is wrong. null: could not tell, or worth a look. */
   ok: boolean | null;
   title: string;

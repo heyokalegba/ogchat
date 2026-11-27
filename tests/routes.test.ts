@@ -871,6 +871,7 @@ describe("settings API", () => {
       },
       github: { set: false, masked: null, source: null },
       runCode: { enabled: false, sandbox: "none" },
+      claudeCode: expect.objectContaining({ configDir: "", permission: "edit", model: "default" }),
     });
   });
 

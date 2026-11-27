@@ -497,6 +497,58 @@ Reading a repository is token-hungry: each file Claude opens is added to the
 conversation and sent again with every step. For exploring, Sonnet or Haiku is
 the economical choice; switch to Opus for the hard part.
 
+### Claude Code, on the account it is signed in to
+
+The third provider is not a key at all. A chat set to **Claude Code** starts
+the `claude` program installed on this computer and shows what it says and
+does. It is the real Claude Code: it works in a real copy of a repository,
+edits files, runs commands and commits, and it uses whichever account it is
+signed in to in Terminal, so it draws on that account's plan rather than on API
+credit. ogchat never sees the sign-in; it starts the program and reads its
+output.
+
+1. Install Claude Code if it is not there (`claude --version` in Terminal says).
+2. Sign in, in Terminal: `claude auth login`.
+3. In settings choose **claude code** and press **test**: it says which
+   account the program is signed in as. Nothing is sent to a model by the test.
+4. Pick _Claude Code_ (or _Claude Code · Opus_, _· Sonnet_ …) in a chat's model
+   list, or leave **claude code** as the provider in settings to make it the
+   default for new chats.
+
+**A second account.** Claude Code keeps one sign-in per folder (`~/.claude`
+by default). To use another account in ogchat without disturbing the one you
+use in Terminal, put a folder name under **Account folder** in settings, such
+as `~/.claude-work`, and sign in to it once:
+
+```bash
+CLAUDE_CONFIG_DIR=~/.claude-work claude auth login
+```
+
+**What it may do** is set in settings: _look only_ (plan mode: read and
+search), _edit files_ (the default), or _edit files and run commands_. It is
+never started with permissions switched off altogether. Unlike the API-key
+Claude above, its commands are **not** inside ogchat's sandbox: they are
+Claude Code's own, running as you, under its own rules.
+
+**Where it works.** With a repository picked in the bar above the message box,
+the chat gets a real clone of it under `data/workspaces/<chat id>/repos`, on a
+branch named `ogchat/<chat id>` made from the branch you picked. It is cloned
+once and then left alone: it is Claude Code's working copy from then on. It
+commits there, and pushes or opens a pull request when you ask. If there is a
+GitHub token in settings, git and `gh` inside the chat are signed in with it
+(by environment, not written to disk); without one, this computer's own git
+sign-in is used. With no repository the chat gets an empty folder of its own.
+
+**Memory.** Each chat keeps one Claude Code session and resumes it, so Claude
+Code remembers the files it has read. If you edit or delete a message, or
+compress the chat, a new session is started and told what was said so far.
+
+An environment's variables are given to it; its setup script is handed to
+Claude Code to run when commands are allowed. The network switch and the
+context meter do not apply: Claude Code manages its own context. Images
+attached to a message are not passed on. Its usage counts against the plan of
+the account it is signed in to, under that account's terms.
+
 ### Any OpenAI-compatible provider
 
 Three values: API base URL, API key, model id. Set them in either place:
@@ -724,6 +776,7 @@ src/
     provider/claude.ts             the only module that talks to Claude (Anthropic's SDK)
     server/github.ts               the repository tools Claude is given, and the only module that talks to GitHub
     server/workspace.ts            running commands for Claude: the per-chat folder, the sandbox, the repository copy
+    server/claudecode.ts           Claude Code as a provider: starts the claude program for a chat and reads its events
     server/environments.ts         environments: a setup script, variables and a network switch for a chat's folder
     daylight.ts                    sun, moon and clock over Brooklyn
     server/                        persistence, projects, settings, turn handling, request guard

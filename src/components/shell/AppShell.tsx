@@ -684,12 +684,13 @@ export function AppShell() {
               startReasoning={startReasoning}
               startWork={startWork}
               above={
-                settings && model?.provider === "claude" && provider?.ready ? (
+                settings && model && model.provider !== "compatible" && provider?.ready ? (
                   <WorkBar
                     api={api}
-                    github={settings.github.set}
-                    runCode={settings.runCode.enabled}
-                    repos={repos}
+                    // Claude Code can also reach a repository with this computer's own git sign-in.
+                    github={settings.github.set || model.provider === "claudecode"}
+                    runCode={settings.runCode.enabled || model.provider === "claudecode"}
+                    repos={settings.github.set ? repos : []}
                     environments={environments}
                     work={activeId ? (activeSession ?? NO_WORK) : startWork}
                     projectRepo={titleProject?.repo ?? null}

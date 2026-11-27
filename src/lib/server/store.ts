@@ -45,6 +45,8 @@ interface SessionFile {
   repo?: string;
   branch?: string;
   environmentId?: string;
+  /** The Claude Code session this chat carries on with, if it runs on Claude Code. */
+  code?: CodeSession;
   createdAt: string;
   updatedAt: string;
   messages: ChatMessage[];
@@ -95,11 +97,43 @@ function parseFile(value: unknown, id: string): SessionFile | null {
     ...(typeof f.repo === "string" && f.repo ? { repo: f.repo } : {}),
     ...(typeof f.branch === "string" && f.branch ? { branch: f.branch } : {}),
     ...(isValidId(f.environmentId) ? { environmentId: f.environmentId } : {}),
+    ...(isCodeSession(f.code) ? { code: f.code } : {}),
     createdAt: f.createdAt,
     updatedAt: f.updatedAt,
     messages: f.messages,
     ...(isSummary(f.summary) ? { summary: f.summary } : {}),
   };
+}
+
+/**
+ * A chat's Claude Code session: its id, and what the chat looked like when
+ * it last answered (the reply it gave, the folder it was in, the summary in
+ * force). If any of that has changed, the session no longer matches the
+ * chat and a new one is started.
+ */
+export interface CodeSession {
+  id: string;
+  after: string;
+  cwd: string;
+  summaryAt: string | null;
+}
+
+function isCodeSession(value: unknown): value is CodeSession {
+  if (!value || typeof value !== "object") return false;
+  const c = value as Record<string, unknown>;
+  return typeof c.id === "string" && typeof c.after === "string" && typeof c.cwd === "string";
+}
+
+export function getCodeSession(id: string): CodeSession | null {
+  return load(id)?.code ?? null;
+}
+
+export function setCodeSession(id: string, code: CodeSession | null): void {
+  const file = load(id);
+  if (!file) return;
+  if (code) file.code = code;
+  else delete file.code;
+  save(file);
 }
 
 export function isEffort(value: unknown): value is ReasoningEffort {

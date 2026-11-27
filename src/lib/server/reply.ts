@@ -1,6 +1,9 @@
 import { streamChat, type ProviderMessage } from "@/lib/provider/adapter";
 import { streamClaude, type ClaudeTool } from "@/lib/provider/claude";
-import type { ResolvedSettings } from "./settings";
+import path from "node:path";
+import { streamClaudeCode } from "./claudecode";
+import { dataDir } from "./paths";
+import { codeSetup, type ResolvedSettings } from "./settings";
 
 /**
  * One reply from whichever provider is chosen in settings: any
@@ -17,9 +20,35 @@ export function streamReply(
     webSearch?: boolean;
     onThinking?: (text: string) => void;
     tools?: ClaudeTool[];
+    /**
+     * For Claude Code: the folder it works in, the session of its own to
+     * carry on with, and what to do with that session's id. Without this it
+     * answers once, in a scratch folder, and keeps no memory of it.
+     */
+    code?: {
+      cwd: string;
+      resume?: string | null;
+      onSession?: (id: string) => void;
+      vars?: Record<string, string>;
+    };
   } = {},
 ): AsyncGenerator<string, void, void> {
   const effort = !options.reasoning || options.reasoning === "default" ? null : options.reasoning;
+  if (settings.provider === "claudecode") {
+    return streamClaudeCode({
+      setup: codeSetup(settings),
+      messages,
+      model: settings.claudeCodeModel,
+      effort,
+      cwd: options.code?.cwd ?? path.join(dataDir(), "workspaces", "one-off"),
+      resume: options.code?.resume,
+      onSession: options.code?.onSession,
+      vars: options.code?.vars,
+      oneOff: !options.code,
+      signal: options.signal,
+      onThinking: options.onThinking,
+    });
+  }
   if (settings.provider === "claude") {
     return streamClaude({
       apiKey: settings.claudeKey,

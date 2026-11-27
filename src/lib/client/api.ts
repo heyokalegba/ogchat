@@ -48,6 +48,9 @@ export interface SettingsUpdate {
   githubToken?: string | null;
   runCode?: boolean;
   claudeWorkspace?: string;
+  claudeCodePermission?: "plan" | "edit" | "run";
+  claudeCodeConfigDir?: string;
+  claudeCodePath?: string;
 }
 
 export interface ChatApi {

@@ -1,3 +1,4 @@
+import { checkClaudeCode } from "@/lib/server/claudecode";
 import { checkRunning } from "@/lib/server/workspace";
 import { checkProvider } from "@/lib/provider/adapter";
 import { checkClaude } from "@/lib/provider/claude";
@@ -5,7 +6,7 @@ import { checkGitHub } from "@/lib/server/github";
 import type { SettingsCheckStep } from "@/lib/types";
 import { guard } from "@/lib/server/guard";
 import { BadRequest, errorJson, json, readBody } from "@/lib/server/http";
-import { previewSettings, SettingsValidationError } from "@/lib/server/settings";
+import { previewSettings, SettingsValidationError, codeSetup } from "@/lib/server/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -31,8 +32,34 @@ export async function POST(request: Request): Promise<Response> {
       claudeModel: body.claudeModel,
       githubToken: body.githubToken,
       claudeWorkspace: body.claudeWorkspace,
+      claudeCodePermission: body.claudeCodePermission,
+      claudeCodeConfigDir: body.claudeCodeConfigDir,
+      claudeCodePath: body.claudeCodePath,
       runCode: body.runCode,
     });
+    if (settings.provider === "claudecode") {
+      // Claude Code: is the program there, and is it signed in. Nothing is sent to a model.
+      const found = checkClaudeCode(codeSetup(settings));
+      const steps: SettingsCheckStep[] = [
+        {
+          id: "claudecode",
+          ok: found.ok,
+          title: found.ok ? "Claude Code is ready" : "Claude Code is not ready",
+          detail: found.detail,
+        },
+      ];
+      if (settings.githubToken) {
+        const github = await checkGitHub(settings.githubToken);
+        steps.push({
+          id: "github",
+          ok: github.ok,
+          title: github.ok ? "GitHub token works" : "GitHub token does not work",
+          detail: github.detail,
+        });
+      }
+      const ok = steps.every((step) => step.ok !== false);
+      return json({ check: { ok, steps }, keySource: null });
+    }
     if (settings.provider === "claude") {
       // Claude: ask Anthropic about the model (which costs nothing), and GitHub who the token is.
       const claude = await checkClaude({

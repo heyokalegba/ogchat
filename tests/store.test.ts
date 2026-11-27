@@ -179,6 +179,10 @@ describe("settings persistence", () => {
       claudeWorkspace: "",
       githubTokenSource: null,
       runCode: false,
+      claudeCodePath: null,
+      claudeCodeConfigDir: null,
+      claudeCodePermission: "edit",
+      claudeCodeModel: "default",
     });
   });
 
@@ -207,6 +211,10 @@ describe("settings persistence", () => {
       claudeWorkspace: "",
       githubTokenSource: null,
       runCode: false,
+      claudeCodePath: null,
+      claudeCodeConfigDir: null,
+      claudeCodePermission: "edit",
+      claudeCodeModel: "default",
     });
     const file = path.join(data.dir(), "settings.json");
     expect(fs.statSync(file).mode & 0o777).toBe(0o600);
@@ -241,6 +249,10 @@ describe("settings persistence", () => {
       claudeWorkspace: "",
       githubTokenSource: null,
       runCode: false,
+      claudeCodePath: null,
+      claudeCodeConfigDir: null,
+      claudeCodePermission: "edit",
+      claudeCodeModel: "default",
     });
     expect(settings.publicSettings().apiKey).toEqual({
       set: true,

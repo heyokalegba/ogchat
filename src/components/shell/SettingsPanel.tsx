@@ -45,6 +45,9 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
   const [runCode, setRunCode] = useState(settings.runCode.enabled);
   const [workspace, setWorkspace] = useState(settings.claude.workspace);
   const listed = settings.claude.models.some((one) => one.id === claudeModel);
+  const [codePermission, setCodePermission] = useState(settings.claudeCode.permission);
+  const [codeConfigDir, setCodeConfigDir] = useState(settings.claudeCode.configDir);
+  const [codePath, setCodePath] = useState(settings.claudeCode.path);
   const pick = (next: ProviderChoice) => {
     setProvider(next);
     setCheck(null);
@@ -54,6 +57,13 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
     provider,
     ...(provider === "claude" ? { runCode, claudeWorkspace: workspace.trim() } : {}),
     ...(provider === "claude" ? { claudeModel } : {}),
+    ...(provider === "claudecode"
+      ? {
+          claudeCodePermission: codePermission,
+          claudeCodeConfigDir: codeConfigDir.trim(),
+          claudeCodePath: codePath.trim(),
+        }
+      : {}),
     ...(claudeKey.trim()
       ? { claudeKey: claudeKey.trim() }
       : dropClaudeKey
@@ -208,11 +218,21 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
               >
                 claude
               </button>
+              <button
+                type="button"
+                className={`${styles.providerButton} ${provider === "claudecode" ? styles.providerActive : ""}`}
+                aria-pressed={provider === "claudecode"}
+                onClick={() => pick("claudecode")}
+              >
+                claude code
+              </button>
             </div>
             <p className={styles.help}>
               {provider === "claude"
                 ? "Claude, from Anthropic, on your own API credit. With a GitHub token it can also read and change a repository you tie to a project."
-                : "Any provider that speaks the OpenAI chat format, by its address, model id and key."}
+                : provider === "claudecode"
+                  ? "Claude Code, the program on this computer, on the account it is signed in to in Terminal. It works in a real copy of a repository and can edit, run and commit."
+                  : "Any provider that speaks the OpenAI chat format, by its address, model id and key."}
             </p>
           </div>
 
@@ -428,7 +448,86 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
                   Workspaces. It is an id, not a secret.
                 </p>
               </div>
+            </>
+          )}
 
+          {provider === "claudecode" && (
+            <>
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor="ogchat-code-permission">
+                  What Claude Code may do
+                </label>
+                <select
+                  id="ogchat-code-permission"
+                  className={styles.textInput}
+                  value={codePermission}
+                  onChange={(event) =>
+                    setCodePermission(event.target.value as "plan" | "edit" | "run")
+                  }
+                >
+                  <option value="plan">look only: read and search, change nothing</option>
+                  <option value="edit">edit files in the chat&apos;s folder</option>
+                  <option value="run">edit files and run commands</option>
+                </select>
+                <p className={styles.help}>
+                  {settings.claudeCode.found
+                    ? "Claude Code was found on this computer."
+                    : "Claude Code was not found on this computer yet: install it, or give its path below."}{" "}
+                  A chat set to Claude Code starts that program in a folder kept for the chat (a
+                  clone of the chat&apos;s repository, if it has one) and uses whichever account it
+                  is signed in to in Terminal, so it draws on that account&apos;s plan, not on an
+                  API key. Commands it runs are <strong>not</strong> inside ogchat&apos;s sandbox:
+                  they run as you.
+                </p>
+              </div>
+
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor="ogchat-code-config">
+                  Account folder
+                </label>
+                <input
+                  id="ogchat-code-config"
+                  className={styles.textInput}
+                  value={codeConfigDir}
+                  placeholder="~/.claude (the usual one)"
+                  autoComplete="off"
+                  spellCheck={false}
+                  onChange={(event) => setCodeConfigDir(event.target.value)}
+                />
+                <p className={styles.help}>
+                  Leave empty to use the account Claude Code is already signed in to. To use a
+                  second account here without disturbing that one, name a folder for it, such as{" "}
+                  <code>~/.claude-work</code>, and sign in to it once in Terminal:{" "}
+                  <code>
+                    CLAUDE_CONFIG_DIR={codeConfigDir.trim() || "~/.claude-work"} claude auth login
+                  </code>
+                  . Press <code>test</code> to see who it is signed in as.
+                </p>
+              </div>
+
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor="ogchat-code-path">
+                  Where Claude Code is
+                </label>
+                <input
+                  id="ogchat-code-path"
+                  className={styles.textInput}
+                  value={codePath}
+                  placeholder="found by itself"
+                  autoComplete="off"
+                  spellCheck={false}
+                  onChange={(event) => setCodePath(event.target.value)}
+                />
+                <p className={styles.help}>
+                  Only needed if the test cannot find it. In Terminal, <code>which claude</code>{" "}
+                  prints the path.
+                </p>
+              </div>
+            </>
+          )}
+
+          {provider !== "compatible" && (
+            <>
               <div className={styles.field}>
                 <div className={styles.labelRow}>
                   <label className={styles.label} htmlFor="ogchat-github-token">
@@ -471,7 +570,11 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
                   requests; it cannot touch your main branch or merge.
                 </p>
               </div>
+            </>
+          )}
 
+          {provider === "claude" && (
+            <>
               <div className={styles.field}>
                 <label className={styles.checkRow} htmlFor="ogchat-run-code">
                   <input
@@ -524,7 +627,7 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
             <p className={styles.help}>
               How hard the model reasons before it answers. Also on the <code>think</code> button by
               the message box.{" "}
-              {provider === "claude" ? (
+              {provider !== "compatible" ? (
                 <>
                   With Claude, auto leaves it to the model, and its thoughts are shown in summary.
                 </>
@@ -582,7 +685,7 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
             <p className={styles.help}>
               How many tokens the model can take in at once: the meter under the message box
               measures each conversation against it.{" "}
-              {provider === "claude" ? (
+              {provider !== "compatible" ? (
                 <>Set it to what your Claude model takes if that is not the figure here.</>
               ) : (
                 <>
