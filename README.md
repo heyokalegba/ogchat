@@ -525,8 +525,10 @@ CLAUDE_CONFIG_DIR=~/.claude-work claude auth login
 ```
 
 **What it may do** is set in settings: _look only_ (plan mode: read and
-search), _edit files_ (the default), or _edit files and run commands_. It is
-never started with permissions switched off altogether. Unlike the API-key
+search), _edit files_ (the default), _edit files and run commands_, or _auto_
+(Claude Code's own auto mode, which judges each action itself and covers all
+of its tools). None of them stops to ask: what a level does not cover is
+refused. It is never started with permissions switched off altogether. Unlike the API-key
 Claude above, its commands are **not** inside ogchat's sandbox: they are
 Claude Code's own, running as you, under its own rules.
 

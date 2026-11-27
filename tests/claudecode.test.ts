@@ -167,8 +167,11 @@ describe("a turn with Claude Code", () => {
     await collect(
       streamClaudeCode({ ...base, setup: setup({ permission: "plan" }), model: "default" }),
     );
+    await collect(streamClaudeCode({ ...base, setup: setup({ permission: "auto" }) }));
     await collect(streamClaudeCode({ ...base, setup: setup({ permission: "run" }), oneOff: true }));
-    const [resumed, plan, oneOff] = runs();
+    const [resumed, plan, auto, oneOff] = runs();
+    expect(auto!.args.join(" ")).toContain("--permission-mode auto");
+    expect(auto!.args.join(" ")).not.toContain("skip-permissions");
     expect(resumed!.typed).toBe("c");
     expect(resumed!.args.join(" ")).toContain("--resume sess-1");
     expect(resumed!.args.join(" ")).toContain("--permission-mode acceptEdits --allowedTools Bash");

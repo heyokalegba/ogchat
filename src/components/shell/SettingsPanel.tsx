@@ -462,12 +462,13 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
                   className={styles.textInput}
                   value={codePermission}
                   onChange={(event) =>
-                    setCodePermission(event.target.value as "plan" | "edit" | "run")
+                    setCodePermission(event.target.value as "plan" | "edit" | "run" | "auto")
                   }
                 >
                   <option value="plan">look only: read and search, change nothing</option>
                   <option value="edit">edit files in the chat&apos;s folder</option>
                   <option value="run">edit files and run commands</option>
+                  <option value="auto">auto: it decides what is safe, and does it</option>
                 </select>
                 <p className={styles.help}>
                   {settings.claudeCode.found
@@ -477,7 +478,10 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
                   clone of the chat&apos;s repository, if it has one) and uses whichever account it
                   is signed in to in Terminal, so it draws on that account&apos;s plan, not on an
                   API key. Commands it runs are <strong>not</strong> inside ogchat&apos;s sandbox:
-                  they run as you.
+                  they run as you. None of these levels stops to ask you anything: what a level does
+                  not cover is refused. <em>Auto</em> is Claude Code&apos;s own auto mode, which
+                  covers all of its tools and leaves the judging to it; if your plan or Claude Code
+                  version does not have it, the chat will say so.
                 </p>
               </div>
 
