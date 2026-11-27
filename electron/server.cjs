@@ -119,15 +119,34 @@ function needsBuild(projectDir) {
 /** Builds the project. Resolves when done; rejects with the tail of the build's output. */
 function build(projectDir, onLine) {
   return new Promise((resolve, reject) => {
-    const tail = [];
+    const all = [];
     const child = runNode([nextBin(projectDir), "build"], projectDir, (line) => {
-      tail.push(line);
-      if (tail.length > 30) tail.shift();
+      // Without the colour codes a terminal would use, which a dialog shows as noise.
+      all.push(line.replace(/\u001b\[[0-9;]*m/g, ""));
       onLine?.(line);
     });
-    child.on("exit", (code) =>
-      code === 0 ? resolve() : reject(new Error(`The build failed.\n\n${tail.join("\n")}`)),
-    );
+    child.on("exit", (code) => {
+      if (code === 0) return resolve();
+      // The whole output goes to a file; the dialog shows the lines that say what failed,
+      // which are rarely the last ones, and then the end of it.
+      const log = path.join(projectDir, "build-error.log");
+      try {
+        fs.writeFileSync(log, all.join("\n"));
+      } catch {
+        // the dialog will have to do
+      }
+      const telling = all.filter((line) =>
+        /error|failed|cannot|not found|unexpected|ENOENT|EACCES|EMFILE|ENOSPC|killed|heap/i.test(
+          line,
+        ),
+      );
+      const shown = [...new Set([...telling.slice(0, 14), ...all.slice(-8)])].join("\n");
+      reject(
+        new Error(
+          `The build failed (exit code ${code}).\n\n${shown}\n\nThe full output is in ${log}`,
+        ),
+      );
+    });
     child.on("error", reject);
   });
 }

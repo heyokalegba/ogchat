@@ -145,7 +145,10 @@ export function sandboxProfile(options: {
     `(deny file-read* (subpath ${q(home)}))`,
     // Names and sizes only, so that a path through the home folder can be followed.
     `(allow file-read-metadata (subpath ${q(home)}))`,
-    `(allow file-read* ${[...TOOL_HOMES.map((dir) => path.join(home, dir)), ...options.readable]
+    `(allow file-read* ${[
+      ...TOOL_HOMES.map((dir) => path.join(/* turbopackIgnore: true */ home, dir)),
+      ...options.readable,
+    ]
       .map((p) => `(subpath ${q(p)})`)
       .join(" ")})`,
     // ogchat's own keys and tokens, wherever its data folder is.

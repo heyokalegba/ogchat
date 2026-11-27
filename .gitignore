@@ -23,3 +23,4 @@ npm-debug.log*
 # the desktop app: its own packages, and what it builds
 /electron/node_modules
 /dist-app
+build-error.log

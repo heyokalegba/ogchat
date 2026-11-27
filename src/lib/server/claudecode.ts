@@ -128,7 +128,7 @@ export function checkClaudeCode(setup: CodeSetup): { ok: boolean; detail: string
     };
   }
   const run = (args: string[]) =>
-    spawnSync(bin, args, {
+    spawnSync(/* turbopackIgnore: true */ bin, args, {
       env: codeEnv(setup) as unknown as NodeJS.ProcessEnv,
       encoding: "utf8",
       timeout: 20_000,
