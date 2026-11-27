@@ -40,6 +40,8 @@ export interface ChatMessage {
   thinking?: string;
   /** On a reply: which model wrote it, and how hard it was asked to think. */
   ranOn?: RanOn;
+  /** On a reply: how long it took, thinking included, in milliseconds. */
+  durationMs?: number;
 }
 
 /**
@@ -278,6 +280,8 @@ export interface SessionDetail {
   thinking: string;
   /** Which model is answering and at what thinking level, when `generating` is true. */
   ranOn: RanOn | null;
+  /** When the reply in progress was started (ISO), when `generating` is true. */
+  startedAt: string | null;
   /** How full the model's context window is with this session as it stands. */
   context: ContextUse;
 }

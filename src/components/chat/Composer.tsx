@@ -27,6 +27,8 @@ export interface ComposerProps {
   busy: boolean;
   /** Sending is not possible right now (for example while the session loads). Typing still is. */
   canSend: boolean;
+  /** While a reply is coming, a message can be queued to go when it is done. */
+  canQueue?: boolean;
   inputRef: Ref<HTMLTextAreaElement>;
   /** Files queued to go out with the next message. */
   files: File[];
@@ -56,7 +58,10 @@ export function Composer(props: ComposerProps) {
   const { value, onChange, onSubmit, onStop, busy, canSend, inputRef, footer } = props;
   const { files, onAddFiles, onRemoveFile, web, onToggleWeb, onReasoningChange } = props;
   const reasoning = props.reasoning ?? "default";
-  const ready = canSend && !busy && (value.trim().length > 0 || files.length > 0);
+  const filled = value.trim().length > 0 || files.length > 0;
+  // While a reply is coming, Enter queues the message instead of sending it.
+  const queueing = busy && Boolean(props.canQueue) && filled;
+  const ready = (canSend && !busy && filled) || queueing;
   const textarea = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
   useImperativeHandle(inputRef, () => textarea.current as HTMLTextAreaElement, []);
@@ -168,6 +173,16 @@ export function Composer(props: ComposerProps) {
           >
             <PaperclipIcon />
           </button>
+          {queueing && (
+            <button
+              type="submit"
+              className={styles.send}
+              aria-label="Queue message"
+              title="Queue: it is sent when this reply is done (Enter)"
+            >
+              <SendIcon />
+            </button>
+          )}
           {busy ? (
             <button
               type="button"

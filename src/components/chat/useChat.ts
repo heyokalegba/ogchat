@@ -102,6 +102,17 @@ function describe(err: unknown): { code: string; message: string } {
   return { code: "unknown", message: "Something went wrong. Retry in a moment." };
 }
 
+/**
+ * A message written while a reply was still coming. It waits its turn and is
+ * sent when the conversation is free, as Claude's own apps do.
+ */
+export interface QueuedMessage {
+  id: string;
+  content: string;
+  files: File[];
+  web: boolean;
+}
+
 export function useChat(options: UseChatOptions) {
   const { sessionId, openToken = 0, api } = options;
 
@@ -116,6 +127,25 @@ export function useChat(options: UseChatOptions) {
   const thinkingRef = useRef("");
   /** Which model is writing the reply in progress, and at what thinking level. */
   const [ranOn, setRanOn] = useState<RanOn | null>(null);
+  /** When the reply in progress started (ms since the epoch): what its timer counts from. */
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  /** Messages written while a reply was coming, waiting to be sent in order. */
+  const [queued, setQueuedState] = useState<QueuedMessage[]>([]);
+  const queuedRef = useRef<QueuedMessage[]>([]);
+  const setQueued = useCallback((next: QueuedMessage[]) => {
+    queuedRef.current = next;
+    setQueuedState(next);
+  }, []);
+  /**
+   * The queue waits instead of going on by itself: after a reply was stopped
+   * or failed, the next message is the user's to send, not the app's.
+   */
+  const [queuePaused, setQueuePausedState] = useState(false);
+  const queuePausedRef = useRef(false);
+  const setQueuePaused = useCallback((paused: boolean) => {
+    queuePausedRef.current = paused;
+    setQueuePausedState(paused);
+  }, []);
   const [error, setError] = useState<ChatErrorState | null>(null);
   /** How full the model's context window is with this conversation. */
   const [context, setContext] = useState<ContextUse | null>(null);
@@ -182,6 +212,7 @@ export function useChat(options: UseChatOptions) {
     setThinking(false);
     setThinkingText("");
     setRanOn(null);
+    setStartedAt(null);
   }, []);
 
   /** Fetches the session and adopts whatever state the server is in. */
@@ -202,6 +233,8 @@ export function useChat(options: UseChatOptions) {
           setStreamText(detail.partial);
           setThinkingText(thinkingRef.current);
           setRanOn(detail.ranOn ?? null);
+          const began = detail.startedAt ? Date.parse(detail.startedAt) : NaN;
+          setStartedAt((current) => (Number.isNaN(began) ? (current ?? Date.now()) : began));
           setPhase("following");
         } else {
           resetStream();
@@ -251,6 +284,8 @@ export function useChat(options: UseChatOptions) {
     setCompressing(false);
     setDraft("");
     setFiles([]);
+    setQueued([]);
+    setQueuePaused(false);
     resetStream();
     setOpenCount((n) => n + 1);
     if (sessionId) {
@@ -259,7 +294,7 @@ export function useChat(options: UseChatOptions) {
     } else {
       setPhase("idle");
     }
-  }, [sessionId, openToken, load, resetStream, setFiles, setPhase]);
+  }, [sessionId, openToken, load, resetStream, setFiles, setPhase, setQueued, setQueuePaused]);
 
   // While the server generates without us, poll until it is done.
   useEffect(() => {
@@ -307,6 +342,7 @@ export function useChat(options: UseChatOptions) {
 
       setError(null);
       resetStream();
+      setStartedAt(Date.now());
       setPhase("streaming");
       setMessages((current) => {
         if (isRegenerate) {
@@ -382,6 +418,8 @@ export function useChat(options: UseChatOptions) {
           case "error": {
             const { message } = event;
             resetStream();
+            // A stopped or failed reply holds the queue until the user says to go on.
+            if (event.type === "error" || event.stopped) setQueuePaused(true);
             if (message) setMessages((current) => [...current, message]);
             if (event.type === "error") {
               setError({ ...event.error, retry: { kind: "regenerate" } });
@@ -439,6 +477,7 @@ export function useChat(options: UseChatOptions) {
         }
         if (id && (isRegenerate || body.replaceFromMessageId)) void load(id, epoch);
         else setPhase("idle");
+        setQueuePaused(true);
         // A refused request (bad file, too large…) needs changing, not repeating.
         setError({ ...describe(err), retry: isRefusal(err) ? null : { kind: "resubmit", body } });
       } finally {
@@ -452,9 +491,22 @@ export function useChat(options: UseChatOptions) {
     (content: string) => {
       const text = content.trim();
       const attached = filesRef.current;
-      if ((!text && attached.length === 0) || phaseRef.current !== "idle") return false;
+      if (!text && attached.length === 0) return false;
+      const now = phaseRef.current;
+      // A reply is still coming: the message waits its turn.
+      if (now === "streaming" || now === "following") {
+        setDraft("");
+        setFiles([]);
+        setQueued([
+          ...queuedRef.current,
+          { id: `queued-${Date.now()}`, content: text, files: attached, web: webRef.current },
+        ]);
+        return true;
+      }
+      if (now !== "idle") return false;
       setDraft("");
       setFiles([]);
+      setQueuePaused(false);
       void submit({
         content: text,
         ...(attached.length ? { files: attached } : {}),
@@ -462,8 +514,46 @@ export function useChat(options: UseChatOptions) {
       });
       return true;
     },
-    [setFiles, submit],
+    [setFiles, setQueued, setQueuePaused, submit],
   );
+
+  /** Sends a queued message now (the conversation must be free), and lets the rest follow. */
+  const sendQueued = useCallback(
+    (id: string) => {
+      const item = queuedRef.current.find((one) => one.id === id);
+      if (!item || phaseRef.current !== "idle") return;
+      setQueued(queuedRef.current.filter((one) => one.id !== id));
+      setQueuePaused(false);
+      void submit({
+        content: item.content,
+        ...(item.files.length ? { files: item.files } : {}),
+        ...(item.web ? { web: true } : {}),
+      });
+    },
+    [setQueued, setQueuePaused, submit],
+  );
+
+  /** Takes a queued message out of the queue, and back into the message box if asked. */
+  const unqueue = useCallback(
+    (id: string, toEdit: boolean) => {
+      const item = queuedRef.current.find((one) => one.id === id);
+      if (!item) return;
+      setQueued(queuedRef.current.filter((one) => one.id !== id));
+      if (toEdit) {
+        setDraft((current) => (current.trim() ? `${current}\n\n${item.content}` : item.content));
+        if (item.files.length) setFiles([...filesRef.current, ...item.files]);
+      }
+    },
+    [setFiles, setQueued],
+  );
+
+  // When the conversation is free again, the next queued message goes, unless the queue is held.
+  useEffect(() => {
+    if (phase !== "idle" || compressing || error || queuePaused) return;
+    const next = queued[0];
+    if (!next || !activeIdRef.current) return;
+    sendQueued(next.id);
+  }, [phase, compressing, error, queuePaused, queued, sendQueued]);
 
   /** Queues files for the next message. Oversized or surplus files are refused with a note. */
   const addFiles = useCallback(
@@ -643,6 +733,11 @@ export function useChat(options: UseChatOptions) {
     thinking,
     thinkingText,
     ranOn,
+    startedAt,
+    queued,
+    queuePaused,
+    sendQueued,
+    unqueue,
     web,
     setWeb,
     error,

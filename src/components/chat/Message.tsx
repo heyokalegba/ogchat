@@ -1,12 +1,13 @@
 "use client";
 
 import { memo, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
-import { clockTime } from "@/lib/format";
+import { clockTime, stopwatch } from "@/lib/format";
 import { describeRanOn } from "@/lib/models";
 import type { Attachment, ChatMessage, RanOn } from "@/lib/types";
 import { MessageAttachments } from "./Attachments";
 import { BlockCaret } from "./BlockCaret";
 import styles from "./chat.module.css";
+import { Elapsed } from "./Elapsed";
 import { CopyButton, Markdown } from "./Markdown";
 
 export interface MessageViewProps {
@@ -47,6 +48,7 @@ function TagRow({
   time,
   note,
   ranOn,
+  clock,
   children,
 }: {
   role: string;
@@ -55,6 +57,8 @@ function TagRow({
   note?: string;
   /** On a reply: the model and thinking level it was written with. */
   ranOn?: RanOn | null;
+  /** Shown after the time: a reply's running clock, or how long it took. */
+  clock?: React.ReactNode;
   children?: React.ReactNode;
 }) {
   const tone =
@@ -68,6 +72,7 @@ function TagRow({
       <span className={`${styles.tag} ${tone}`}>{role}&gt;</span>
       {time && <time className={styles.time}>{time}</time>}
       {note && <span className={styles.time}>{note}</span>}
+      {clock}
       {usable(ranOn) && <ModelNote ranOn={ranOn} />}
       {children}
     </div>
@@ -178,6 +183,13 @@ export const MessageView = memo(function MessageView(props: MessageViewProps) {
         time={clockTime(message.createdAt)}
         note={message.web ? "web" : undefined}
         ranOn={isUser ? null : message.ranOn}
+        clock={
+          !isUser && typeof message.durationMs === "number" ? (
+            <span className={styles.time} title="How long the reply took, thinking included">
+              took {stopwatch(message.durationMs)}
+            </span>
+          ) : null
+        }
       >
         <div className={`${styles.actions} ${confirming ? styles.actionsPinned : ""}`}>
           {isUser && message.content && <CopyButton text={message.content} label="prompt" />}
@@ -286,11 +298,26 @@ export function StreamingMessage(props: {
   thought?: string;
   /** The model writing it and its thinking level, once the server has said. */
   ranOn?: RanOn | null;
+  /** When it started (ms since the epoch), for its running clock. */
+  startedAt?: number | null;
 }) {
-  const { text, thinking, thought, ranOn } = props;
+  const { text, thinking, thought, ranOn, startedAt } = props;
   return (
     <article className={styles.message} data-role="assistant" aria-live="off">
-      <TagRow role="assistant" time="" ranOn={ranOn} />
+      <TagRow
+        role="assistant"
+        time=""
+        ranOn={ranOn}
+        clock={
+          startedAt ? (
+            <Elapsed
+              since={startedAt}
+              label={text ? "writing" : "thinking"}
+              className={`${styles.time} ${styles.clock}`}
+            />
+          ) : null
+        }
+      />
       {thought && <Thought text={thought} live={!text} />}
       <div className={`${styles.body} ${styles.streaming}`}>
         {text ? (

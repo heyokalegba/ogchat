@@ -1440,3 +1440,26 @@
   font-size: 13px;
   white-space: pre;
 }
+
+/* ---------------------------------------------------------------- plain */
+
+/* Black on white: a white page, no city behind it. */
+.shell[data-look="plain"] {
+  background: #ffffff;
+}
+
+/*
+ * The sidebar is drawn white on black glass; turned over, it is black on
+ * white. Turning the hue back round keeps the accent its own colour.
+ */
+.shell[data-look="plain"] .sidebar {
+  border-right: 1px solid #1f1f1f;
+  background: #000000;
+  text-shadow: none;
+  filter: invert(1) hue-rotate(180deg);
+}
+
+.shell[data-look="plain"] .wall {
+  border-color: transparent;
+  box-shadow: none;
+}

@@ -14,6 +14,8 @@ export interface Generation {
   partial: string;
   /** Reasoning received so far, when the provider shares it. */
   thinking: string;
+  /** When the reply was started, in milliseconds since the epoch: what its timer counts from. */
+  startedAt: number;
   /** Which model is answering and at what thinking level, once the turn has started. */
   ranOn?: RanOn;
 }
@@ -34,6 +36,7 @@ export function beginGeneration(sessionId: string): Generation | null {
     controller: new AbortController(),
     partial: "",
     thinking: "",
+    startedAt: Date.now(),
   };
   map.set(sessionId, generation);
   return generation;

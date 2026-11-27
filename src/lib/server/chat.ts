@@ -288,6 +288,7 @@ export async function runTurn(
         // What it reasoned on the way, kept with the reply for anyone curious.
         thinking: generation.thinking.slice(0, MAX_THINKING_CHARS),
         ranOn: generation.ranOn,
+        durationMs: Date.now() - generation.startedAt,
       })?.message ?? null
     );
   };

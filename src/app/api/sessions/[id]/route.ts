@@ -38,6 +38,7 @@ export async function GET(request: Request, { params }: Context): Promise<Respon
     partial: generation?.partial ?? "",
     thinking: generation?.thinking ?? "",
     ranOn: generation?.ranOn ?? null,
+    startedAt: generation ? new Date(generation.startedAt).toISOString() : null,
     context: contextOf(session),
   };
   return json(detail);

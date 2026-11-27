@@ -579,6 +579,13 @@ defaults:
 attached images are refused by the provider. Text files and PDFs are fine,
 because ogchat sends those as text.
 
+### Plain: black on white
+
+The **plain** button at the top right (also under _page_ in the look panel)
+turns ogchat into black text on a white page: no city, no wall, no colour
+behind the words, for long stretches of focused work. Text size and sidebar
+width still apply. **scene** brings everything back as it was.
+
 ### Thinking, web search and a system prompt
 
 - **Thinking.** The `think` button by the message box opens the effort levels
@@ -699,6 +706,15 @@ continue`. The count is an estimate from the length of the text, near
   `Opus 5.5 (in place of Fable 5.2)`. Hover it for the full id, the way it was
   reached and the level that was sent. While a reply is being written the same
   line is in the status by the message box.
+- A reply in progress has a clock beside it, `thinking 0:42` until the answer
+  starts and `writing 1:10` after, also in the status by the message box. It
+  counts from when the server started the reply, so a chat opened in another
+  tab shows the real time. Once done, the reply keeps `took 1:52`.
+- You can keep writing while a reply comes in. Enter puts the message in a
+  queue above the box, and queued messages are sent one at a time, each when
+  the reply before it is done, as in Claude's own apps. Each can be taken back
+  into the box to edit, or removed. If you stop a reply, or it fails, the queue
+  holds, and each message gets a **send now** button.
 - While a reasoning model is working out its answer, `thinking` pulses slowly.
   If the provider shares the reasoning, it appears under that heading as it
   is written, folds away when the answer starts, and stays with the reply

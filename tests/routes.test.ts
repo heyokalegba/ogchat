@@ -156,6 +156,7 @@ describe("sessions API", () => {
       partial: "",
       thinking: "",
       ranOn: null,
+      startedAt: null,
       context: { tokens: 4, limit: 1_000_000 },
     });
   });
@@ -264,6 +265,10 @@ describe("sending messages", () => {
     expect(stored.session.messages[1]?.id).toBe(done.message?.id);
     // …and kept with the reply.
     expect(stored.session.messages[1]?.ranOn).toMatchObject({ ...said, effort: null });
+    // So is how long it took, for "took 0:03" beside it.
+    expect(stored.session.messages[1]?.durationMs).toEqual(expect.any(Number));
+    expect(stored.session.messages[1]!.durationMs).toBeGreaterThanOrEqual(0);
+    expect(stored.startedAt).toBeNull();
 
     expect(provider.calls).toHaveLength(1);
     expect(provider.calls[0]).toMatchObject({

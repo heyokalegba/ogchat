@@ -8,6 +8,12 @@ import { SCENES, type SceneId } from "./art";
  * preferences, so they live in this browser's storage and nowhere else.
  */
 export interface Look {
+  /**
+   * Plain: black text on a white page, with no scene, wall or colour behind
+   * it. For long stretches of focused work. The scene settings are kept for
+   * when it is switched off again.
+   */
+  plain: boolean;
   scene: SceneId;
   /** Milliseconds the scene's clock runs ahead of (or behind) the real one. 0 is real time. */
   clockOffsetMs: number;
@@ -53,6 +59,7 @@ export interface Look {
 }
 
 export const DEFAULT_LOOK: Look = {
+  plain: false,
   scene: "skyline",
   clockOffsetMs: 0,
   date: "",
@@ -113,6 +120,7 @@ function clean(value: unknown): Look {
   const number = (v: unknown, fallback: number) =>
     typeof v === "number" && Number.isFinite(v) ? v : fallback;
   return {
+    plain: raw.plain === true,
     scene:
       typeof raw.scene === "string" && raw.scene in SCENES
         ? (raw.scene as SceneId)
@@ -203,6 +211,23 @@ function lightness(color: string): number {
  * stronger: a solid outline first, then the soft glow.
  */
 export function lookVariables(look: Look): Record<string, string> {
+  if (look.plain) {
+    // Black on white: the text size and sidebar width still apply; nothing else does.
+    return {
+      "--og-sidebar": `${look.sidebarWidth}px`,
+      "--og-type": (look.textSize / 100).toFixed(2),
+      "--og-input-bg": "#ffffff",
+      "--og-input-ink": "#000000",
+      "--og-input-dim": "rgba(0, 0, 0, 0.55)",
+      "--og-input-accent": "#74291c",
+      "--og-wall-opacity": "1",
+      "--og-wall-light": "1",
+      "--og-scene-veil": "0",
+      "--og-wall-text": "#000000",
+      "--og-halo-rgb": "255, 255, 255",
+      "--og-halo": "none",
+    };
+  }
   const color = activeTextColor(look);
   const halo = lightness(color) > 0.5 ? "20, 16, 12" : "246, 240, 227";
   // What is typed in the message box is dark on a light box and light on a dark one.
