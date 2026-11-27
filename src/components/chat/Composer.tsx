@@ -18,13 +18,23 @@ import styles from "./chat.module.css";
 import { GlobeIcon, PaperclipIcon, SendIcon, StopIcon } from "./icons";
 
 /** The thinking levels the composer steps through. "low" is in settings for those who want it. */
-const THINKING: ReasoningEffort[] = ["default", "medium", "high", "max"];
+const THINKING: ReasoningEffort[] = ["default", "medium", "high", "xhigh", "max"];
 const THINKING_LABEL: Record<ReasoningEffort, string> = {
   default: "auto",
   low: "low",
   medium: "medium",
   high: "high",
+  xhigh: "xhigh",
   max: "max",
+};
+/** What each level means, for the button's tooltip. */
+const THINKING_HELP: Record<ReasoningEffort, string> = {
+  default: "auto: no level is sent and the model decides how long to think",
+  low: "low: quick answers, little thinking",
+  medium: "medium: some thinking",
+  high: "high: thinks carefully",
+  xhigh: "xhigh (extra high): thinks at length; sent as high to providers without it",
+  max: "max: thinks as long as it needs; slowest and costliest",
 };
 
 export interface ComposerProps {
@@ -153,7 +163,7 @@ export function Composer(props: ComposerProps) {
                 onReasoningChange(THINKING[(at + 1) % THINKING.length]!);
               }}
               aria-label={`Thinking: ${THINKING_LABEL[reasoning]}. Press to change.`}
-              title="How hard the model thinks before answering: auto, medium, high, max"
+              title={`Thinking level, ${THINKING_HELP[reasoning]}.\nPress to step through auto, medium, high, xhigh, max.`}
             >
               <span className={styles.chipPrefix}>think: </span>
               {THINKING_LABEL[reasoning]}

@@ -6,12 +6,16 @@
  * that the stop route can reach a generation started by the messages route.
  */
 
+import type { RanOn } from "@/lib/types";
+
 export interface Generation {
   controller: AbortController;
   /** Text received so far. */
   partial: string;
   /** Reasoning received so far, when the provider shares it. */
   thinking: string;
+  /** Which model is answering and at what thinking level, once the turn has started. */
+  ranOn?: RanOn;
 }
 
 const store = globalThis as typeof globalThis & {

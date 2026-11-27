@@ -37,7 +37,11 @@ if (log) {
 
 const resume = args[args.indexOf("--resume") + 1];
 const session = args.includes("--resume") ? resume : `sess-${typed.length}`;
-out({ type: "system", subtype: "init", session_id: session, cwd: process.cwd() });
+// Like the real one, it names the model it settled on: an alias as the full id it stands for.
+const ALIASES = { fable: "claude-fable-5-1", opus: "claude-opus-5-5", sonnet: "claude-sonnet-5-5" };
+const asked = args.includes("--model") ? args[args.indexOf("--model") + 1] : "opus";
+const model = ALIASES[asked] ?? asked;
+out({ type: "system", subtype: "init", session_id: session, cwd: process.cwd(), model });
 
 const mode = process.env.FAKE_CLAUDE_MODE ?? "";
 if (/\/hang/.test(typed)) await new Promise(() => setInterval(() => {}, 1000));

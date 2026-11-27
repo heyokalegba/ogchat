@@ -38,13 +38,33 @@ export interface ChatMessage {
    * shared it. Shown on request; never sent back to the provider.
    */
   thinking?: string;
+  /** On a reply: which model wrote it, and how hard it was asked to think. */
+  ranOn?: RanOn;
+}
+
+/**
+ * Which model a reply came from and at which thinking level, as sent and as
+ * reported back. `model` is the one the provider says answered when it says
+ * (Claude Code's "fable" alias comes back as the full id it chose, and a
+ * declined request the API hands on comes back as the model that took it);
+ * otherwise it is the one asked for.
+ */
+export interface RanOn {
+  provider: ProviderChoice;
+  /** What the chat was set to: a full id, or an alias such as "fable" or "default". */
+  requested: string;
+  /** What answered, as far as is known. */
+  model: string;
+  /** The thinking level sent with it; null when none was sent and the model chose. */
+  effort: string | null;
 }
 
 /**
  * How hard a reasoning model should think before it answers. "default"
- * sends nothing and leaves it to the provider.
+ * sends nothing and leaves it to the provider. "xhigh" sits between high
+ * and max; providers that do not take it are sent "high".
  */
-export const REASONING_EFFORTS = ["default", "low", "medium", "high", "max"] as const;
+export const REASONING_EFFORTS = ["default", "low", "medium", "high", "xhigh", "max"] as const;
 export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 
 export interface SessionMeta {
@@ -229,6 +249,8 @@ export type StreamEvent =
   | { type: "start"; session: SessionMeta; userMessage: ChatMessage | null }
   /** The model is reasoning before it answers. `text` is the next piece of that reasoning. */
   | { type: "thinking"; text?: string }
+  /** Which model is answering and at what thinking level: sent first, and again if the provider names another. */
+  | { type: "model"; ranOn: RanOn }
   | { type: "delta"; text: string }
   | { type: "done"; session: SessionMeta; message: ChatMessage | null; stopped: boolean }
   | { type: "error"; session: SessionMeta; error: ChatError; message: ChatMessage | null };
@@ -254,6 +276,8 @@ export interface SessionDetail {
   partial: string;
   /** Reasoning produced so far when `generating` is true. */
   thinking: string;
+  /** Which model is answering and at what thinking level, when `generating` is true. */
+  ranOn: RanOn | null;
   /** How full the model's context window is with this session as it stands. */
   context: ContextUse;
 }

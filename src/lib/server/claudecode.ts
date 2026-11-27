@@ -36,14 +36,8 @@ import { workspaceFor } from "./workspace";
 export type CodePermission = "plan" | "edit" | "run" | "auto";
 export const CODE_PERMISSIONS: readonly CodePermission[] = ["plan", "edit", "run", "auto"];
 
-/** The models offered for a Claude Code chat: its own aliases. "default" is whatever it would pick. */
-export const CODE_MODELS = [
-  { id: "default", label: "Claude Code" },
-  { id: "opus", label: "Claude Code · Opus" },
-  { id: "sonnet", label: "Claude Code · Sonnet" },
-  { id: "haiku", label: "Claude Code · Haiku" },
-  { id: "fable", label: "Claude Code · Fable" },
-] as const;
+/** The models offered for a Claude Code chat: pinned ids, and its own aliases. */
+export { CODE_MODELS } from "@/lib/models";
 
 export interface CodeSetup {
   /** Where the program is, if it is not found by itself. */
@@ -283,6 +277,8 @@ export interface CodeTurn {
   resume?: string | null;
   /** Called with the session's id as soon as it is known. */
   onSession?: (id: string) => void;
+  /** Called with the full id of the model it is using, once it says (an alias resolved). */
+  onModel?: (id: string) => void;
   /** Variables for the program and what it runs: the GitHub sign-in, the environment's own. */
   vars?: Record<string, string>;
   /** One answer and no memory of it: for a summary. */
@@ -458,6 +454,14 @@ export async function* streamClaudeCode(turn: CodeTurn): AsyncGenerator<string, 
       }
       // What a helper it started says is its own business; only the main thread is the reply.
       if (event.parent_tool_use_id) continue;
+      // The model it settled on: named when it starts, and on each message it writes.
+      const named =
+        event.type === "system"
+          ? event.model
+          : event.type === "assistant"
+            ? (event.message as { model?: unknown } | undefined)?.model
+            : undefined;
+      if (typeof named === "string" && /^claude-/.test(named)) turn.onModel?.(named);
       if (event.type === "stream_event") {
         const inner = event.event as { type?: string; delta?: Record<string, unknown> } | undefined;
         if (inner?.type === "message_start") {

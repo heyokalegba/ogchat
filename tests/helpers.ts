@@ -142,7 +142,12 @@ export function forbidNetwork(): void {
 export type ClaudeBlock =
   { text: string } | { thinking: string } | { tool: string; id: string; input: unknown };
 
-export function claudeStream(blocks: ClaudeBlock[], stop = "end_turn"): Response {
+export function claudeStream(
+  blocks: ClaudeBlock[],
+  stop = "end_turn",
+  /** The model the API says answered. */
+  model = "claude-opus-5-5",
+): Response {
   const events: [string, unknown][] = [
     [
       "message_start",
@@ -152,7 +157,7 @@ export function claudeStream(blocks: ClaudeBlock[], stop = "end_turn"): Response
           id: "msg_test",
           type: "message",
           role: "assistant",
-          model: "claude-opus-5-5",
+          model,
           content: [],
           stop_reason: null,
           stop_sequence: null,

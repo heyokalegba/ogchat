@@ -383,8 +383,9 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
                 )}
                 <p className={styles.help}>
                   Opus is the most capable of the usual three and costs the most per message; Sonnet
-                  is about half the price; Haiku is far cheaper and quicker. What you pay is by the
-                  token, on your Anthropic account.
+                  is about half the price; Haiku is far cheaper and quicker. Fable 5.2 is the newest
+                  Fable; Fable 5.1 stays listed for chats that want the earlier one. What you pay is
+                  by the token, on your Anthropic account.
                 </p>
               </div>
 
@@ -624,7 +625,11 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
             >
               {REASONING_EFFORTS.map((effort) => (
                 <option key={effort} value={effort}>
-                  {effort === "default" ? "auto (the provider decides)" : effort}
+                  {effort === "default"
+                    ? "auto (the provider decides)"
+                    : effort === "xhigh"
+                      ? "xhigh (extra high)"
+                      : effort}
                 </option>
               ))}
             </select>

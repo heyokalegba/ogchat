@@ -7,6 +7,7 @@ import type {
   Attachment,
   ChatMessage,
   ContextUse,
+  RanOn,
   SendBody,
   Session,
   ReasoningEffort,
@@ -113,6 +114,8 @@ export function useChat(options: UseChatOptions) {
   /** What it has reasoned so far, when the provider shares it. */
   const [thinkingText, setThinkingText] = useState("");
   const thinkingRef = useRef("");
+  /** Which model is writing the reply in progress, and at what thinking level. */
+  const [ranOn, setRanOn] = useState<RanOn | null>(null);
   const [error, setError] = useState<ChatErrorState | null>(null);
   /** How full the model's context window is with this conversation. */
   const [context, setContext] = useState<ContextUse | null>(null);
@@ -178,6 +181,7 @@ export function useChat(options: UseChatOptions) {
     setStreamText("");
     setThinking(false);
     setThinkingText("");
+    setRanOn(null);
   }, []);
 
   /** Fetches the session and adopts whatever state the server is in. */
@@ -197,6 +201,7 @@ export function useChat(options: UseChatOptions) {
           thinkingRef.current = detail.thinking ?? "";
           setStreamText(detail.partial);
           setThinkingText(thinkingRef.current);
+          setRanOn(detail.ranOn ?? null);
           setPhase("following");
         } else {
           resetStream();
@@ -356,6 +361,10 @@ export function useChat(options: UseChatOptions) {
                 });
               }
             }
+            break;
+          }
+          case "model": {
+            setRanOn(event.ranOn);
             break;
           }
           case "delta": {
@@ -633,6 +642,7 @@ export function useChat(options: UseChatOptions) {
     streamText,
     thinking,
     thinkingText,
+    ranOn,
     web,
     setWeb,
     error,

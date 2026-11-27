@@ -155,6 +155,7 @@ describe("sessions API", () => {
       generating: false,
       partial: "",
       thinking: "",
+      ranOn: null,
       context: { tokens: 4, limit: 1_000_000 },
     });
   });
@@ -226,7 +227,21 @@ describe("sending messages", () => {
     const session = await create();
 
     const events = await send(session.id, { content: "  Say hello to the world  " });
-    expect(events.map((e) => e.type)).toEqual(["start", "delta", "delta", "delta", "done"]);
+    expect(events.map((e) => e.type)).toEqual([
+      "start",
+      "model",
+      "delta",
+      "delta",
+      "delta",
+      "done",
+    ]);
+    // Which model is answering, and at which thinking level, is said before the reply.
+    const said = { provider: "compatible", requested: "abliterated-model-large-v2" };
+    expect((events[1] as Extract<StreamEvent, { type: "model" }>).ranOn).toEqual({
+      ...said,
+      model: "abliterated-model-large-v2",
+      effort: null,
+    });
 
     const start = events[0] as Extract<StreamEvent, { type: "start" }>;
     expect(start.userMessage).toMatchObject({ role: "user", content: "Say hello to the world" });
@@ -247,6 +262,8 @@ describe("sending messages", () => {
       ["assistant", "Hello, world."],
     ]);
     expect(stored.session.messages[1]?.id).toBe(done.message?.id);
+    // …and kept with the reply.
+    expect(stored.session.messages[1]?.ranOn).toMatchObject({ ...said, effort: null });
 
     expect(provider.calls).toHaveLength(1);
     expect(provider.calls[0]).toMatchObject({
@@ -310,6 +327,7 @@ describe("sending messages", () => {
     const events = await send(session.id, { content: "hi" });
     expect(events.map((event) => event.type)).toEqual([
       "start",
+      "model",
       "thinking",
       "thinking",
       "delta",
@@ -359,6 +377,12 @@ describe("sending messages", () => {
       "user",
       "assistant",
     ]);
+
+    // The OpenAI shape has no "xhigh": it goes as "high", and the reply says so.
+    await putSettings(req("PUT", "/api/settings", { reasoning: "xhigh" }));
+    const events = await send(session.id, { content: "harder" });
+    expect(provider.calls[2]?.body.reasoning_effort).toBe("high");
+    expect(last(events, "done").message?.ranOn?.effort).toBe("high");
   });
 
   it("asks the provider to search the web only for messages sent with web on", async () => {
@@ -720,7 +744,7 @@ describe("failures surface as inline errors, never a lost session", () => {
 
   it("no key: asks for one, and nothing is sent", async () => {
     const { provider, session, events } = await failingTurn(() => sseResponse(["unreachable"]));
-    expect(events.map((e) => e.type)).toEqual(["start", "error"]);
+    expect(events.map((e) => e.type)).toEqual(["start", "model", "error"]);
     const error = last(events, "error");
     expect(error.error.code).toBe("not_configured");
     expect(error.error.message).toMatch(/settings/i);
@@ -814,7 +838,7 @@ describe("failures surface as inline errors, never a lost session", () => {
           { headers: { "Content-Type": "text/event-stream" } },
         ),
     );
-    expect(events.map((e) => e.type)).toEqual(["start", "delta", "error"]);
+    expect(events.map((e) => e.type)).toEqual(["start", "model", "delta", "error"]);
     const error = last(events, "error");
     expect(error.error.code).toBe("network");
     expect(error.message).toMatchObject({ content: "I was say", partial: true });

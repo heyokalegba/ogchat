@@ -13,6 +13,7 @@ import {
   type ReactNode,
 } from "react";
 import { createApi } from "@/lib/client/api";
+import { describeRanOn, modelName } from "@/lib/models";
 import type {
   ChatMessage,
   ModelChoice,
@@ -352,7 +353,12 @@ export function ChatSurface(props: ChatSurfaceProps) {
                 </Fragment>
               ))}
               {busy && (
-                <StreamingMessage text={streamText} thinking={thinking} thought={thinkingText} />
+                <StreamingMessage
+                  text={streamText}
+                  thinking={thinking}
+                  thought={thinkingText}
+                  ranOn={chat.ranOn}
+                />
               )}
             </div>
 
@@ -455,7 +461,11 @@ export function ChatSurface(props: ChatSurfaceProps) {
                   <span className={`${styles.dot} ${busy ? styles.dotBusy : ""}`} />
                   {busy || !props.models || !props.model || !props.onModelChange ? (
                     <span className={styles.statusLabel}>
-                      {busy ? "generating" : provider.model}
+                      {busy
+                        ? chat.ranOn
+                          ? `generating · ${describeRanOn(chat.ranOn).short}`
+                          : "generating"
+                        : modelName(provider.model)}
                     </span>
                   ) : (
                     <ModelPicker

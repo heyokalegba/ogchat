@@ -149,6 +149,27 @@ describe("a reply from Claude", () => {
     });
   });
 
+  it("sends Fable 5.2 with xhigh as it is, and says which model answered", async () => {
+    const calls = stubNet(() => claudeStream([{ text: "ok" }], "end_turn", "claude-fable-5-2"));
+    const seen: string[] = [];
+    await collect(
+      streamClaude({
+        apiKey: KEY,
+        model: "claude-fable-5-2",
+        messages,
+        effort: "xhigh",
+        onModel: (id) => seen.push(id),
+      }),
+    );
+    expect(calls[0]!.body).toMatchObject({
+      model: "claude-fable-5-2",
+      output_config: { effort: "xhigh" },
+      // Fable 5.2 may decline on policy grounds; the API may hand it on.
+      fallbacks: "default",
+    });
+    expect(seen).toEqual(["claude-fable-5-2"]);
+  });
+
   it("leaves thinking, effort and the fallback off for a model that takes none of them", async () => {
     const calls = stubNet(() => claudeStream([{ text: "ok" }]));
     await collect(
@@ -595,6 +616,37 @@ describe("Claude and a repository, through the app", () => {
     expect((await putSettings(req("PUT", "/api/settings", { provider: "nonsense" }))).status).toBe(
       400,
     );
+  });
+
+  it("records on each reply which model wrote it and at what thinking level", async () => {
+    await putSettings(req("PUT", "/api/settings", { provider: "claude", claudeKey: KEY }));
+    const { session } = (await (
+      await createSession(
+        req("POST", "/api/sessions", {
+          model: { provider: "claude", model: "claude-fable-5-2" },
+          reasoning: "xhigh",
+        }),
+      )
+    ).json()) as { session: Session };
+    expect(session.reasoning).toBe("xhigh");
+    // Fable 5.2 declines and the API hands the request to Opus 5.5.
+    stubNet(() => claudeStream([{ text: "answered" }], "end_turn", "claude-opus-5-5"));
+    const sent = await events(
+      await sendMessage(
+        req("POST", `/api/sessions/${session.id}/messages`, { content: "hi" }),
+        ctx(session.id),
+      ),
+    );
+    const said = sent.filter((e) => e.type === "model").map((e) => e.ranOn);
+    const asked = { provider: "claude", requested: "claude-fable-5-2", effort: "xhigh" };
+    expect(said).toEqual([
+      { ...asked, model: "claude-fable-5-2" },
+      { ...asked, model: "claude-opus-5-5" },
+    ]);
+    const detail = (await (
+      await getSession(req("GET", `/api/sessions/${session.id}`), ctx(session.id))
+    ).json()) as SessionDetail;
+    expect(detail.session.messages.at(-1)?.ranOn).toEqual({ ...asked, model: "claude-opus-5-5" });
   });
 
   it("tests Claude by asking about the model, which costs nothing", async () => {

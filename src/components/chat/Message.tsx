@@ -2,7 +2,8 @@
 
 import { memo, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { clockTime } from "@/lib/format";
-import type { Attachment, ChatMessage } from "@/lib/types";
+import { describeRanOn } from "@/lib/models";
+import type { Attachment, ChatMessage, RanOn } from "@/lib/types";
 import { MessageAttachments } from "./Attachments";
 import { BlockCaret } from "./BlockCaret";
 import styles from "./chat.module.css";
@@ -26,16 +27,34 @@ export interface MessageViewProps {
 
 const CONFIRM_MS = 3000;
 
+/** Whether something read back from disk is a usable RanOn (older replies have none). */
+function usable(ranOn: RanOn | null | undefined): ranOn is RanOn {
+  return Boolean(ranOn && typeof ranOn.model === "string" && typeof ranOn.provider === "string");
+}
+
+/** Which model wrote a reply and at what thinking level; the full story is in its tooltip. */
+function ModelNote({ ranOn }: { ranOn: RanOn }) {
+  const { short, full } = describeRanOn(ranOn);
+  return (
+    <span className={styles.modelNote} title={full} aria-label={full.replace(/\n/g, " ")}>
+      {short}
+    </span>
+  );
+}
+
 function TagRow({
   role,
   time,
   note,
+  ranOn,
   children,
 }: {
   role: string;
   time: string;
   /** A word after the time, such as "web" on a message that searched. */
   note?: string;
+  /** On a reply: the model and thinking level it was written with. */
+  ranOn?: RanOn | null;
   children?: React.ReactNode;
 }) {
   const tone =
@@ -49,6 +68,7 @@ function TagRow({
       <span className={`${styles.tag} ${tone}`}>{role}&gt;</span>
       {time && <time className={styles.time}>{time}</time>}
       {note && <span className={styles.time}>{note}</span>}
+      {usable(ranOn) && <ModelNote ranOn={ranOn} />}
       {children}
     </div>
   );
@@ -157,6 +177,7 @@ export const MessageView = memo(function MessageView(props: MessageViewProps) {
         role={message.role}
         time={clockTime(message.createdAt)}
         note={message.web ? "web" : undefined}
+        ranOn={isUser ? null : message.ranOn}
       >
         <div className={`${styles.actions} ${confirming ? styles.actionsPinned : ""}`}>
           {isUser && message.content && <CopyButton text={message.content} label="prompt" />}
@@ -259,11 +280,17 @@ function Thought({ text, live }: { text: string; live: boolean }) {
   );
 }
 
-export function StreamingMessage(props: { text: string; thinking?: boolean; thought?: string }) {
-  const { text, thinking, thought } = props;
+export function StreamingMessage(props: {
+  text: string;
+  thinking?: boolean;
+  thought?: string;
+  /** The model writing it and its thinking level, once the server has said. */
+  ranOn?: RanOn | null;
+}) {
+  const { text, thinking, thought, ranOn } = props;
   return (
     <article className={styles.message} data-role="assistant" aria-live="off">
-      <TagRow role="assistant" time="" />
+      <TagRow role="assistant" time="" ranOn={ranOn} />
       {thought && <Thought text={thought} live={!text} />}
       <div className={`${styles.body} ${styles.streaming}`}>
         {text ? (

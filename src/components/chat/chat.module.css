@@ -235,6 +235,7 @@
 /* Labels on the wall sit on a strip of paper, whatever brick is behind them. */
 .messages .tag,
 .messages .time,
+.messages .modelNote,
 .messages .action {
   padding: 1px 6px;
   background: rgba(235, 228, 212, 0.8);
@@ -261,6 +262,18 @@
   font-weight: 600;
   color: var(--og-text-2);
   font-variant-numeric: tabular-nums;
+}
+
+/* On a reply: the model that wrote it and the thinking level. The tooltip says more. */
+.modelNote {
+  font-size: calc(12px * var(--og-type));
+  font-weight: 600;
+  color: var(--og-text-2);
+  cursor: help;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .actions {

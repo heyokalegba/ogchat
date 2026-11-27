@@ -371,6 +371,8 @@ workspace does the same without the id.
 | `claude-opus-5-5`   | the default: the hardest work | most  |
 | `claude-sonnet-5-5` | everyday chat and code        | less  |
 | `claude-haiku-5-5`  | quick questions               | least |
+| `claude-fable-5-2`  | the newest Fable              |       |
+| `claude-fable-5-1`  | the Fable before it           |       |
 
 You pay by the token on your Anthropic account, and every message sends the
 whole conversation again, so long chats cost more per message: the meter under
@@ -511,9 +513,15 @@ output.
 2. Sign in, in Terminal: `claude auth login`.
 3. In settings choose **claude code** and press **test**: it says which
    account the program is signed in as. Nothing is sent to a model by the test.
-4. Pick _Claude Code_ (or _Claude Code · Opus_, _· Sonnet_ …) in a chat's model
-   list, or leave **claude code** as the provider in settings to make it the
-   default for new chats.
+4. Pick a Claude Code model in a chat's model list, or leave **claude code** as
+   the provider in settings to make it the default for new chats.
+
+**Which model.** _Claude Code · Fable 5.2_, _· Fable 5.1_, _· Opus 5.5_ and so
+on pass that exact model id (`--model claude-fable-5-2`), so the chat gets that
+model whatever version of Claude Code is installed. _Claude Code · Fable (its
+newest)_ and the other aliases are whatever the installed Claude Code takes
+them to mean, which can lag behind: an older Claude Code takes `fable` to be
+Fable 5.1. Either way the reply says which model Claude Code actually used.
 
 **A second account.** Claude Code keeps one sign-in per folder (`~/.claude`
 by default). To use another account in ogchat without disturbing the one you
@@ -574,8 +582,10 @@ because ogchat sends those as text.
 ### Thinking, web search and a system prompt
 
 - **Thinking.** The `think` button by the message box steps through auto,
-  medium, high and max; settings has the same choice, plus low. It is sent to
-  the provider as `reasoning_effort`. Auto sends nothing. On
+  medium, high, xhigh (extra high) and max; settings has the same choice, plus
+  low. It is sent to Claude as `effort`, to Claude Code as `--effort`, and to
+  the other provider as `reasoning_effort`, which has no xhigh, so that goes as
+  high. Auto sends nothing. On
   `abliterated-model-large-v2` medium and high are the same level, and auto
   means max.
 - **Web search.** The globe by the message box lets the next message search the
@@ -677,6 +687,13 @@ continue`. The count is an estimate from the length of the text, near
   character it is at, that character shown in reverse, blinking in whole
   steps. Click away and it becomes an outline, as in a terminal window that
   is not the active one. `BlockCaret.tsx` draws it.
+- Every reply says, beside its time, which model wrote it and at which thinking
+  level: `Fable 5.2 · think: high`, or `Claude Code · Fable 5.1 · think: auto`.
+  It is the model the provider reports, so a Claude Code alias shows the model
+  it stood for, and a request Claude declined and handed on reads
+  `Opus 5.5 (in place of Fable 5.2)`. Hover it for the full id, the way it was
+  reached and the level that was sent. While a reply is being written the same
+  line is in the status by the message box.
 - While a reasoning model is working out its answer, `thinking` pulses slowly.
   If the provider shares the reasoning, it appears under that heading as it
   is written, folds away when the answer starts, and stays with the reply
@@ -918,28 +935,28 @@ still, with a few figures standing in it.
 
 ## API
 
-| Route                                            | Purpose                                                                                                                                                                                                                         |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/sessions?q=&project=`                  | List sessions, optionally filtered by text and by project (`project` is an id, or `none`)                                                                                                                                       |
-| `POST /api/sessions`                             | Create a session, optionally in a project `{ projectId? }`                                                                                                                                                                      |
-| `GET /api/sessions/:id`                          | Session with messages (and its `summary` once compressed), plus `generating` / `partial` and `context: { tokens, limit }`                                                                                                       |
-| `PATCH /api/sessions/:id`                        | Rename `{ title }`, or file under a project `{ projectId }` (null takes it out)                                                                                                                                                 |
-| `DELETE /api/sessions/:id`                       | Delete                                                                                                                                                                                                                          |
-| `POST /api/sessions/:id/messages`                | Send `{ content, replaceFromMessageId?, web? }` or `{ regenerate: true }`; streams NDJSON events `start`, `thinking`, `delta`, `done` / `error`. With attachments, send `multipart/form-data` with the same fields plus `files` |
-| `GET /api/sessions/:id/files/:fileId`            | An attachment: images as images, everything else as plain text                                                                                                                                                                  |
-| `DELETE /api/sessions/:id/messages/:messageId`   | Delete a user message and everything after it                                                                                                                                                                                   |
-| `POST /api/sessions/:id/stop`                    | Stop the reply in progress                                                                                                                                                                                                      |
-| `GET` / `PUT /api/settings`                      | Read (masked) / update provider settings: `baseUrl`, `model`, `apiKey`, `reasoning`, `systemPrompt`                                                                                                                             |
-| `POST /api/settings/test`                        | Try `{ baseUrl?, model?, apiKey? }` (or the current settings) against the provider without saving; returns `{ check }`                                                                                                          |
-| `GET /api/world`                                 | `{ world: { builtAt } }`: when this street was first opened                                                                                                                                                                     |
-| `POST /api/sessions/:id/compress`                | `{ session, context }`: has the model summarise the conversation and keeps the summary with the session; waits for the model. `400 nothing_to_compress`, `409 busy`, `502` when the provider fails                              |
-| `DELETE /api/sessions/:id/compress`              | `{ session, context }`: drops the summary, so the whole conversation is sent again                                                                                                                                              |
-| `GET /api/weather`                               | `{ now }`: New York's weather at this moment (code, cloud, temperature, wind, snow lying)                                                                                                                                       |
-| `GET /api/weather?date=2025-01-06`               | `{ day: { date, hours } }`: that day hour by hour; `400 bad_date` outside 1 January 2025 to today, `502 weather_unavailable` when the service cannot be reached                                                                 |
-| `GET` / `POST /api/projects`                     | List projects (with instructions, files and session counts) / create one `{ name }`                                                                                                                                             |
-| `GET` / `PATCH` / `DELETE /api/projects/:id`     | Read / update `{ name?, instructions? }` / delete a project. Its sessions are kept                                                                                                                                              |
-| `POST /api/projects/:id/files`                   | Add files (`multipart/form-data`, field `files`)                                                                                                                                                                                |
-| `GET` / `DELETE /api/projects/:id/files/:fileId` | A project file as the model receives it / remove it                                                                                                                                                                             |
+| Route                                            | Purpose                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/sessions?q=&project=`                  | List sessions, optionally filtered by text and by project (`project` is an id, or `none`)                                                                                                                                                                                 |
+| `POST /api/sessions`                             | Create a session, optionally in a project `{ projectId? }`                                                                                                                                                                                                                |
+| `GET /api/sessions/:id`                          | Session with messages (and its `summary` once compressed), plus `generating` / `partial` and `context: { tokens, limit }`                                                                                                                                                 |
+| `PATCH /api/sessions/:id`                        | Rename `{ title }`, or file under a project `{ projectId }` (null takes it out)                                                                                                                                                                                           |
+| `DELETE /api/sessions/:id`                       | Delete                                                                                                                                                                                                                                                                    |
+| `POST /api/sessions/:id/messages`                | Send `{ content, replaceFromMessageId?, web? }` or `{ regenerate: true }`; streams NDJSON events `start`, `model` (which model and thinking level), `thinking`, `delta`, `done` / `error`. With attachments, send `multipart/form-data` with the same fields plus `files` |
+| `GET /api/sessions/:id/files/:fileId`            | An attachment: images as images, everything else as plain text                                                                                                                                                                                                            |
+| `DELETE /api/sessions/:id/messages/:messageId`   | Delete a user message and everything after it                                                                                                                                                                                                                             |
+| `POST /api/sessions/:id/stop`                    | Stop the reply in progress                                                                                                                                                                                                                                                |
+| `GET` / `PUT /api/settings`                      | Read (masked) / update provider settings: `baseUrl`, `model`, `apiKey`, `reasoning`, `systemPrompt`                                                                                                                                                                       |
+| `POST /api/settings/test`                        | Try `{ baseUrl?, model?, apiKey? }` (or the current settings) against the provider without saving; returns `{ check }`                                                                                                                                                    |
+| `GET /api/world`                                 | `{ world: { builtAt } }`: when this street was first opened                                                                                                                                                                                                               |
+| `POST /api/sessions/:id/compress`                | `{ session, context }`: has the model summarise the conversation and keeps the summary with the session; waits for the model. `400 nothing_to_compress`, `409 busy`, `502` when the provider fails                                                                        |
+| `DELETE /api/sessions/:id/compress`              | `{ session, context }`: drops the summary, so the whole conversation is sent again                                                                                                                                                                                        |
+| `GET /api/weather`                               | `{ now }`: New York's weather at this moment (code, cloud, temperature, wind, snow lying)                                                                                                                                                                                 |
+| `GET /api/weather?date=2025-01-06`               | `{ day: { date, hours } }`: that day hour by hour; `400 bad_date` outside 1 January 2025 to today, `502 weather_unavailable` when the service cannot be reached                                                                                                           |
+| `GET` / `POST /api/projects`                     | List projects (with instructions, files and session counts) / create one `{ name }`                                                                                                                                                                                       |
+| `GET` / `PATCH` / `DELETE /api/projects/:id`     | Read / update `{ name?, instructions? }` / delete a project. Its sessions are kept                                                                                                                                                                                        |
+| `POST /api/projects/:id/files`                   | Add files (`multipart/form-data`, field `files`)                                                                                                                                                                                                                          |
+| `GET` / `DELETE /api/projects/:id/files/:fileId` | A project file as the model receives it / remove it                                                                                                                                                                                                                       |
 
 There is no login, so the API only answers requests addressed to a loopback
 host and refuses state-changing requests from other origins. To serve ogchat
