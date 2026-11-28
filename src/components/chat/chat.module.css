@@ -490,9 +490,24 @@
   text-decoration: none;
 }
 
-a.chip:hover {
+a.chip:hover,
+button.chip:hover {
   color: var(--og-white);
   background: var(--og-ink);
+}
+
+/* The part of a waiting file that opens it: everything but its remove button. */
+.chipOpen {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 24px;
+}
+
+.surface .chipOpen:hover .chipName {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .chip svg {
@@ -852,24 +867,31 @@ a.chip:hover {
   background: var(--og-accent);
 }
 
-/* A small lettered control in the input row: the thinking level. */
-.surface .chip {
+/*
+ * A small lettered control in the input row: the thinking level. Always ink on
+ * paper, whatever colour the box has been painted, so it reads on a dark one too.
+ */
+.surface .thinkChip {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   height: 32px;
   padding: 0 8px;
-  border: 2px solid var(--og-input-ink, var(--og-ink));
+  border: 2px solid var(--og-ink);
+  background: var(--og-white);
   font-family: var(--og-font-mono);
   font-size: calc(12px * var(--og-type));
   font-weight: 700;
   white-space: nowrap;
-  color: var(--og-input-ink, var(--og-ink));
+  color: var(--og-ink);
   transition:
     background var(--og-fast) var(--og-ease),
     color var(--og-fast) var(--og-ease);
 }
 
-.surface .chip:hover,
-.surface .chipOn {
+.surface .thinkChip:hover,
+.surface .thinkChipOn {
   color: var(--og-white);
   background: var(--og-ink);
 }
@@ -1228,7 +1250,7 @@ a.chip:hover {
 }
 
 @media (max-width: 560px) {
-  .surface .chip {
+  .surface .thinkChip {
     padding: 0 5px;
   }
   /* No room for the word on a phone; the level alone still says what it is set to. */
@@ -1714,4 +1736,152 @@ a.chip:hover {
 /* A reply's running clock: steady digits, so it does not jitter as it counts. */
 .clock {
   font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------- file viewer */
+
+/* An attachment opened over the chat: dark ink on paper, in every look. */
+.viewerScrim {
+  position: absolute;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(13, 12, 11, 0.55);
+  animation: og-fade 120ms var(--og-ease) both;
+}
+
+.viewer {
+  display: flex;
+  flex-direction: column;
+  width: min(920px, 100%);
+  height: min(760px, 100%);
+  min-height: 0;
+  border: var(--og-line) solid var(--og-ink);
+  background: var(--og-white);
+  color: var(--og-text);
+  box-shadow: var(--og-shadow);
+}
+
+.viewerHead {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 8px 8px 14px;
+  border-bottom: var(--og-line) solid var(--og-ink);
+}
+
+.viewerTitle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-family: var(--og-font-mono);
+}
+
+.viewerName {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: calc(14px * var(--og-type));
+  font-weight: 700;
+  color: var(--og-ink);
+}
+
+.viewerFacts {
+  font-size: calc(12px * var(--og-type));
+  color: var(--og-text-2);
+}
+
+.surface .viewerClose {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  color: var(--og-ink);
+}
+
+.surface .viewerClose:hover {
+  color: var(--og-white);
+  background: var(--og-ink);
+}
+
+.viewerBody {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: auto;
+}
+
+.viewerText {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: transparent;
+  font-family: var(--og-font-mono);
+  font-size: calc(13.5px * var(--og-type));
+  line-height: 1.55;
+  color: var(--og-text);
+  caret-color: var(--og-accent);
+  tab-size: 2;
+}
+
+.surface .viewerText:focus-visible {
+  outline: none;
+}
+
+.viewerImage {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  margin: auto;
+  object-fit: contain;
+}
+
+.viewerNote {
+  margin: auto;
+  max-width: 46ch;
+  padding: 16px;
+  font-size: calc(14.5px * var(--og-type));
+  line-height: 1.5;
+  text-align: center;
+  color: var(--og-text-2);
+}
+
+.viewerFoot {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 10px 10px 14px;
+  border-top: var(--og-line) solid var(--og-ink);
+}
+
+.viewerHint {
+  flex: 1;
+  min-width: 12ch;
+  font-family: var(--og-font-mono);
+  font-size: calc(12px * var(--og-type));
+  color: var(--og-text-2);
+}
+
+.surface a.button {
+  display: inline-grid;
+  place-items: center;
+  text-decoration: none;
+}
+
+@media (max-width: 560px) {
+  .viewerScrim {
+    padding: 0;
+  }
 }

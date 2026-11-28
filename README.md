@@ -675,7 +675,8 @@ The provider must speak the OpenAI chat-completions shape:
   retry it. **copy chat**, under the message box, copies the whole conversation.
 - Attach files with the paperclip, by dropping them on the chat, or by pasting
   (see below). Pasting more than 2,000 characters of text attaches it as a
-  text file instead of filling the message box.
+  text file instead of filling the message box. Press the file to open it:
+  before it is sent you can read and edit it there.
 - Code in a reply sits in a panel as wide as its longest line, at the left, and
   scrolls sideways once it reaches the full width.
 - **The context meter.** Under the message box: how much of the model's
@@ -778,6 +779,15 @@ What a file is gets decided from its contents, not its name. Anything else
 (archives, Office documents, audio…) is refused with a message, and your draft
 and the other files stay in the composer. Text longer than 200,000 characters
 per file is cut and marked as truncated.
+
+**Opening a file.** Press an attached file to open it over the chat, dark on
+light whatever the look. One that is still waiting in the message box can be
+changed when it is text, which is how you edit a long paste: change it, then
+**save** (⌘S) and it goes out as you left it. **remove** takes it off the
+message, and closing with unsaved edits asks once before it throws them away.
+A file on a sent message opens the same way, to read or copy: for a PDF that is
+the text the model was given. **open in a window** puts it in a window of its
+own.
 
 Attachments stay part of the conversation: they are re-sent as context on every
 later turn of that session, kept when you edit the message, and deleted from

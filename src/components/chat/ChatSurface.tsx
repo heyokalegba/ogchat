@@ -15,6 +15,7 @@ import {
 import { createApi } from "@/lib/client/api";
 import { describeRanOn, effortFacts, effortName, modelName } from "@/lib/models";
 import type {
+  Attachment,
   ChatMessage,
   ModelChoice,
   ReasoningEffort,
@@ -31,6 +32,7 @@ import { MessageView, StreamingMessage } from "./Message";
 import "./theme.css";
 import { useChat } from "./useChat";
 import { Elapsed } from "./Elapsed";
+import { FileViewer, type Viewing } from "./FileViewer";
 
 export interface ChatSurfaceProps {
   /** Session to show; null starts a new conversation that is saved on first send. */
@@ -175,6 +177,21 @@ export function ChatSurface(props: ChatSurfaceProps) {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // A file opened over the chat: one waiting in the message box, or one already sent.
+  const [viewing, setViewing] = useState<Viewing | null>(null);
+  const openPending = useCallback((file: File) => setViewing({ kind: "pending", file }), []);
+  const openSent = useCallback(
+    (attachment: Attachment, url: string) => setViewing({ kind: "sent", attachment, url }),
+    [],
+  );
+  const closeViewer = useCallback(() => {
+    setViewing(null);
+    inputRef.current?.focus();
+  }, []);
+  // A waiting file that has gone (sent, removed, another chat opened) takes its viewer with it.
+  const viewed =
+    viewing && (viewing.kind === "sent" || chat.files.includes(viewing.file)) ? viewing : null;
   const stick = useRef(true);
 
   const busy = phase === "streaming" || phase === "following";
@@ -351,6 +368,7 @@ export function ChatSurface(props: ChatSurfaceProps) {
                     }
                     onReplay={onReplay}
                     fileUrl={chat.fileUrl}
+                    onOpenFile={openSent}
                   />
                   {chat.summary?.upTo === message.id && (
                     <SummaryMark
@@ -489,6 +507,7 @@ export function ChatSurface(props: ChatSurfaceProps) {
         files={chat.files}
         onAddFiles={chat.addFiles}
         onRemoveFile={chat.removeFile}
+        onOpenFile={openPending}
         web={chat.web}
         onToggleWeb={() => chat.setWeb(!chat.web)}
         reasoning={props.reasoning}
@@ -564,6 +583,20 @@ export function ChatSurface(props: ChatSurfaceProps) {
           </div>
         }
       />
+      {viewed && (
+        <FileViewer
+          viewing={viewed}
+          onSave={(file, next) => {
+            chat.replaceFile(file, next);
+            closeViewer();
+          }}
+          onRemove={(file) => {
+            chat.removeFile(chat.files.indexOf(file));
+            closeViewer();
+          }}
+          onClose={closeViewer}
+        />
+      )}
     </section>
   );
 }
