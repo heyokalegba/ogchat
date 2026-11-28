@@ -433,6 +433,9 @@ With Claude as the chat's model, a bar sits just above the message box:
   go only to the chat's `ogchat/...` branch.
 - **env**: the environment its commands run in (shown once _Let Claude run
   code_ is on).
+- **folder** (chats on Claude Code): a folder on this computer for the chat to
+  work in, in place of a repository. See
+  [A folder of your own](#a-folder-of-your-own-working-on-local-files) below.
 
 Each chat keeps its own, so two chats, or two windows, can be at work on
 different repositories at once. Set them before the first message or change
@@ -543,6 +546,8 @@ commits there, and pushes or opens a pull request when you ask. If there is a
 GitHub token in settings, git and `gh` inside the chat are signed in with it
 (by environment, not written to disk); without one, this computer's own git
 sign-in is used. With no repository the chat gets an empty folder of its own.
+Or give it [a folder of your own](#a-folder-of-your-own-working-on-local-files),
+and it works on the files that are already on this computer.
 
 **Memory.** Each chat keeps one Claude Code session and resumes it, so Claude
 Code remembers the files it has read. If you edit or delete a message, or
@@ -553,6 +558,41 @@ Claude Code to run when commands are allowed. The network switch and the
 context meter do not apply: Claude Code manages its own context. Images
 attached to a message are not passed on. Its usage counts against the plan of
 the account it is signed in to, under that account's terms.
+
+### A folder of your own: working on local files
+
+A chat on Claude Code can work in any folder on this computer, on the files as
+they are, instead of in a copy ogchat keeps. In the bar above the message box,
+type or paste the folder's path under **folder** (`~/projects/site`; a path
+dragged out of Finder or Terminal works too) and press Enter, or press
+**choose…** to pick it in the Mac's own folder window. Clear the box to go
+back to a folder kept for the chat.
+
+From the next message on, Claude Code is started in that folder. It reads
+what is there and, at the permission level in settings, edits it:
+
+- The edits are made **in place**. ogchat keeps no copy and no undo of its
+  own; if the folder is a git repository, `git diff` shows what changed and
+  git can take it back. For anything you could not afford to lose, commit or
+  copy it first.
+- With _look only_ it reads and changes nothing. With _edit files_ (the
+  default) it edits files in the folder. With _edit files and run commands_
+  or _auto_ it also runs commands there, as you, outside ogchat's sandbox.
+- It is told the files are yours: to change only what the task calls for, to
+  say which files it changed, and to leave git alone (no commits, pushes or
+  branches) unless you ask.
+- A chat works in a folder **or** on a repository, not both: setting one
+  clears the other. A project's repository is not used while the chat has a
+  folder.
+- Changing the folder starts a fresh Claude Code session in the new one, told
+  what was said so far. Deleting the chat never touches the folder.
+- If the folder is moved or deleted, the next message says so instead of
+  running somewhere else.
+
+This is for chats on **Claude Code** only. Claude through the API key runs its
+commands inside a sandbox that is kept out of your home folder on purpose, so
+it has no folder of yours to be given; it works on a repository's copy, or on
+files you attach.
 
 ### Switching between Claude accounts
 
@@ -588,6 +628,22 @@ account starts a fresh Claude Code session there and is told what was said so
 far, since one account cannot resume another's session. Removing an account
 from the list leaves its folder on disk alone. Keys are kept in
 `data/settings.json` like the others, and are only ever shown masked.
+
+**Colours.** Once there is more than one account, each has a colour, so that
+a chat on one is told from a chat on another at a glance:
+
+- in the list of chats, the **C** beside a Claude chat is filled with the
+  colour of the account its latest reply ran on (hover it for the name);
+- beside each reply, a dot in the colour of the account that reply ran on, so
+  a chat that moved from one account to another shows where;
+- at the top of a Claude chat, a dot in the **account** list in the colour of
+  the account the next reply will run on.
+
+The first account is blue, the next green, then violet, and so on. To give an
+account another colour, pick it in settings under **its colour**, below the
+account's name. An account keeps its colour when it is renamed or when
+another is removed. A reply written before there was a second account counts
+as the main account's.
 
 ### Plan usage or API tokens: what a Claude chat is paid for with
 
@@ -1042,29 +1098,30 @@ still, with a few figures standing in it.
 
 ## API
 
-| Route                                            | Purpose                                                                                                                                                                                                                                                                   |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/sessions?q=&project=`                  | List sessions, optionally filtered by text and by project (`project` is an id, or `none`)                                                                                                                                                                                 |
-| `POST /api/sessions`                             | Create a session, optionally in a project `{ projectId? }`                                                                                                                                                                                                                |
-| `GET /api/sessions/:id`                          | Session with messages (and its `summary` once compressed), plus `generating` / `partial` and `context: { tokens, limit }`                                                                                                                                                 |
-| `PATCH /api/sessions/:id`                        | Rename `{ title }`, or file under a project `{ projectId }` (null takes it out)                                                                                                                                                                                           |
-| `DELETE /api/sessions/:id`                       | Delete                                                                                                                                                                                                                                                                    |
-| `POST /api/sessions/:id/messages`                | Send `{ content, replaceFromMessageId?, web? }` or `{ regenerate: true }`; streams NDJSON events `start`, `model` (which model and thinking level), `thinking`, `delta`, `done` / `error`. With attachments, send `multipart/form-data` with the same fields plus `files` |
-| `GET /api/sessions/:id/files/:fileId`            | An attachment: images as images, everything else as plain text                                                                                                                                                                                                            |
-| `DELETE /api/sessions/:id/messages/:messageId`   | Delete a user message and everything after it                                                                                                                                                                                                                             |
-| `POST /api/sessions/:id/stop`                    | Stop the reply in progress                                                                                                                                                                                                                                                |
-| `GET` / `PUT /api/settings`                      | Read (masked) / update provider settings: `baseUrl`, `model`, `apiKey`, `reasoning`, `systemPrompt`                                                                                                                                                                       |
-| `GET /api/settings/sign-in`                      | `{ signIn: { state, email } }`: how Claude Code is signed in on the account in use. `state` is `plan` (replies count against a Claude plan), `api` (the Console: API tokens), `out` or `unknown`                                                                          |
-| `POST /api/settings/test`                        | Try `{ baseUrl?, model?, apiKey? }` (or the current settings) against the provider without saving; returns `{ check }`                                                                                                                                                    |
-| `GET /api/world`                                 | `{ world: { builtAt } }`: when this street was first opened                                                                                                                                                                                                               |
-| `POST /api/sessions/:id/compress`                | `{ session, context }`: has the model summarise the conversation and keeps the summary with the session; waits for the model. `400 nothing_to_compress`, `409 busy`, `502` when the provider fails                                                                        |
-| `DELETE /api/sessions/:id/compress`              | `{ session, context }`: drops the summary, so the whole conversation is sent again                                                                                                                                                                                        |
-| `GET /api/weather`                               | `{ now }`: New York's weather at this moment (code, cloud, temperature, wind, snow lying)                                                                                                                                                                                 |
-| `GET /api/weather?date=2025-01-06`               | `{ day: { date, hours } }`: that day hour by hour; `400 bad_date` outside 1 January 2025 to today, `502 weather_unavailable` when the service cannot be reached                                                                                                           |
-| `GET` / `POST /api/projects`                     | List projects (with instructions, files and session counts) / create one `{ name }`                                                                                                                                                                                       |
-| `GET` / `PATCH` / `DELETE /api/projects/:id`     | Read / update `{ name?, instructions? }` / delete a project. Its sessions are kept                                                                                                                                                                                        |
-| `POST /api/projects/:id/files`                   | Add files (`multipart/form-data`, field `files`)                                                                                                                                                                                                                          |
-| `GET` / `DELETE /api/projects/:id/files/:fileId` | A project file as the model receives it / remove it                                                                                                                                                                                                                       |
+| Route                                            | Purpose                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/sessions?q=&project=`                  | List sessions, optionally filtered by text and by project (`project` is an id, or `none`)                                                                                                                                                                                    |
+| `POST /api/sessions`                             | Create a session, optionally in a project `{ projectId? }` and with where it works `{ repo?, branch?, environmentId?, folder? }`                                                                                                                                             |
+| `GET /api/sessions/:id`                          | Session with messages (and its `summary` once compressed), plus `generating` / `partial` and `context: { tokens, limit }`                                                                                                                                                    |
+| `PATCH /api/sessions/:id`                        | Rename `{ title }`, file under a project `{ projectId }` (null takes it out), or set where it works `{ repo?, branch?, environmentId?, folder? }` (null clears one; a `folder` on this computer takes the place of a repository, and the other way round). `400 bad_work`    |
+| `DELETE /api/sessions/:id`                       | Delete                                                                                                                                                                                                                                                                       |
+| `POST /api/sessions/:id/messages`                | Send `{ content, replaceFromMessageId?, web? }` or `{ regenerate: true }`; streams NDJSON events `start`, `model` (which model and thinking level), `thinking`, `delta`, `done` / `error`. With attachments, send `multipart/form-data` with the same fields plus `files`    |
+| `GET /api/sessions/:id/files/:fileId`            | An attachment: images as images, everything else as plain text                                                                                                                                                                                                               |
+| `DELETE /api/sessions/:id/messages/:messageId`   | Delete a user message and everything after it                                                                                                                                                                                                                                |
+| `POST /api/sessions/:id/stop`                    | Stop the reply in progress                                                                                                                                                                                                                                                   |
+| `GET` / `PUT /api/settings`                      | Read (masked) / update provider settings: `baseUrl`, `model`, `apiKey`, `reasoning`, `systemPrompt`                                                                                                                                                                          |
+| `GET /api/settings/sign-in`                      | `{ signIn: { state, email } }`: how Claude Code is signed in on the account in use. `state` is `plan` (replies count against a Claude plan), `api` (the Console: API tokens), `out` or `unknown`                                                                             |
+| `POST /api/folders`                              | `{ path }` → `{ folder }`: checks that a path is a folder on this computer and gives it back in full; `400 bad_folder` says why not. `{ choose: true }` opens the system's folder window and answers `{ folder }` (null when cancelled); `501 no_dialog` where there is none |
+| `POST /api/settings/test`                        | Try `{ baseUrl?, model?, apiKey? }` (or the current settings) against the provider without saving; returns `{ check }`                                                                                                                                                       |
+| `GET /api/world`                                 | `{ world: { builtAt } }`: when this street was first opened                                                                                                                                                                                                                  |
+| `POST /api/sessions/:id/compress`                | `{ session, context }`: has the model summarise the conversation and keeps the summary with the session; waits for the model. `400 nothing_to_compress`, `409 busy`, `502` when the provider fails                                                                           |
+| `DELETE /api/sessions/:id/compress`              | `{ session, context }`: drops the summary, so the whole conversation is sent again                                                                                                                                                                                           |
+| `GET /api/weather`                               | `{ now }`: New York's weather at this moment (code, cloud, temperature, wind, snow lying)                                                                                                                                                                                    |
+| `GET /api/weather?date=2025-01-06`               | `{ day: { date, hours } }`: that day hour by hour; `400 bad_date` outside 1 January 2025 to today, `502 weather_unavailable` when the service cannot be reached                                                                                                              |
+| `GET` / `POST /api/projects`                     | List projects (with instructions, files and session counts) / create one `{ name }`                                                                                                                                                                                          |
+| `GET` / `PATCH` / `DELETE /api/projects/:id`     | Read / update `{ name?, instructions? }` / delete a project. Its sessions are kept                                                                                                                                                                                           |
+| `POST /api/projects/:id/files`                   | Add files (`multipart/form-data`, field `files`)                                                                                                                                                                                                                             |
+| `GET` / `DELETE /api/projects/:id/files/:fileId` | A project file as the model receives it / remove it                                                                                                                                                                                                                          |
 
 There is no login, so the API only answers requests addressed to a loopback
 host and refuses state-changing requests from other origins. To serve ogchat

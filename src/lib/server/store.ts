@@ -13,6 +13,7 @@ import type {
   SessionWork,
 } from "@/lib/types";
 import { PROVIDER_CHOICES, REASONING_EFFORTS, type ReasoningEffort } from "@/lib/types";
+import { accountRefOf } from "@/lib/accounts";
 import { titleFromMessage } from "@/lib/title";
 import { pruneFiles, removeSessionFiles } from "./files";
 import { readJson, writeJsonAtomic } from "./fsjson";
@@ -46,6 +47,8 @@ interface SessionFile {
   repo?: string;
   branch?: string;
   environmentId?: string;
+  /** A folder on this computer it works in, in place of a repository. */
+  folder?: string;
   /** The Claude Code session this chat carries on with, if it runs on Claude Code. */
   code?: CodeSession;
   createdAt: string;
@@ -98,6 +101,7 @@ function parseFile(value: unknown, id: string): SessionFile | null {
     ...(typeof f.repo === "string" && f.repo ? { repo: f.repo } : {}),
     ...(typeof f.branch === "string" && f.branch ? { branch: f.branch } : {}),
     ...(isValidId(f.environmentId) ? { environmentId: f.environmentId } : {}),
+    ...(typeof f.folder === "string" && f.folder ? { folder: f.folder } : {}),
     ...(isCodeSession(f.code) ? { code: f.code } : {}),
     createdAt: f.createdAt,
     updatedAt: f.updatedAt,
@@ -183,6 +187,15 @@ function save(file: SessionFile): void {
   writeJsonAtomic(fileFor(file.id), file);
 }
 
+/** The Claude account a chat was last on: the one its latest reply from Claude ran on. */
+function lastAccount(messages: ChatMessage[]): Session["account"] {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const ref = accountRefOf(messages[i]!.ranOn);
+    if (ref) return ref;
+  }
+  return null;
+}
+
 function toSession(file: SessionFile): Session {
   return {
     id: file.id,
@@ -196,6 +209,8 @@ function toSession(file: SessionFile): Session {
     repo: file.repo ?? null,
     branch: file.branch ?? null,
     environmentId: file.environmentId ?? null,
+    folder: file.folder ?? null,
+    account: lastAccount(file.messages),
     messages: file.messages,
     ...(file.summary ? { summary: file.summary } : {}),
   };
@@ -214,6 +229,8 @@ export function toMeta(session: SessionMeta): SessionMeta {
     repo: session.repo ?? null,
     branch: session.branch ?? null,
     environmentId: session.environmentId ?? null,
+    folder: session.folder ?? null,
+    account: session.account ?? null,
   };
 }
 
@@ -273,8 +290,10 @@ export function createSession(
     ...(projectId ? { projectId } : {}),
     ...(model ? { model } : {}),
     ...(reasoning ? { reasoning } : {}),
-    ...(work?.repo ? { repo: work.repo } : {}),
-    ...(work?.repo && work.branch ? { branch: work.branch } : {}),
+    // A folder of your own or a repository: the folder, if both were given.
+    ...(work?.folder ? { folder: work.folder } : {}),
+    ...(work?.repo && !work.folder ? { repo: work.repo } : {}),
+    ...(work?.repo && !work.folder && work.branch ? { branch: work.branch } : {}),
     ...(work?.environmentId ? { environmentId: work.environmentId } : {}),
     createdAt: now,
     updatedAt: now,
@@ -310,21 +329,31 @@ export function setSessionModel(id: string, model: SessionModel | null): Session
 }
 
 /**
- * Sets where a session works. Each of repository, branch and environment is
- * changed only if given; null clears it. A branch belongs to a repository:
- * changing the repository drops the branch unless a new one comes with it.
- * The values are checked by the caller.
+ * Sets where a session works. Each of repository, branch, environment and
+ * folder is changed only if given; null clears it. A branch belongs to a
+ * repository: changing the repository drops the branch unless a new one comes
+ * with it. A chat works in a folder of your own or on a repository, not both:
+ * setting one takes the other away. The values are checked by the caller.
  */
 export function setSessionWork(id: string, work: Partial<SessionWork>): Session | null {
   const file = load(id);
   if (!file) return null;
-  if (work.repo !== undefined) {
-    if (work.repo !== (file.repo ?? null)) delete file.branch;
-    if (work.repo) file.repo = work.repo;
-    else delete file.repo;
+  if (work.folder !== undefined) {
+    if (work.folder) file.folder = work.folder;
+    else delete file.folder;
   }
-  if (work.branch !== undefined) {
-    if (work.branch) file.branch = work.branch;
+  if (work.folder) {
+    delete file.repo;
+    delete file.branch;
+  } else if (work.repo !== undefined) {
+    if (work.repo !== (file.repo ?? null)) delete file.branch;
+    if (work.repo) {
+      file.repo = work.repo;
+      delete file.folder;
+    } else delete file.repo;
+  }
+  if (work.branch !== undefined && !work.folder) {
+    if (work.branch && file.repo) file.branch = work.branch;
     else delete file.branch;
   }
   if (work.environmentId !== undefined) {

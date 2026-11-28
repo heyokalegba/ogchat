@@ -4,7 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { POST as sendMessage } from "@/app/api/sessions/[id]/messages/route";
-import { POST as createSession } from "@/app/api/sessions/route";
+import { PATCH as patchSession } from "@/app/api/sessions/[id]/route";
+import { GET as listSessions, POST as createSession } from "@/app/api/sessions/route";
 import { GET as getSettings, PUT as putSettings } from "@/app/api/settings/route";
 import { GET as getSignIn } from "@/app/api/settings/sign-in/route";
 import { POST as testSettings } from "@/app/api/settings/test/route";
@@ -20,7 +21,7 @@ import {
 } from "@/lib/server/claudecode";
 import { workBranch } from "@/lib/server/github";
 import { getSession, truncateFrom } from "@/lib/server/store";
-import type { PublicSettings, Session, StreamEvent } from "@/lib/types";
+import type { PublicSettings, Session, SessionMeta, StreamEvent } from "@/lib/types";
 import { useTempDataDir } from "./helpers";
 
 useTempDataDir();
@@ -132,6 +133,18 @@ describe("what Claude Code is started with", () => {
     expect(codeBriefing({ sessionId: SESSION, permission: "plan", hasToken: false })).toContain(
       "plan mode",
     );
+    // In a folder of your own it is told the files are yours, and to leave git alone.
+    const yours = codeBriefing({
+      sessionId: SESSION,
+      folder: "/Users/someone/site",
+      repo: "octo/widgets",
+      permission: "run",
+      hasToken: true,
+    });
+    expect(yours).toContain("Your working directory is /Users/someone/site");
+    expect(yours).toContain("in place");
+    expect(yours).toContain("do not commit, push");
+    expect(yours).not.toContain("octo/widgets");
   });
 });
 
@@ -326,6 +339,21 @@ describe("the folder a Claude Code chat works in", () => {
       codeFolder({ sessionId: SESSION, repo: "octo/missing", token: null }),
     ).rejects.toThrow(/could not be cloned/);
   });
+
+  it("is a folder of your own when the chat has one, as it stands, and says so when it has gone", async () => {
+    const mine = temp();
+    fs.writeFileSync(path.join(mine, "notes.txt"), "mine");
+    // It comes before a repository, and nothing is cloned into it or made beside it.
+    expect(
+      await codeFolder({ sessionId: SESSION, folder: mine, repo: "octo/missing", token: null }),
+    ).toBe(mine);
+    expect(fs.readdirSync(mine)).toEqual(["notes.txt"]);
+    fs.rmSync(mine, { recursive: true });
+    await expect(codeFolder({ sessionId: SESSION, folder: mine, token: null })).rejects.toThrow(
+      /is not there any more/,
+    );
+    expect(fs.existsSync(mine)).toBe(false);
+  });
 });
 
 describe("Claude Code, through the app", () => {
@@ -498,12 +526,24 @@ describe("Claude Code, through the app", () => {
           message: { ranOn: { account?: string } };
         }
       ).message.ranOn.account;
+    /** The account the chat is marked with in the list: the one its last reply ran on. */
+    const marked = async () =>
+      (
+        (await (await listSessions(req("GET", "/api/sessions"))).json()) as {
+          sessions: SessionMeta[];
+        }
+      ).sessions.find((one) => one.id === session.id)!.account;
 
+    expect(await marked()).toBeNull();
     expect(await said("hello")).toBe("main");
     expect(await said("again")).toBe("main");
+    expect(await marked()).toEqual({ id: "main", name: "main" });
     await putSettings(req("PUT", "/api/settings", { claudeAccount: "a-work" }));
     expect(await said("now from work")).toBe("work");
     expect(await said("and once more")).toBe("work");
+    // By id, which a new name for the account does not change.
+    expect(await marked()).toEqual({ id: "a-work", name: "work" });
+    expect(getSession(session.id)!.messages.at(-1)!.ranOn).toMatchObject({ accountId: "a-work" });
 
     const [one, two, three, four] = runs();
     expect(one!.env.CLAUDE_CONFIG_DIR).toBeUndefined();
@@ -516,6 +556,52 @@ describe("Claude Code, through the app", () => {
     // From then on it carries on with its own.
     expect(four!.env.CLAUDE_CONFIG_DIR).toBe(home);
     expect(four!.args.join(" ")).toMatch(/--resume sess-\d+/);
+  });
+
+  it("works in a folder of your own when the chat is given one, and edits there in place", async () => {
+    const runs = logged();
+    const mine = temp();
+    fs.writeFileSync(path.join(mine, "notes.txt"), "mine");
+    await putSettings(
+      req("PUT", "/api/settings", { provider: "claudecode", claudeCodePath: FAKE }),
+    );
+    const { session } = (await (
+      await createSession(req("POST", "/api/sessions", { folder: mine, repo: "octo/widgets" }))
+    ).json()) as { session: Session };
+    // The folder, not the repository: a chat works in one or on the other.
+    expect(session).toMatchObject({ folder: mine, repo: null, branch: null });
+
+    await send(session.id, "what is in here?");
+    await send(session.id, "and again");
+    const [one, two] = runs();
+    expect(fs.realpathSync(one!.cwd)).toBe(fs.realpathSync(mine));
+    expect(one!.args.join(" ")).toContain(`Your working directory is ${mine}`);
+    // The same folder: its session is carried on.
+    expect(two!.args.join(" ")).toMatch(/--resume sess-\d+/);
+    // Nothing of ogchat's is put in it, and nothing is kept for the chat in its place.
+    expect(fs.readdirSync(mine)).toEqual(["notes.txt"]);
+
+    // Cleared, it is back in a folder kept for the chat, and starts afresh there.
+    await patchSession(
+      req("PATCH", `/api/sessions/${session.id}`, { folder: null }),
+      ctx(session.id),
+    );
+    await send(session.id, "third");
+    const three = runs()[2]!;
+    expect(three.cwd).toContain(session.id);
+    expect(three.args).not.toContain("--resume");
+
+    // A folder that has gone is said plainly, in the chat.
+    const gone = temp();
+    await patchSession(
+      req("PATCH", `/api/sessions/${session.id}`, { folder: gone }),
+      ctx(session.id),
+    );
+    fs.rmSync(gone, { recursive: true });
+    const failed = (await send(session.id, "fourth")).find((e) => e.type === "error");
+    expect(failed).toMatchObject({
+      error: { message: expect.stringContaining("is not there any more") },
+    });
   });
 
   it("shows a plain message in the chat when Claude Code is not signed in", async () => {

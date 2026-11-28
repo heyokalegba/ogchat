@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { ChatSurface } from "@/components/chat";
+import { ChatSurface, ClaudeAccounts } from "@/components/chat";
 import { MenuIcon } from "@/components/chat/icons";
 import "@/components/chat/theme.css";
 import { createApi } from "@/lib/client/api";
@@ -29,9 +29,11 @@ import { shelterOf } from "@/lib/weather";
 import { trafficAt } from "./life";
 import { useAmbience } from "./useAmbience";
 import { useWeather } from "./useWeather";
+import { colorHex } from "@/lib/accounts";
 import { describePaidBy } from "@/lib/models";
 import {
   isClaudeProvider,
+  type ClaudeAccount,
   type CodeSignIn,
   type Environment,
   type Project,
@@ -83,7 +85,9 @@ function writeUrl(id: string | null, mode: "push" | "replace"): void {
   else window.history.replaceState(null, "", url);
 }
 
-const NO_WORK: SessionWork = { repo: null, branch: null, environmentId: null };
+const NO_WORK: SessionWork = { repo: null, branch: null, environmentId: null, folder: null };
+/** One and the same list every time, so that nothing downstream is drawn again for it. */
+const NO_ACCOUNTS: readonly ClaudeAccount[] = [];
 
 function newestFirst(a: SessionMeta, b: SessionMeta): number {
   return b.updatedAt.localeCompare(a.updatedAt) || b.createdAt.localeCompare(a.createdAt);
@@ -597,7 +601,15 @@ export function AppShell() {
   }, [api, codeFound, codeHome]);
   const paid = model && provider?.ready ? describePaidBy(model.provider, codeSignIn) : null;
   // The Claude accounts there are to switch between, when there is more than one.
-  const accounts = settings && settings.claude.accounts.length > 1 ? settings.claude.accounts : [];
+  const accounts =
+    settings && settings.claude.accounts.length > 1 ? settings.claude.accounts : NO_ACCOUNTS;
+  // The one this chat's next reply runs on. An account with no sign-in of its
+  // own (on Claude Code) or no key of its own (on the API) borrows the main one's.
+  const picked = accounts.find((one) => one.id === settings?.claude.account) ?? accounts[0];
+  const accountInUse =
+    picked && (model?.provider === "claudecode" ? picked.configDir : picked.key.set)
+      ? picked
+      : accounts[0];
   const onAccountChange = useCallback(
     (id: string) => {
       setSettings((current) =>
@@ -701,6 +713,15 @@ export function AppShell() {
                 title="Which Claude account this and every other Claude chat runs on, from the next message"
               >
                 <span className={styles.accountLabel}>account</span>
+                {accountInUse && (
+                  <span
+                    className={styles.accountDot}
+                    style={{ background: colorHex(accountInUse.color) }}
+                    data-account={accountInUse.id}
+                    title={`This chat's next reply runs on ${accountInUse.name}`}
+                    aria-hidden="true"
+                  />
+                )}
                 <select
                   className={styles.accountSelect}
                   value={settings.claude.account}
@@ -791,45 +812,49 @@ export function AppShell() {
         </header>
         <div className={styles.surfaceSlot}>
           {ready && (
-            <ChatSurface
-              className={styles.wall}
-              sessionId={activeId}
-              openToken={openToken}
-              provider={provider}
-              models={settings?.choices}
-              model={model}
-              codeSignIn={codeSignIn}
-              onModelChange={onModelChange}
-              startModel={startModel}
-              startReasoning={startReasoning}
-              startWork={startWork}
-              above={
-                settings && model && model.provider !== "compatible" && provider?.ready ? (
-                  <WorkBar
-                    api={api}
-                    // Claude Code can also reach a repository with this computer's own git sign-in.
-                    github={settings.github.set || model.provider === "claudecode"}
-                    runCode={settings.runCode.enabled || model.provider === "claudecode"}
-                    repos={settings.github.set ? repos : []}
-                    environments={environments}
-                    work={activeId ? (activeSession ?? NO_WORK) : startWork}
-                    projectRepo={titleProject?.repo ?? null}
-                    onChange={onWorkChange}
-                    onOpenSettings={openSettings}
-                    onEditEnvironments={() => setEnvironmentsOpen(true)}
-                  />
-                ) : null
-              }
-              projectId={projectId}
-              reasoning={
-                (activeId ? activeSession?.reasoning : startReasoning) ?? settings?.reasoning
-              }
-              onReasoningChange={settings ? onReasoningChange : undefined}
-              onSessionCreated={onSessionCreated}
-              onSessionUpdated={onSessionUpdated}
-              onSessionMissing={onSessionMissing}
-              onOpenSettings={openSettings}
-            />
+            <ClaudeAccounts value={accounts}>
+              <ChatSurface
+                className={styles.wall}
+                sessionId={activeId}
+                openToken={openToken}
+                provider={provider}
+                models={settings?.choices}
+                model={model}
+                codeSignIn={codeSignIn}
+                onModelChange={onModelChange}
+                startModel={startModel}
+                startReasoning={startReasoning}
+                startWork={startWork}
+                above={
+                  settings && model && model.provider !== "compatible" && provider?.ready ? (
+                    <WorkBar
+                      api={api}
+                      // Claude Code can also reach a repository with this computer's own git sign-in.
+                      github={settings.github.set || model.provider === "claudecode"}
+                      runCode={settings.runCode.enabled || model.provider === "claudecode"}
+                      folders={model.provider === "claudecode"}
+                      folderDialog={settings.claudeCode.folderDialog}
+                      repos={settings.github.set ? repos : []}
+                      environments={environments}
+                      work={activeId ? (activeSession ?? NO_WORK) : startWork}
+                      projectRepo={titleProject?.repo ?? null}
+                      onChange={onWorkChange}
+                      onOpenSettings={openSettings}
+                      onEditEnvironments={() => setEnvironmentsOpen(true)}
+                    />
+                  ) : null
+                }
+                projectId={projectId}
+                reasoning={
+                  (activeId ? activeSession?.reasoning : startReasoning) ?? settings?.reasoning
+                }
+                onReasoningChange={settings ? onReasoningChange : undefined}
+                onSessionCreated={onSessionCreated}
+                onSessionUpdated={onSessionUpdated}
+                onSessionMissing={onSessionMissing}
+                onOpenSettings={openSettings}
+              />
+            </ClaudeAccounts>
           )}
         </div>
       </main>

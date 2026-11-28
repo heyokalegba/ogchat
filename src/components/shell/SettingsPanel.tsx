@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { ACCOUNT_COLORS, colorHex, nextAccountColor } from "@/lib/accounts";
 import { ApiError, type ChatApi } from "@/lib/client/api";
 import {
   MAIN_ACCOUNT,
@@ -20,6 +21,8 @@ interface AccountDraft {
   name: string;
   configDir: string;
   workspace: string;
+  /** The colour its chats are marked with. */
+  color: string;
   /** A key typed for it, and whether its saved key is to be removed. */
   key: string;
   dropKey: boolean;
@@ -66,6 +69,7 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
       name: saved.name,
       configDir: saved.configDir,
       workspace: saved.workspace,
+      color: saved.color,
       key: "",
       dropKey: false,
       saved,
@@ -91,6 +95,7 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
         name,
         configDir: `~/.claude-${folderName(name)}`,
         workspace: "",
+        color: nextAccountColor(list.map((one) => one.color)),
         key: "",
         dropKey: false,
         saved: null,
@@ -126,6 +131,7 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
       ? {
           claudeAccount: account.id,
           claudeMainName: main.name.trim(),
+          claudeMainColor: main.color,
           claudeCodeConfigDir: main.configDir.trim(),
           claudeWorkspace: main.workspace.trim(),
           claudeAccounts: accounts.slice(1).map((one) => ({
@@ -133,6 +139,7 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
             name: one.name.trim(),
             configDir: one.configDir.trim(),
             workspace: one.workspace.trim(),
+            color: one.color,
             ...(one.key.trim() ? { key: one.key.trim() } : one.dropKey ? { key: null } : {}),
           })),
         }
@@ -300,7 +307,7 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
               {provider === "claude"
                 ? "Claude, from Anthropic, through the API. Replies are paid for in API tokens, on your API key; your plan's usage limits are not touched. With a GitHub token it can also read and change a repository you tie to a project."
                 : provider === "claudecode"
-                  ? "Claude Code, the program on this computer, on the account it is signed in to in Terminal. Signed in to a Claude plan, replies count against that plan's usage limits and spend no API tokens. It works in a real copy of a repository and can edit, run and commit."
+                  ? "Claude Code, the program on this computer, on the account it is signed in to in Terminal. Signed in to a Claude plan, replies count against that plan's usage limits and spend no API tokens. It works in a real copy of a repository, or in a folder of your own on this computer, and can edit, run and commit."
                   : "Any provider that speaks the OpenAI chat format, by its address, model id and key."}
             </p>
           </div>
@@ -350,12 +357,38 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
                   onChange={(event) => editAccount({ name: event.target.value })}
                 />
               </div>
+              {accounts.length > 1 && (
+                <div
+                  className={styles.accountColors}
+                  role="radiogroup"
+                  aria-label={`Colour for ${account.name.trim() || "this account"}`}
+                >
+                  <span className={styles.accountColorsLabel}>its colour</span>
+                  {ACCOUNT_COLORS.map((one) => {
+                    const other = accounts.find((a) => a.id !== account.id && a.color === one.id);
+                    return (
+                      <button
+                        key={one.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={account.color === one.id}
+                        aria-label={one.id}
+                        title={other ? `${one.id} (${other.name.trim()} has it)` : one.id}
+                        className={styles.accountColor}
+                        style={{ background: colorHex(one.id) }}
+                        onClick={() => editAccount({ color: one.id })}
+                      />
+                    );
+                  })}
+                </div>
+              )}
               <p className={styles.help}>
                 {accounts.length > 1 ? (
                   <>
                     The account chosen here is the one every Claude chat uses once you save. You can
                     also switch with <code>account</code> at the top of a Claude chat. Each reply
-                    says which account it ran on.
+                    says which account it ran on, and carries its colour, as does the chat in the
+                    list.
                   </>
                 ) : (
                   <>
@@ -612,13 +645,14 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
                     ? "Claude Code was found on this computer."
                     : "Claude Code was not found on this computer yet: install it, or give its path below."}{" "}
                   A chat set to Claude Code starts that program in a folder kept for the chat (a
-                  clone of the chat&apos;s repository, if it has one) and uses whichever account it
-                  is signed in to in Terminal, so it draws on that account&apos;s plan, not on an
-                  API key. Commands it runs are <strong>not</strong> inside ogchat&apos;s sandbox:
-                  they run as you. None of these levels stops to ask you anything: what a level does
-                  not cover is refused. <em>Auto</em> is Claude Code&apos;s own auto mode, which
-                  covers all of its tools and leaves the judging to it; if your plan or Claude Code
-                  version does not have it, the chat will say so.
+                  clone of the chat&apos;s repository, if it has one), or in a folder of your own if
+                  you give the chat one above its message box, where it edits your files in place.
+                  It uses whichever account it is signed in to in Terminal, so it draws on that
+                  account&apos;s plan, not on an API key. Commands it runs are <strong>not</strong>{" "}
+                  inside ogchat&apos;s sandbox: they run as you. None of these levels stops to ask
+                  you anything: what a level does not cover is refused. <em>Auto</em> is Claude
+                  Code&apos;s own auto mode, which covers all of its tools and leaves the judging to
+                  it; if your plan or Claude Code version does not have it, the chat will say so.
                 </p>
               </div>
 

@@ -135,6 +135,8 @@ describe("sessions API", () => {
         repo: null,
         branch: null,
         environmentId: null,
+        folder: null,
+        account: null,
       },
     ]);
   });
@@ -902,6 +904,7 @@ describe("settings API", () => {
           {
             id: "main",
             name: "main",
+            color: "blue",
             configDir: "",
             key: { set: false, masked: null, source: null },
             workspace: "",

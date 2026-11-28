@@ -35,6 +35,9 @@ export function ranOnFor(settings: ResolvedSettings, reasoning?: string | null):
     model: requested,
     effort: effortSent(settings, reasoning),
     ...(account ? { account } : {}),
+    ...(settings.provider === "compatible"
+      ? {}
+      : { accountId: settings.claudeAccountIdOn[settings.provider] }),
     ...(paidBy ? { paidBy } : {}),
   };
 }

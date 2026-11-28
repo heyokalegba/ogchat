@@ -16,6 +16,7 @@ const ENV_NAMES = [
   "OGCHAT_GITHUB_TOKEN",
   "OGCHAT_ANTHROPIC_URL",
   "OGCHAT_GITHUB_URL",
+  "OGCHAT_FOLDER_DIALOG",
 ] as const;
 
 /** Points the app at a fresh, empty data directory for every test. */

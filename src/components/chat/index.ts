@@ -3,5 +3,6 @@
  *
  *   import { ChatSurface } from "@/components/chat";
  */
+export { ClaudeAccounts } from "./accounts";
 export { ChatSurface, type ChatSurfaceProps } from "./ChatSurface";
 export { useChat, type ChatController, type ChatPhase } from "./useChat";

@@ -269,6 +269,11 @@
   color: var(--og-on-dark-2);
 }
 
+/* With more than one Claude account: filled with the colour of the one the chat last ran on. */
+.itemAccount {
+  color: #111114;
+}
+
 /* A project's files, in its panel. */
 .fileList {
   display: grid;
@@ -715,6 +720,15 @@
 .accountLabel {
   padding: 0 2px 0 10px;
   color: var(--og-on-dark-3);
+}
+
+/* The colour of the account in use: the same one its chats and replies carry. */
+.accountDot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-left: 6px;
+  border-radius: 50%;
 }
 
 .shell .accountSelect {
@@ -1193,6 +1207,41 @@
   cursor: pointer;
 }
 
+/* The colour an account's chats are marked with: one of a few, picked by its square. */
+.accountColors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.accountColorsLabel {
+  margin-right: 4px;
+  font-family: var(--og-font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.overlay .accountColor {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.overlay .accountColor[aria-checked="true"] {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.overlay .accountColor:focus-visible {
+  outline: 2px dashed currentColor;
+  outline-offset: 2px;
+}
+
 .textInput {
   width: 100%;
   height: 40px;
@@ -1501,6 +1550,48 @@
   cursor: pointer;
 }
 
+/* A folder of your own: a path is long, so once there is one its box is wider. */
+.shell .workFolder {
+  width: 320px;
+}
+
+/* "choose…", at the end of the folder's box: opens a window to pick it in. */
+.shell .workPick {
+  padding: 0 8px;
+  border-left: var(--og-line) solid var(--og-ink);
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.shell .workPick:hover:not(:disabled) {
+  color: #ebe4d4;
+  background: var(--og-ink);
+}
+
+.shell .workPick:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* What is wrong with the folder that was typed, and a note on one that is not in use. */
+.workError,
+.workNote {
+  padding: 2px 7px;
+  font-weight: 600;
+  background: rgba(235, 228, 212, 0.92);
+}
+
+.workError {
+  color: #8f2a1f;
+}
+
+.workNote {
+  cursor: help;
+}
+
 .shell .workInput::placeholder {
   color: rgba(23, 23, 26, 0.55);
 }
@@ -1676,6 +1767,24 @@
 
 .shell[data-look="formal"] .workLink {
   background: transparent;
+}
+
+.shell[data-look="formal"] .workPick {
+  border-left-color: var(--og-rule);
+}
+
+.shell[data-look="formal"] .workPick:hover:not(:disabled) {
+  color: #0b0b0c;
+  background: #f4f4f5;
+}
+
+.shell[data-look="formal"] .workError,
+.shell[data-look="formal"] .workNote {
+  background: transparent;
+}
+
+.shell[data-look="formal"] .workError {
+  color: #f08a7b;
 }
 
 .shell[data-look="formal"] .workLink:hover {

@@ -1,3 +1,4 @@
+import { isAccountColor, nextAccountColor } from "@/lib/accounts";
 import {
   MAIN_ACCOUNT,
   REASONING_EFFORTS,
@@ -12,6 +13,7 @@ import {
 } from "@/lib/types";
 import { CLAUDE_MODELS, DEFAULT_CLAUDE_MODEL } from "@/lib/provider/claude";
 import { maskKey } from "@/lib/provider/redact";
+import { canChooseFolder } from "./folders";
 import { readJson, writeJsonAtomic } from "./fsjson";
 import { settingsFile } from "./paths";
 import { sandboxKind } from "./workspace";
@@ -75,6 +77,8 @@ export interface ResolvedSettings {
    * one. Null when there is only the one account, so there is nothing to tell apart.
    */
   claudeAccountOn: { claude: string | null; claudecode: string | null };
+  /** The same, by id, and always: which account's key, and which one's sign-in, is the one used. */
+  claudeAccountIdOn: { claude: string; claudecode: string };
 }
 
 /** A Claude account besides the main one. It has a sign-in folder, a key, or both. */
@@ -84,6 +88,8 @@ interface StoredAccount {
   configDir?: string;
   key?: string;
   workspace?: string;
+  /** The colour its chats are marked with. Given one when it is first saved. */
+  color?: string;
 }
 
 export const MAX_ACCOUNTS = 12;
@@ -108,6 +114,8 @@ interface StoredSettings {
   claudeCodeModel?: string;
   /** The main account's name, if it was given one other than "main". */
   claudeMainName?: string;
+  /** The main account's colour, if it was given one. */
+  claudeMainColor?: string;
   /** The other accounts, and the id of the one in use (absent: the main one). */
   claudeAccounts?: StoredAccount[];
   claudeAccount?: string;
@@ -141,8 +149,10 @@ export interface SettingsPatch {
   claudeCodeModel?: unknown;
   /** The name the main Claude account goes by; "" or null for "main". */
   claudeMainName?: unknown;
+  /** The main account's colour: one of ACCOUNT_COLORS by id; "" or null for the usual one. */
+  claudeMainColor?: unknown;
   /**
-   * Every Claude account besides the main one: { id, name, configDir, workspace, key }.
+   * Every Claude account besides the main one: { id, name, configDir, workspace, key, color }.
    * The list replaces the saved one. A `key` is saved, removed and left alone
    * as `apiKey` is, by the account's id.
    */
@@ -195,6 +205,7 @@ function readStored(): StoredSettings {
     claudeCodePermission: isPermission(s.claudeCodePermission) ? s.claudeCodePermission : undefined,
     claudeCodeModel: str(s.claudeCodeModel),
     claudeMainName: str(s.claudeMainName),
+    claudeMainColor: isAccountColor(s.claudeMainColor) ? s.claudeMainColor : undefined,
     claudeAccounts: readAccounts(s.claudeAccounts),
     claudeAccount: str(s.claudeAccount),
     systemPrompt:
@@ -226,6 +237,7 @@ function readAccounts(value: unknown): StoredAccount[] | undefined {
       configDir: str(a.configDir),
       key: str(a.key),
       workspace: str(a.workspace),
+      color: isAccountColor(a.color) ? a.color : undefined,
     });
   }
   return list.length ? list : undefined;
@@ -296,7 +308,27 @@ function resolveFrom(stored: StoredSettings): ResolvedSettings {
       claude: several ? (account?.key ? account.name : mainName) : null,
       claudecode: several ? (account?.configDir ? account.name : mainName) : null,
     },
+    claudeAccountIdOn: {
+      claude: account?.key ? account.id : MAIN_ACCOUNT,
+      claudecode: account?.configDir ? account.id : MAIN_ACCOUNT,
+    },
   };
+}
+
+/**
+ * Each account's colour, the main one's first. One that was never given a
+ * colour takes the first that no other account has, so no two look alike
+ * until there are more accounts than colours.
+ */
+function accountColors(stored: StoredSettings): string[] {
+  const given = [stored.claudeMainColor, ...(stored.claudeAccounts ?? []).map((one) => one.color)];
+  const taken: (string | undefined)[] = [...given];
+  return given.map((color, i) => {
+    if (color) return color;
+    const next = nextAccountColor(taken);
+    taken[i] = next;
+    return next;
+  });
 }
 
 /** Every Claude account as the browser may see it: the main one first, keys masked. */
@@ -307,17 +339,20 @@ function accountList(stored: StoredSettings): ClaudeAccount[] {
     masked: key ? maskKey(key) : null,
     source: key ? source : null,
   });
+  const colors = accountColors(stored);
   return [
     {
       id: MAIN_ACCOUNT,
       name: stored.claudeMainName ?? MAIN_ACCOUNT,
+      color: colors[0]!,
       configDir: stored.claudeCodeConfigDir ?? "",
       key: shown(mainKey, stored.claudeKey ? "settings" : "env"),
       workspace: stored.claudeWorkspace ?? env("ANTHROPIC_WORKSPACE_ID") ?? "",
     },
-    ...(stored.claudeAccounts ?? []).map((one) => ({
+    ...(stored.claudeAccounts ?? []).map((one, i) => ({
       id: one.id,
       name: one.name,
+      color: colors[i + 1]!,
       configDir: one.configDir ?? "",
       key: shown(one.key, "settings"),
       workspace: one.workspace ?? "",
@@ -436,8 +471,18 @@ export function publicSettings(): PublicSettings {
       configDir: s.claudeCodeConfigDir ?? "",
       permission: s.claudeCodePermission,
       model: s.claudeCodeModel,
+      folderDialog: canChooseFolder(),
     },
   };
+}
+
+/** An account's colour as it was sent: one of the colours, or null for "the usual one". */
+function cleanColor(input: unknown): string | null {
+  if (input === null || input === undefined || input === "") return null;
+  if (!isAccountColor(input)) {
+    throw new SettingsValidationError("That is not one of the colours an account can have.");
+  }
+  return input;
 }
 
 /** A key as typed: null when there is none, an error when it cannot be a key. */
@@ -527,6 +572,11 @@ function applyMainAccount(stored: StoredSettings, patch: SettingsPatch): void {
     if (name === MAIN_ACCOUNT) delete stored.claudeMainName;
     else stored.claudeMainName = name;
   }
+  if (patch.claudeMainColor !== undefined) {
+    const color = cleanColor(patch.claudeMainColor);
+    if (color) stored.claudeMainColor = color;
+    else delete stored.claudeMainColor;
+  }
 }
 
 /** The other accounts in a patch, and which account is in use, put into `stored`. */
@@ -562,15 +612,30 @@ function applyAccounts(stored: StoredSettings, patch: SettingsPatch): void {
           ? before.find((kept) => kept.id === id)?.key
           : (cleanKey(given.key) ?? undefined);
       const workspace = cleanWorkspace(given.workspace) || undefined;
+      // A colour not mentioned is the one it has; a new account is given one below.
+      const color =
+        given.color === undefined
+          ? before.find((kept) => kept.id === id)?.color
+          : (cleanColor(given.color) ?? undefined);
       if (!configDir && !key) {
         throw new SettingsValidationError(
           `The account "${name}" needs a sign-in folder for Claude Code, an API key, or both.`,
         );
       }
-      next.push({ id, name, configDir, key, workspace });
+      next.push({ id, name, configDir, key, workspace, color });
     }
     if (next.length) stored.claudeAccounts = next;
     else delete stored.claudeAccounts;
+  }
+  // Once there is more than one account, each keeps the colour it has, so that
+  // taking one off the list does not repaint the chats of the others.
+  if (stored.claudeAccounts?.length) {
+    const colors = accountColors(stored);
+    stored.claudeMainColor = colors[0];
+    stored.claudeAccounts = stored.claudeAccounts.map((one, i) => ({
+      ...one,
+      color: colors[i + 1],
+    }));
   }
 
   const names = [stored.claudeMainName ?? MAIN_ACCOUNT].concat(

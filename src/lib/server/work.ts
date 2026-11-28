@@ -1,5 +1,6 @@
 import type { SessionWork } from "@/lib/types";
 import { isEnvironmentId } from "./environments";
+import { checkFolder } from "./folders";
 import { parseBranch, parseRepo } from "./github";
 
 /**
@@ -30,6 +31,14 @@ export function parseWork(body: Record<string, unknown>): Partial<SessionWork> |
     if (none(body.environmentId) || body.environmentId === "default") work.environmentId = null;
     else if (isEnvironmentId(body.environmentId)) work.environmentId = body.environmentId;
     else return "That environment does not exist.";
+  }
+  if (body.folder !== undefined) {
+    if (none(body.folder)) work.folder = null;
+    else {
+      const checked = checkFolder(body.folder);
+      if ("error" in checked) return checked.error;
+      work.folder = checked.folder;
+    }
   }
   return work;
 }
