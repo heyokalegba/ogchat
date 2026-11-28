@@ -9,17 +9,18 @@ import { SCENES, type SceneId } from "./art";
  */
 export interface Look {
   /**
-   * Plain: black text on a white page, with no scene, wall or colour behind
-   * it. For long stretches of focused work. The scene settings are kept for
-   * when it is switched off again.
+   * The page behind a chat: the scene and its wall, "plain" (black text on a
+   * white page) or "formal" (white text on a black one). On the last two
+   * there is no scene, wall or colour, for long stretches of focused work;
+   * the scene settings are kept for when it is switched back.
    */
-  plain: boolean;
+  page: Page;
   /**
-   * The page behind a chat on Claude or Claude Code. "formal" is white text
-   * on a black page, so those chats are told apart at a glance from chats on
-   * any other model; "same" shows them like the rest.
+   * The page behind a chat on Claude or Claude Code, chosen apart from the
+   * rest. Formal to begin with, so those chats are told apart at a glance
+   * from chats on any other model.
    */
-  claudePage: "formal" | "same";
+  claudePage: Page;
   scene: SceneId;
   /** Milliseconds the scene's clock runs ahead of (or behind) the real one. 0 is real time. */
   clockOffsetMs: number;
@@ -67,14 +68,30 @@ export interface Look {
 /** What is behind a chat: the scene and its wall, black on white, or white on black. */
 export type Page = "scene" | "plain" | "formal";
 
+/** The pages there are to switch between, as the switches name them. */
+export const PAGES: readonly { id: Page; label: string; hint: string }[] = [
+  { id: "scene", label: "scene", hint: "Scene: the city and the wall" },
+  { id: "plain", label: "plain", hint: "Plain: black text on a white page" },
+  { id: "formal", label: "formal", hint: "Formal: white text on a black page" },
+];
+const isPage = (value: unknown): value is Page => PAGES.some((page) => page.id === value);
+
 /** The page a chat is shown on, given whether it is a chat on Claude. */
 export function pageFor(look: Look, claude: boolean): Page {
-  if (claude && look.claudePage === "formal") return "formal";
-  return look.plain ? "plain" : "scene";
+  return claude ? look.claudePage : look.page;
+}
+
+/**
+ * What changes when a page is picked for chats on Claude, or for the rest.
+ * The chat is brought back if it was put away: there is no scene to look at
+ * on a plain or formal page.
+ */
+export function pageChange(claude: boolean, page: Page): Partial<Look> {
+  return claude ? { claudePage: page, chatShown: true } : { page, chatShown: true };
 }
 
 export const DEFAULT_LOOK: Look = {
-  plain: false,
+  page: "scene",
   claudePage: "formal",
   scene: "skyline",
   clockOffsetMs: 0,
@@ -136,9 +153,16 @@ export function cleanLook(value: unknown): Look {
   const raw = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
   const number = (v: unknown, fallback: number) =>
     typeof v === "number" && Number.isFinite(v) ? v : fallback;
+  // Before there was a choice of three, plain was a switch of its own, and
+  // chats on Claude were formal or "same": like the rest.
+  const page: Page = isPage(raw.page) ? raw.page : raw.plain === true ? "plain" : "scene";
   return {
-    plain: raw.plain === true,
-    claudePage: raw.claudePage === "same" ? "same" : "formal",
+    page,
+    claudePage: isPage(raw.claudePage)
+      ? raw.claudePage
+      : raw.claudePage === "same"
+        ? page
+        : "formal",
     scene:
       typeof raw.scene === "string" && raw.scene in SCENES
         ? (raw.scene as SceneId)
@@ -228,10 +252,7 @@ function lightness(color: string): number {
  * wall hidden the text sits on buildings and sky, so the halo is made much
  * stronger: a solid outline first, then the soft glow.
  */
-export function lookVariables(
-  look: Look,
-  page: Page = look.plain ? "plain" : "scene",
-): Record<string, string> {
+export function lookVariables(look: Look, page: Page = look.page): Record<string, string> {
   if (page === "formal") {
     // White on black: as with plain, only the text size and sidebar width still apply.
     return {

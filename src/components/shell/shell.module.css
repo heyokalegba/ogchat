@@ -613,7 +613,7 @@
   margin-left: auto;
 }
 
-/* Two black labels, the chosen one inverted. */
+/* Black labels in a row, the chosen one inverted. The page switch is one of these too. */
 .sceneSwitch {
   display: flex;
   border: var(--og-line) solid var(--og-ink);
@@ -1012,7 +1012,7 @@
     padding: 0 12px;
   }
 
-  /* On a phone the scene switch lives in the look panel, leaving room for the title. */
+  /* On a phone the page and scene switches live in the look panel, leaving room for the title. */
   .topTools > .sceneSwitch {
     display: none;
   }
@@ -1573,6 +1573,16 @@
 
 .shell[data-look="formal"] .topTitle {
   padding: 4px 10px;
+}
+
+/* The page switch, as tall as the labels beside it. */
+.shell[data-look="formal"] .pageSwitch {
+  border: 1px solid var(--og-rule);
+  background: #000000;
+}
+
+.shell[data-look="formal"] .pageSwitch .sceneButton {
+  height: 28px;
 }
 
 .shell[data-look="formal"] .lookButton:hover,

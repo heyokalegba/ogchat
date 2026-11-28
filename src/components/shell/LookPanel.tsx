@@ -17,6 +17,8 @@ import {
   activeTextColor,
   DEFAULT_LOOK,
   INPUT_SWATCHES,
+  pageChange,
+  PAGES,
   SCENE_STRENGTH,
   SIDEBAR_WIDTH,
   TEXT_SIZE,
@@ -417,56 +419,46 @@ export function LookPanel({
             page
           </span>
           <div className={styles.sceneSwitch} role="group" aria-labelledby="ogchat-plain">
-            <button
-              type="button"
-              className={`${styles.sceneButton} ${look.plain ? "" : styles.sceneActive}`}
-              aria-pressed={!look.plain}
-              onClick={() => onChange({ plain: false })}
-            >
-              scene
-            </button>
-            <button
-              type="button"
-              className={`${styles.sceneButton} ${look.plain ? styles.sceneActive : ""}`}
-              aria-pressed={look.plain}
-              title="Black text on white, with nothing behind it: for focused work"
-              onClick={() => onChange({ plain: true, chatShown: true })}
-            >
-              plain
-            </button>
+            {PAGES.map((choice) => (
+              <button
+                key={choice.id}
+                type="button"
+                className={`${styles.sceneButton} ${look.page === choice.id ? styles.sceneActive : ""}`}
+                aria-pressed={look.page === choice.id}
+                title={choice.hint}
+                onClick={() => onChange(pageChange(false, choice.id))}
+              >
+                {choice.label}
+              </button>
+            ))}
           </div>
         </div>
         <p className={styles.lookNote}>
-          Plain is black text on a white page. Text size and sidebar width still apply.
+          Plain is black text on a white page; formal is white text on a black one. Text size and
+          sidebar width still apply.
         </p>
         <div className={styles.lookRow}>
           <span className={styles.lookLabel} id="ogchat-claude-page">
             claude chats
           </span>
           <div className={styles.sceneSwitch} role="group" aria-labelledby="ogchat-claude-page">
-            <button
-              type="button"
-              className={`${styles.sceneButton} ${look.claudePage === "formal" ? styles.sceneActive : ""}`}
-              aria-pressed={look.claudePage === "formal"}
-              title="White text on a black page for chats on Claude and Claude Code"
-              onClick={() => onChange({ claudePage: "formal" })}
-            >
-              formal
-            </button>
-            <button
-              type="button"
-              className={`${styles.sceneButton} ${look.claudePage === "same" ? styles.sceneActive : ""}`}
-              aria-pressed={look.claudePage === "same"}
-              title="Show chats on Claude on the same page as every other chat"
-              onClick={() => onChange({ claudePage: "same" })}
-            >
-              like the rest
-            </button>
+            {PAGES.map((choice) => (
+              <button
+                key={choice.id}
+                type="button"
+                className={`${styles.sceneButton} ${look.claudePage === choice.id ? styles.sceneActive : ""}`}
+                aria-pressed={look.claudePage === choice.id}
+                title={`${choice.hint}, for chats on Claude and Claude Code`}
+                onClick={() => onChange(pageChange(true, choice.id))}
+              >
+                {choice.label}
+              </button>
+            ))}
           </div>
         </div>
         <p className={styles.lookNote}>
-          Formal is white text on a black page. A chat on Claude or Claude Code is shown that way,
-          so it is told apart at a glance from a chat on any other model.
+          A chat on Claude or Claude Code has a page of its own, formal to begin with, so it is told
+          apart at a glance from a chat on any other model.
         </p>
       </section>
 
