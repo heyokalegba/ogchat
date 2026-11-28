@@ -725,12 +725,14 @@ export function AppShell() {
                 <span className={styles.accountLabel}>account</span>
                 {accountInUse && (
                   <span
-                    className={styles.accountDot}
+                    className={styles.accountTag}
                     style={{ background: colorHex(accountInUse.color) }}
                     data-account={accountInUse.id}
                     title={`This chat's next reply runs on ${accountInUse.name}`}
                     aria-hidden="true"
-                  />
+                  >
+                    {accountInUse.tag}
+                  </span>
                 )}
                 <select
                   className={styles.accountSelect}

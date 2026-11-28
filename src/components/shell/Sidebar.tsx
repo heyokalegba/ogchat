@@ -207,7 +207,7 @@ function SessionItem(props: {
             }
             aria-hidden="true"
           >
-            C
+            {props.account ? props.account.tag : "C"}
           </span>
         )}
         <span className={styles.itemTitle}>{session.title}</span>

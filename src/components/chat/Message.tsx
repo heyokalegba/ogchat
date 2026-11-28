@@ -47,8 +47,8 @@ function usable(ranOn: RanOn | null | undefined): ranOn is RanOn {
 
 /**
  * Which model wrote a reply and at what thinking level; the full story is in
- * its tooltip. With more than one Claude account, a dot in the colour of the
- * account it ran on comes first.
+ * its tooltip. With more than one Claude account, the mark of the account it
+ * ran on comes first: its letter, on its colour.
  */
 function ModelNote({ ranOn }: { ranOn: RanOn }) {
   const { short, full } = describeRanOn(ranOn);
@@ -58,11 +58,13 @@ function ModelNote({ ranOn }: { ranOn: RanOn }) {
     <span className={styles.modelNote} title={full} aria-label={full.replace(/\n/g, " ")}>
       {account && (
         <span
-          className={styles.accountDot}
+          className={styles.accountTag}
           style={{ background: colorHex(account.color) }}
           data-account={account.id}
           aria-hidden="true"
-        />
+        >
+          {account.tag}
+        </span>
       )}
       {short}
     </span>

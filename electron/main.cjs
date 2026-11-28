@@ -29,7 +29,11 @@ function projectDir() {
 if (!process.env.OGCHAT_NODE && noted().node) process.env.OGCHAT_NODE = noted().node;
 
 let server = null;
+/** The server on its way up, so that quitting in the middle of starting still stops it. */
+let starting = null;
 let quitting = false;
+/** Whether the server has been stopped, and the app may go. */
+let stopped = false;
 
 /** A small page shown while the app gets ready, in the app's own colours. */
 function splash(message) {
@@ -101,8 +105,9 @@ async function open() {
     } else {
       await window.loadURL(splash("starting"));
     }
-    server = await startServer(dir);
-    if (quitting) return server.stop();
+    starting = startServer(dir);
+    server = await starting;
+    if (quitting) return; // the quit is stopping it
     await window.loadURL(server.url);
   } catch (err) {
     return fail(String(err && err.message ? err.message : err));
@@ -120,7 +125,22 @@ async function open() {
 
 app.whenReady().then(open);
 app.on("window-all-closed", () => app.quit());
-app.on("before-quit", () => {
+/*
+ * Quitting waits for the server to stop. A server that outlived the app would
+ * be found by the next launch and taken for one that is already running, and
+ * after an update that is the old ogchat.
+ */
+app.on("before-quit", (event) => {
+  if (stopped || !starting) return;
+  event.preventDefault();
+  if (quitting) return; // already on its way
   quitting = true;
-  server?.stop();
+  for (const window of BrowserWindow.getAllWindows()) window.hide();
+  starting
+    .then((started) => started.stop())
+    .catch(() => {})
+    .finally(() => {
+      stopped = true;
+      app.quit();
+    });
 });

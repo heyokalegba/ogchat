@@ -905,6 +905,7 @@ describe("settings API", () => {
             id: "main",
             name: "main",
             color: "blue",
+            tag: "M",
             configDir: "",
             key: { set: false, masked: null, source: null },
             workspace: "",

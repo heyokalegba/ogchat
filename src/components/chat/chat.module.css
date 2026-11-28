@@ -276,14 +276,25 @@
   white-space: nowrap;
 }
 
-/* Before it, when there is more than one Claude account: the colour of the one it ran on. */
-.accountDot {
+/*
+ * Before it, when there is more than one Claude account: the mark of the one
+ * it ran on, its letter on its colour. The letter tells the accounts apart
+ * where the colour does not show.
+ */
+.accountTag {
   display: inline-block;
-  width: 9px;
-  height: 9px;
+  min-width: 1.5em;
+  height: 1.5em;
   margin-right: 6px;
-  border-radius: 50%;
-  vertical-align: -0.5px;
+  padding: 0 0.3em;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+  font-size: calc(10px * var(--og-type));
+  font-weight: 700;
+  line-height: 1.5em;
+  text-align: center;
+  color: #111114;
+  text-shadow: none;
+  vertical-align: 1px;
 }
 
 .actions {

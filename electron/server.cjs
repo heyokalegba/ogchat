@@ -6,14 +6,17 @@
  * port of its own and says when it is answering.
  * No Electron APIs in here, so it can be exercised with plain node.
  */
-const { spawn } = require("node:child_process");
+const { execFileSync, spawn } = require("node:child_process");
 const fs = require("node:fs");
 const http = require("node:http");
 const net = require("node:net");
 const path = require("node:path");
 
-/** The desktop app's own port, so its saved look does not depend on what else is running. */
-const FIRST_PORT = 3311;
+/**
+ * The desktop app's own port, so its saved look does not depend on what else
+ * is running. OGCHAT_PORT moves it, for trying the app beside one in use.
+ */
+const FIRST_PORT = Number(process.env.OGCHAT_PORT) || 3311;
 
 function isFile(file) {
   try {
@@ -177,16 +180,131 @@ function answers(url) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** What a command prints, or "" where it cannot be run or says nothing. */
+function said(command, args) {
+  try {
+    return execFileSync(command, args, {
+      encoding: "utf8",
+      env: { ...process.env, LC_ALL: "C" },
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 4000,
+    }).trim();
+  } catch {
+    return "";
+  }
+}
+
+function realPath(dir) {
+  try {
+    return fs.realpathSync(dir);
+  } catch {
+    return path.resolve(dir);
+  }
+}
+
 /**
- * Starts the server and resolves with { url, stop } once it answers. If an
- * ogchat is already answering on the app's port (a second window, say), that
- * one is used and `stop` does nothing.
+ * The process listening on a port of this computer: its id, the folder it
+ * runs in and when it started. Null where that cannot be told (no `lsof`, as
+ * on Windows, or nothing is listening).
+ */
+function listener(port) {
+  const pid = Number(said("lsof", ["-nP", "-t", `-iTCP:${port}`, "-sTCP:LISTEN"]).split("\n")[0]);
+  if (!Number.isInteger(pid) || pid <= 0) return null;
+  const cwd = said("lsof", ["-a", "-p", String(pid), "-d", "cwd", "-Fn"])
+    .split("\n")
+    .find((line) => line.startsWith("n"))
+    ?.slice(1);
+  const started = Date.parse(said("ps", ["-o", "lstart=", "-p", String(pid)]));
+  if (!cwd || !Number.isFinite(started)) return null;
+  return { pid, cwd, started };
+}
+
+/**
+ * The process to replace, if the ogchat answering on `port` is this project's
+ * own server from before the project was last built.
+ *
+ * A server goes on serving the build it started with. One left running from
+ * before an update (the app did not get to stop it, or it was started some
+ * other way) would otherwise be taken for "already running" and shown in the
+ * window: the old ogchat, however many times the app is opened again.
+ *
+ * Only a server run from this very folder is ever judged, and only by times
+ * the computer itself gives: anything else answering here is left alone.
+ */
+function staleServer(projectDir, port) {
+  const running = listener(port);
+  if (!running || realPath(running.cwd) !== realPath(projectDir)) return null;
+  let built;
+  try {
+    built = fs.statSync(path.join(projectDir, ".next", "BUILD_ID")).mtimeMs;
+  } catch {
+    return null;
+  }
+  // `ps` gives the start to the second, so a server started just as the build ended is not old.
+  return running.started + 2000 < built ? running : null;
+}
+
+function alive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Stops a process: asks first, and after a while no longer asks. True once it is gone. */
+async function stopProcess(pid, patience = 3000) {
+  const gone = async (ms) => {
+    for (const end = Date.now() + ms; Date.now() < end; await sleep(100)) {
+      if (!alive(pid)) return true;
+    }
+    return !alive(pid);
+  };
+  try {
+    process.kill(pid, "SIGTERM");
+    if (await gone(patience)) return true;
+    process.kill(pid, "SIGKILL");
+  } catch {
+    // already gone, or not ours to stop
+  }
+  return gone(2000);
+}
+
+/**
+ * Stops the server this app started, and resolves once it has gone. A server
+ * with a reply still streaming does not always leave when asked, and one that
+ * outlives the app is the old ogchat the next launch would find.
+ */
+function stopChild(child) {
+  return new Promise((resolve) => {
+    if (child.exitCode !== null || child.signalCode !== null) return resolve();
+    const force = setTimeout(() => child.kill("SIGKILL"), 2500);
+    child.once("exit", () => {
+      clearTimeout(force);
+      resolve();
+    });
+    child.kill();
+  });
+}
+
+/**
+ * Starts the server and resolves with { url, stop } once it answers. `stop`
+ * resolves when the server has gone.
+ *
+ * If an ogchat is already answering on the app's port (a second window, say),
+ * that one is used and `stop` does nothing. Unless it is this project's own
+ * server from before the last build: that one is stopped and a new one is
+ * started in its place.
  */
 async function startServer(projectDir, onLine) {
   let port = FIRST_PORT;
   for (; port < FIRST_PORT + 20; port++) {
     if (await answers(`http://127.0.0.1:${port}`)) {
-      return { url: `http://127.0.0.1:${port}`, stop() {} };
+      const old = staleServer(projectDir, port);
+      if (!old) return { url: `http://127.0.0.1:${port}`, stop: async () => {} };
+      onLine?.(`replacing the server from before the last build (process ${old.pid})`);
+      await stopProcess(old.pid);
     }
     if (await portFree(port)) break;
   }
@@ -209,11 +327,20 @@ async function startServer(projectDir, onLine) {
   });
   for (let n = 0; n < 120; n++) {
     if (exited) throw new Error(`The server stopped.\n\n${tail.join("\n")}`);
-    if (await answers(url)) return { url, stop: () => child.kill() };
+    if (await answers(url)) return { url, stop: () => stopChild(child) };
     await sleep(250);
   }
-  child.kill();
+  await stopChild(child);
   throw new Error(`The server did not start in time.\n\n${tail.join("\n")}`);
 }
 
-module.exports = { build, needsBuild, problemWith, runtime, startServer };
+module.exports = {
+  build,
+  listener,
+  needsBuild,
+  problemWith,
+  runtime,
+  staleServer,
+  startServer,
+  stopProcess,
+};

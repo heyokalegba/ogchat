@@ -1,4 +1,4 @@
-import { isAccountColor, nextAccountColor } from "@/lib/accounts";
+import { accountTags, isAccountColor, nextAccountColor } from "@/lib/accounts";
 import {
   MAIN_ACCOUNT,
   REASONING_EFFORTS,
@@ -340,11 +340,14 @@ function accountList(stored: StoredSettings): ClaudeAccount[] {
     source: key ? source : null,
   });
   const colors = accountColors(stored);
+  const mainName = stored.claudeMainName ?? MAIN_ACCOUNT;
+  const tags = accountTags([mainName, ...(stored.claudeAccounts ?? []).map((one) => one.name)]);
   return [
     {
       id: MAIN_ACCOUNT,
-      name: stored.claudeMainName ?? MAIN_ACCOUNT,
+      name: mainName,
       color: colors[0]!,
+      tag: tags[0]!,
       configDir: stored.claudeCodeConfigDir ?? "",
       key: shown(mainKey, stored.claudeKey ? "settings" : "env"),
       workspace: stored.claudeWorkspace ?? env("ANTHROPIC_WORKSPACE_ID") ?? "",
@@ -353,6 +356,7 @@ function accountList(stored: StoredSettings): ClaudeAccount[] {
       id: one.id,
       name: one.name,
       color: colors[i + 1]!,
+      tag: tags[i + 1]!,
       configDir: one.configDir ?? "",
       key: shown(one.key, "settings"),
       workspace: one.workspace ?? "",
