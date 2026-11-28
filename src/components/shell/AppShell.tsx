@@ -29,21 +29,22 @@ import { shelterOf } from "@/lib/weather";
 import { trafficAt } from "./life";
 import { useAmbience } from "./useAmbience";
 import { useWeather } from "./useWeather";
-import type {
-  Environment,
-  Project,
-  PublicSettings,
-  ReasoningEffort,
-  RepoChoice,
-  SessionMeta,
-  SessionModel,
-  SessionWork,
+import {
+  isClaudeProvider,
+  type Environment,
+  type Project,
+  type PublicSettings,
+  type ReasoningEffort,
+  type RepoChoice,
+  type SessionMeta,
+  type SessionModel,
+  type SessionWork,
 } from "@/lib/types";
 import { EnvironmentsPanel } from "./EnvironmentsPanel";
 import { WorkBar } from "./WorkBar";
 import { SCENES, type SceneId } from "./art";
 import { Backdrop } from "./Backdrop";
-import { DEFAULT_LOOK, loadLook, lookVariables, saveLook, type Look } from "./look";
+import { DEFAULT_LOOK, loadLook, lookVariables, pageFor, saveLook, type Look } from "./look";
 import { LookPanel } from "./LookPanel";
 import { ProjectPanel } from "./ProjectPanel";
 import { SettingsPanel } from "./SettingsPanel";
@@ -53,6 +54,8 @@ import { isSoloWindow, useChatWindows, useSoloWindow } from "./useWindows";
 
 const SEARCH_DEBOUNCE_MS = 140;
 const PROJECT_KEY = "ogchat:project";
+/** Whether the chat last on screen was on Claude: the page to open on, before settings are in. */
+const KIND_KEY = "ogchat:kind";
 /** How often the scene looks at the clock. The sun moves a quarter of a degree a minute. */
 const CLOCK_TICK_MS = 15_000;
 const SCENE_IDS = Object.keys(SCENES) as SceneId[];
@@ -124,6 +127,8 @@ export function AppShell() {
   const [repos, setRepos] = useState<RepoChoice[] | null>(null);
   const [environments, setEnvironments] = useState<Environment[]>([]);
   const [environmentsOpen, setEnvironmentsOpen] = useState(false);
+  /** Whether the chat last seen was on Claude, for the moment before the model is known. */
+  const [wasClaude, setWasClaude] = useState(false);
 
   const refreshSessions = useCallback(
     async (q: string, signal?: AbortSignal) => {
@@ -148,6 +153,7 @@ export function AppShell() {
     try {
       projectRef.current = window.localStorage.getItem(PROJECT_KEY) || null;
       setProjectId(projectRef.current);
+      setWasClaude(window.localStorage.getItem(KIND_KEY) === "claude");
     } catch {
       // storage unavailable: start on all chats
     }
@@ -545,6 +551,32 @@ export function AppShell() {
     const ready = settings.choices.some((c) => c.provider === model.provider && c.ready);
     return { ready, model: model.model };
   }, [settings, model]);
+  // A chat on Claude or Claude Code is told apart from one on any other model:
+  // it has a page of its own (white on black, unless the look panel says otherwise).
+  const onClaude = model ? isClaudeProvider(model.provider) : wasClaude;
+  const page = pageFor(look, onClaude);
+  useEffect(() => {
+    if (!model) return;
+    const claude = isClaudeProvider(model.provider);
+    setWasClaude(claude);
+    try {
+      window.localStorage.setItem(KIND_KEY, claude ? "claude" : "other");
+    } catch {
+      // not remembered: the page settles a moment later next time
+    }
+  }, [model]);
+  // The Claude accounts there are to switch between, when there is more than one.
+  const accounts = settings && settings.claude.accounts.length > 1 ? settings.claude.accounts : [];
+  const onAccountChange = useCallback(
+    (id: string) => {
+      setSettings((current) =>
+        current ? { ...current, claude: { ...current.claude, account: id } } : current,
+      );
+      const reload = () => api.getSettings().then(setSettings, () => {});
+      api.saveSettings({ claudeAccount: id }).then(setSettings, reload);
+    },
+    [api],
+  );
   const onModelChange = useCallback(
     (next: SessionModel) => {
       const id = activeIdRef.current;
@@ -561,12 +593,12 @@ export function AppShell() {
   return (
     <div
       className={`ogchat ${styles.shell} ${look.wallShown ? "" : styles.noWall} ${
-        look.chatShown ? "" : styles.sceneOnly
+        look.chatShown || page !== "scene" ? "" : styles.sceneOnly
       } ${solo ? styles.solo : ""}`}
-      style={lookVariables(look) as CSSProperties}
-      data-look={look.plain ? "plain" : undefined}
+      style={lookVariables(look, page) as CSSProperties}
+      data-look={page === "scene" ? undefined : page}
     >
-      {ready && view && !look.plain && (
+      {ready && view && page === "scene" && (
         <Backdrop
           scene={look.scene}
           view={view}
@@ -595,6 +627,7 @@ export function AppShell() {
           query={query}
           loaded={loaded}
           settings={settings}
+          claudeByDefault={isClaudeProvider(settings?.active.provider)}
           open={sidebarOpen}
           searchRef={searchRef}
           onQueryChange={onQueryChange}
@@ -631,20 +664,59 @@ export function AppShell() {
             {activeId ? (activeTitle ?? "session") : "new session"}
           </div>
           <div className={styles.topTools}>
-            <button
-              type="button"
-              className={`${styles.lookButton} ${look.plain ? styles.lookButtonOpen : ""}`}
-              aria-pressed={look.plain}
-              title={
-                look.plain
-                  ? "Back to the scene and the wall"
-                  : "Plain: black text on white, nothing behind it, for focused work"
-              }
-              onClick={() => changeLook({ plain: !look.plain, chatShown: true })}
-            >
-              {look.plain ? "scene" : "plain"}
-            </button>
-            {!look.plain && (
+            {onClaude && accounts.length > 0 && settings && (
+              <label
+                className={styles.accountPick}
+                title="Which Claude account this and every other Claude chat runs on, from the next message"
+              >
+                <span className={styles.accountLabel}>account</span>
+                <select
+                  className={styles.accountSelect}
+                  value={settings.claude.account}
+                  aria-label="Claude account"
+                  onChange={(event) => onAccountChange(event.target.value)}
+                >
+                  {accounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {onClaude && (
+              <button
+                type="button"
+                className={`${styles.lookButton} ${page === "formal" ? styles.lookButtonOpen : ""}`}
+                aria-pressed={page === "formal"}
+                title={
+                  page === "formal"
+                    ? "Chats on Claude are shown white on black. Click to show them like every other chat"
+                    : "Formal: show chats on Claude white on black, apart from the rest"
+                }
+                onClick={() =>
+                  changeLook({ claudePage: look.claudePage === "formal" ? "same" : "formal" })
+                }
+              >
+                formal
+              </button>
+            )}
+            {page !== "formal" && (
+              <button
+                type="button"
+                className={`${styles.lookButton} ${look.plain ? styles.lookButtonOpen : ""}`}
+                aria-pressed={look.plain}
+                title={
+                  look.plain
+                    ? "Back to the scene and the wall"
+                    : "Plain: black text on white, nothing behind it, for focused work"
+                }
+                onClick={() => changeLook({ plain: !look.plain, chatShown: true })}
+              >
+                {look.plain ? "scene" : "plain"}
+              </button>
+            )}
+            {page === "scene" && (
               <div className={styles.sceneSwitch} role="group" aria-label="Scene">
                 {SCENE_IDS.map((id) => (
                   <button
@@ -660,7 +732,7 @@ export function AppShell() {
                 ))}
               </div>
             )}
-            {!look.plain && (
+            {page === "scene" && (
               <button
                 type="button"
                 className={`${styles.lookButton} ${look.chatShown ? "" : styles.lookButtonOpen}`}

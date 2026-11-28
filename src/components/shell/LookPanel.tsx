@@ -439,6 +439,35 @@ export function LookPanel({
         <p className={styles.lookNote}>
           Plain is black text on a white page. Text size and sidebar width still apply.
         </p>
+        <div className={styles.lookRow}>
+          <span className={styles.lookLabel} id="ogchat-claude-page">
+            claude chats
+          </span>
+          <div className={styles.sceneSwitch} role="group" aria-labelledby="ogchat-claude-page">
+            <button
+              type="button"
+              className={`${styles.sceneButton} ${look.claudePage === "formal" ? styles.sceneActive : ""}`}
+              aria-pressed={look.claudePage === "formal"}
+              title="White text on a black page for chats on Claude and Claude Code"
+              onClick={() => onChange({ claudePage: "formal" })}
+            >
+              formal
+            </button>
+            <button
+              type="button"
+              className={`${styles.sceneButton} ${look.claudePage === "same" ? styles.sceneActive : ""}`}
+              aria-pressed={look.claudePage === "same"}
+              title="Show chats on Claude on the same page as every other chat"
+              onClick={() => onChange({ claudePage: "same" })}
+            >
+              like the rest
+            </button>
+          </div>
+        </div>
+        <p className={styles.lookNote}>
+          Formal is white text on a black page. A chat on Claude or Claude Code is shown that way,
+          so it is told apart at a glance from a chat on any other model.
+        </p>
       </section>
 
       <section className={styles.lookSection}>

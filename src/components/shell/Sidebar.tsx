@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent, type Ref } from "react";
 import { shortAge } from "@/lib/format";
-import type { Project, PublicSettings, SessionMeta } from "@/lib/types";
+import { isClaudeProvider, type Project, type PublicSettings, type SessionMeta } from "@/lib/types";
 import { GearIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from "../chat/icons";
 import styles from "./shell.module.css";
 
@@ -13,6 +13,8 @@ export interface SidebarProps {
   /** False until the first list has loaded. */
   loaded: boolean;
   settings: PublicSettings | null;
+  /** Whether a chat with no model of its own is a chat on Claude: the model in settings is. */
+  claudeByDefault?: boolean;
   open: boolean;
   searchRef: Ref<HTMLInputElement>;
   onQueryChange: (query: string) => void;
@@ -74,6 +76,8 @@ function SessionItem(props: {
   session: SessionMeta;
   /** The name of the session's project, shown when the list mixes projects. */
   tag?: string;
+  /** A chat on Claude or Claude Code: marked, so it is told apart from the rest. */
+  claude: boolean;
   active: boolean;
   /** Open in a window of its own. */
   away: boolean;
@@ -174,6 +178,11 @@ function SessionItem(props: {
           if (event.key === "F2") startRename();
         }}
       >
+        {props.claude && (
+          <span className={styles.itemClaude} title="A chat on Claude" aria-hidden="true">
+            C
+          </span>
+        )}
         <span className={styles.itemTitle}>{session.title}</span>
         {props.tag && <span className={styles.itemTag}>{props.tag}</span>}
         <span className={styles.itemAge}>{away ? "window" : shortAge(session.updatedAt)}</span>
@@ -377,6 +386,11 @@ export function Sidebar(props: SidebarProps) {
             key={session.id}
             session={session}
             tag={project ? undefined : projectName(session.projectId)}
+            claude={
+              session.model
+                ? isClaudeProvider(session.model.provider)
+                : Boolean(props.claudeByDefault)
+            }
             active={session.id === activeId}
             away={props.away?.has(session.id) ?? false}
             onPopOut={props.onPopOut ? (at) => props.onPopOut?.(session.id, at) : undefined}

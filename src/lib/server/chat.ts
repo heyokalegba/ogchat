@@ -343,6 +343,7 @@ export async function runTurn(
         }
       | undefined;
     let codeId: string | null = null;
+    let codeHome = "";
     let codeSystem = "";
     if (settings.provider === "claudecode") {
       const codeRepo = turn.session.repo ?? project?.repo ?? null;
@@ -356,8 +357,15 @@ export async function runTurn(
       const kept = getCodeSession(sessionId);
       const before = turn.session.messages.at(-2)?.id ?? null;
       const summaryAt = turn.session.summary?.at ?? null;
+      // Claude Code keeps a session with the account it ran on, so it is only
+      // carried on while the chat is still on that account.
+      codeHome = settings.claudeCodeConfigDir?.trim() ?? "";
       const resume =
-        kept && kept.cwd === cwd && kept.after === before && kept.summaryAt === summaryAt
+        kept &&
+        kept.cwd === cwd &&
+        kept.after === before &&
+        kept.summaryAt === summaryAt &&
+        (kept.home ?? "") === codeHome
           ? kept.id
           : null;
       codeId = resume;
@@ -421,6 +429,7 @@ export async function runTurn(
         after: message.id,
         cwd: code.cwd,
         summaryAt: turn.session.summary?.at ?? null,
+        home: codeHome,
       });
     }
     emit({ type: "done", session: meta(), message, stopped: false });

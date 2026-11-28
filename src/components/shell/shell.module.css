@@ -253,6 +253,22 @@
   color: var(--og-yellow);
 }
 
+/* A chat on Claude or Claude Code, marked so the list tells them from the rest. */
+.itemClaude {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  margin-right: -3px;
+  border: 1px solid rgba(246, 241, 230, 0.5);
+  font-family: var(--og-font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--og-on-dark-2);
+}
+
 /* A project's files, in its panel. */
 .fileList {
   display: grid;
@@ -649,6 +665,43 @@
 
 .look .sceneSwitch {
   border-color: rgba(246, 241, 230, 0.5);
+}
+
+/* Which Claude account a Claude chat runs on: a black label with a list in it. */
+.accountPick {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  border: var(--og-line) solid var(--og-ink);
+  background: var(--og-ink);
+  font-family: var(--og-font-mono);
+  font-size: calc(12.5px * var(--og-type));
+  font-weight: 600;
+  color: var(--og-on-dark);
+}
+
+.accountLabel {
+  padding: 0 2px 0 10px;
+  color: var(--og-on-dark-3);
+}
+
+.shell .accountSelect {
+  max-width: 170px;
+  height: 100%;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 0;
+  outline-offset: -2px;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.shell .accountSelect option {
+  color: #17171a;
+  background: #ebe4d4;
 }
 
 .lookClock {
@@ -1087,6 +1140,23 @@
   color: var(--og-accent);
 }
 
+/* Two links side by side at the end of a label's row. */
+.linkRow {
+  display: flex;
+  gap: 14px;
+}
+
+/* A Claude account: which one, and what it is called. */
+.accountRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.accountRow select.textInput {
+  cursor: pointer;
+}
+
 .textInput {
   width: 100%;
   height: 40px;
@@ -1462,4 +1532,106 @@
 .shell[data-look="plain"] .wall {
   border-color: transparent;
   box-shadow: none;
+}
+
+/* ---------------------------------------------------------------- formal */
+
+/*
+ * White on black, for a chat on Claude: a black page in thin grey rules, no
+ * city, and none of the warm colours. The chat surface turns its own tokens
+ * over (see ../chat); here it is the frame round it.
+ */
+.shell[data-look="formal"] {
+  --og-on-dark: #f4f4f5;
+  --og-on-dark-2: rgba(244, 244, 245, 0.78);
+  --og-on-dark-3: rgba(244, 244, 245, 0.52);
+  --og-accent-on-dark: #f4f4f5;
+  --og-yellow: #f4f4f5;
+  --og-rule: #34343a;
+  background: #000000;
+}
+
+.shell[data-look="formal"] .sidebar {
+  border-right: 1px solid var(--og-rule);
+  background: #050506;
+  text-shadow: none;
+}
+
+.shell[data-look="formal"] .wall {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/* The labels of the top bar were black on the sky; on black they get a rule round them. */
+.shell[data-look="formal"] .topTitle,
+.shell[data-look="formal"] .lookButton,
+.shell[data-look="formal"] .accountPick,
+.shell[data-look="formal"] .menuButton {
+  border: 1px solid var(--og-rule);
+  background: #000000;
+}
+
+.shell[data-look="formal"] .topTitle {
+  padding: 4px 10px;
+}
+
+.shell[data-look="formal"] .lookButton:hover,
+.shell[data-look="formal"] .lookButtonOpen,
+.shell[data-look="formal"] .lookButton[aria-pressed="true"] {
+  border-color: #f4f4f5;
+  color: #000000;
+  background: #f4f4f5;
+}
+
+.shell[data-look="formal"] .accountSelect option {
+  color: #f4f4f5;
+  background: #17181b;
+}
+
+.shell[data-look="formal"] .itemClaude {
+  border-color: rgba(244, 244, 245, 0.45);
+}
+
+.shell[data-look="formal"] .searchInput,
+.shell[data-look="formal"] .projectTool,
+.shell[data-look="formal"] .newButton {
+  border-width: 1px;
+  border-color: var(--og-rule);
+}
+
+.shell[data-look="formal"] .sidebarFooter {
+  border-top: 1px solid var(--og-rule);
+}
+
+/* Where the chat works: the same fields, in thin rules on black. */
+.shell[data-look="formal"] .workField {
+  border-color: var(--og-rule);
+  background: transparent;
+}
+
+.shell[data-look="formal"] .workLabel {
+  color: var(--og-text-2);
+  background: #17181b;
+}
+
+.shell[data-look="formal"] .workInput::placeholder {
+  color: rgba(244, 244, 245, 0.45);
+}
+
+.shell[data-look="formal"] .workInput[aria-invalid="true"] {
+  color: #f08a7b;
+}
+
+.shell[data-look="formal"] .workSelect option {
+  color: #f4f4f5;
+  background: #17181b;
+}
+
+.shell[data-look="formal"] .workLink {
+  background: transparent;
+}
+
+.shell[data-look="formal"] .workLink:hover {
+  color: #0b0b0c;
+  background: #f4f4f5;
 }

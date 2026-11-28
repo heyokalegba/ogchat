@@ -183,6 +183,8 @@ describe("settings persistence", () => {
       claudeCodeConfigDir: null,
       claudeCodePermission: "edit",
       claudeCodeModel: "default",
+      claudeAccount: "main",
+      claudeAccountOn: { claude: null, claudecode: null },
     });
   });
 
@@ -215,6 +217,8 @@ describe("settings persistence", () => {
       claudeCodeConfigDir: null,
       claudeCodePermission: "edit",
       claudeCodeModel: "default",
+      claudeAccount: "main",
+      claudeAccountOn: { claude: null, claudecode: null },
     });
     const file = path.join(data.dir(), "settings.json");
     expect(fs.statSync(file).mode & 0o777).toBe(0o600);
@@ -253,6 +257,8 @@ describe("settings persistence", () => {
       claudeCodeConfigDir: null,
       claudeCodePermission: "edit",
       claudeCodeModel: "default",
+      claudeAccount: "main",
+      claudeAccountOn: { claude: null, claudecode: null },
     });
     expect(settings.publicSettings().apiKey).toEqual({
       set: true,
@@ -296,5 +302,159 @@ describe("settings persistence", () => {
       expect(() => settings.updateSettings(patch)).toThrow(settings.SettingsValidationError);
     }
     expect(fs.existsSync(path.join(data.dir(), "settings.json"))).toBe(false);
+  });
+});
+
+describe("Claude accounts", () => {
+  const WORK_KEY = "sk-ant-work-7c1e9b2a4d6f-WORKSECRET";
+  const work = { id: "a-work", name: "work", configDir: "~/.claude-work" };
+
+  it("has one account, the main one, until another is added", async () => {
+    const { settings } = await boot();
+    expect(settings.publicSettings().claude).toMatchObject({
+      account: "main",
+      accounts: [
+        {
+          id: "main",
+          name: "main",
+          configDir: "",
+          key: { set: false, masked: null, source: null },
+          workspace: "",
+        },
+      ],
+    });
+  });
+
+  it("switches Claude Code to another sign-in, and back", async () => {
+    const { settings } = await boot();
+    settings.updateSettings({ claudeKey: TEST_KEY, claudeAccounts: [work] });
+    // Added, not yet in use.
+    expect(settings.resolveSettings()).toMatchObject({
+      claudeAccount: "main",
+      claudeCodeConfigDir: null,
+      claudeAccountOn: { claude: "main", claudecode: "main" },
+    });
+
+    const view = settings.updateSettings({ claudeAccount: "a-work" });
+    expect(view.claude.account).toBe("a-work");
+    expect(view.claude.accounts.map((one) => [one.id, one.name, one.configDir])).toEqual([
+      ["main", "main", ""],
+      ["a-work", "work", "~/.claude-work"],
+    ]);
+    expect(settings.resolveSettings()).toMatchObject({
+      claudeAccount: "a-work",
+      claudeCodeConfigDir: "~/.claude-work",
+      // It has no key of its own: the API still goes through the main account's.
+      claudeKey: TEST_KEY,
+      claudeAccountOn: { claude: "main", claudecode: "work" },
+    });
+
+    settings.updateSettings({ claudeAccount: "main" });
+    expect(settings.resolveSettings()).toMatchObject({
+      claudeAccount: "main",
+      claudeCodeConfigDir: null,
+    });
+  });
+
+  it("keeps each account's key and workspace apart, and never shows a key", async () => {
+    const { settings } = await boot();
+    settings.updateSettings({ claudeKey: TEST_KEY, claudeWorkspace: "wrkspc_main" });
+    const view = settings.updateSettings({
+      claudeMainName: "personal",
+      claudeAccounts: [{ id: "a-work", name: "work", key: WORK_KEY }],
+      claudeAccount: "a-work",
+    });
+    expect(JSON.stringify(view)).not.toContain(WORK_KEY);
+    expect(view.claude.accounts[1]!.key).toEqual({
+      set: true,
+      masked: "••••••••CRET",
+      source: "settings",
+    });
+    expect(settings.resolveSettings()).toMatchObject({
+      claudeKey: WORK_KEY,
+      claudeKeySource: "settings",
+      // The main account's workspace id does not go out with another account's key.
+      claudeWorkspace: "",
+      // No sign-in folder of its own: Claude Code stays on the main account.
+      claudeCodeConfigDir: null,
+      claudeAccountOn: { claude: "work", claudecode: "personal" },
+    });
+
+    // A key not mentioned is kept; null takes it away, and then it needs a folder.
+    settings.updateSettings({
+      claudeAccounts: [{ id: "a-work", name: "the office", workspace: "wrkspc_work" }],
+    });
+    expect(settings.resolveSettings()).toMatchObject({
+      claudeKey: WORK_KEY,
+      claudeWorkspace: "wrkspc_work",
+      claudeAccountOn: { claude: "the office", claudecode: "personal" },
+    });
+    expect(() =>
+      settings.updateSettings({ claudeAccounts: [{ id: "a-work", name: "work", key: null }] }),
+    ).toThrow(/needs a sign-in folder for Claude Code, an API key, or both/);
+    expect(settings.resolveSettings().claudeKey).toBe(WORK_KEY);
+
+    const restarted = await boot();
+    expect(restarted.settings.resolveSettings()).toMatchObject({
+      claudeAccount: "a-work",
+      claudeKey: WORK_KEY,
+    });
+  });
+
+  it("goes back to the main account when the one in use is removed", async () => {
+    const { settings } = await boot();
+    settings.updateSettings({ claudeAccounts: [work], claudeAccount: "a-work" });
+    const view = settings.updateSettings({ claudeAccounts: [] });
+    expect(view.claude).toMatchObject({ account: "main", accounts: [{ id: "main" }] });
+    expect(settings.resolveSettings()).toMatchObject({
+      claudeAccount: "main",
+      claudeCodeConfigDir: null,
+      claudeAccountOn: { claude: null, claudecode: null },
+    });
+  });
+
+  it("turns down accounts it cannot use", async () => {
+    const { settings } = await boot();
+    const bad: [unknown, RegExp][] = [
+      [{ claudeAccounts: "work" }, /must be a list/],
+      [{ claudeAccounts: [{ ...work, id: "main" }] }, /account id/],
+      [{ claudeAccounts: [{ ...work, id: "Not An Id" }] }, /account id/],
+      [{ claudeAccounts: [work, { ...work, name: "other" }] }, /same id/],
+      [{ claudeAccounts: [{ ...work, name: "  " }] }, /Give every Claude account a name/],
+      [{ claudeAccounts: [{ ...work, name: "Main" }] }, /Two Claude accounts are called/],
+      [{ claudeAccounts: [{ ...work, configDir: "relative/folder" }] }, /full path/],
+      [{ claudeAccounts: [{ id: "a-work", name: "work" }] }, /needs a sign-in folder/],
+      [{ claudeAccounts: [work], claudeAccount: "a-other" }, /no such Claude account/],
+      [
+        {
+          claudeAccounts: Array.from({ length: 13 }, (_, i) => ({
+            ...work,
+            id: `a-${i}`,
+            name: `n${i}`,
+          })),
+        },
+        /at most/,
+      ],
+    ];
+    for (const [patch, message] of bad) {
+      expect(() => settings.updateSettings(patch as never)).toThrow(message);
+    }
+    // Nothing of any of them was saved.
+    expect(settings.publicSettings().claude.accounts).toHaveLength(1);
+  });
+
+  it("tries an account that is typed without saving it", async () => {
+    const { settings } = await boot();
+    const preview = settings.previewSettings({
+      provider: "claudecode",
+      claudeAccounts: [work],
+      claudeAccount: "a-work",
+    });
+    expect(preview).toMatchObject({
+      provider: "claudecode",
+      claudeAccount: "a-work",
+      claudeCodeConfigDir: "~/.claude-work",
+    });
+    expect(settings.publicSettings().claude.accounts).toHaveLength(1);
   });
 });

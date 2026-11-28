@@ -109,14 +109,19 @@ function parseFile(value: unknown, id: string): SessionFile | null {
 /**
  * A chat's Claude Code session: its id, and what the chat looked like when
  * it last answered (the reply it gave, the folder it was in, the summary in
- * force). If any of that has changed, the session no longer matches the
- * chat and a new one is started.
+ * force, the account it was on). If any of that has changed, the session no
+ * longer matches the chat and a new one is started.
  */
 export interface CodeSession {
   id: string;
   after: string;
   cwd: string;
   summaryAt: string | null;
+  /**
+   * Where the account it was started on keeps its sign-in ("" for the usual
+   * place). A session belongs to that account: another one cannot carry it on.
+   */
+  home?: string;
 }
 
 function isCodeSession(value: unknown): value is CodeSession {

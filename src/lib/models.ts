@@ -140,10 +140,11 @@ const shortName = (id: string) => modelName(id).replace(/^Claude /, "");
 /**
  * A reply's model and thinking level, as a short line to show beside it
  * ("Fable 5.2 · think: high", "Claude Code · Fable 5.1 · think: auto") and as
- * a few full sentences for its tooltip.
+ * a few full sentences for its tooltip. Where there are several Claude
+ * accounts, both also say which one it ran on.
  */
 export function describeRanOn(ranOn: RanOn): { short: string; full: string } {
-  const { provider, requested, model, effort } = ranOn;
+  const { provider, requested, model, effort, account } = ranOn;
   // Claude Code's "default" or an alias, not yet resolved to a model.
   const unresolved = provider === "claudecode" && !isFullId(model);
   const name = unresolved
@@ -158,6 +159,7 @@ export function describeRanOn(ranOn: RanOn): { short: string; full: string } {
     provider === "claudecode" ? "Claude Code" : "",
     swapped ? `${name} (in place of ${shortName(requested)})` : name,
     think,
+    account ? `account: ${account}` : "",
   ]
     .filter(Boolean)
     .join(" · ");
@@ -171,6 +173,7 @@ export function describeRanOn(ranOn: RanOn): { short: string; full: string } {
       ? `Chosen by Claude Code from "${requested}".`
       : "",
     `Through: ${PROVIDER_NAMES[provider]}.`,
+    account ? `Account: ${account}.` : "",
     effort
       ? `Thinking: ${effortName(effort)} (sent as effort "${effort}").`
       : autoLine(provider, model),

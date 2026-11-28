@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ApiError, type ChatApi } from "@/lib/client/api";
 import {
+  MAIN_ACCOUNT,
+  type ClaudeAccount,
   type PublicSettings,
   type ProviderChoice,
   type ReasoningEffort,
@@ -11,6 +13,25 @@ import {
 import { EFFORT_BLURB, EFFORT_LEVELS } from "@/lib/models";
 import { CloseIcon } from "../chat/icons";
 import styles from "./shell.module.css";
+
+/** A Claude account as it stands in the form: what is typed, over what is saved. */
+interface AccountDraft {
+  id: string;
+  name: string;
+  configDir: string;
+  workspace: string;
+  /** A key typed for it, and whether its saved key is to be removed. */
+  key: string;
+  dropKey: boolean;
+  /** As it is saved, or null for one added just now. */
+  saved: ClaudeAccount | null;
+}
+
+const folderName = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "two";
 
 export interface SettingsPanelProps {
   api: ChatApi;
@@ -38,15 +59,56 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
   const [removeKey, setRemoveKey] = useState(false);
   const [provider, setProvider] = useState<ProviderChoice>(settings.provider);
   const [claudeModel, setClaudeModel] = useState(settings.claude.model);
-  const [claudeKey, setClaudeKey] = useState("");
-  const [dropClaudeKey, setDropClaudeKey] = useState(false);
+  /** The Claude accounts, the main one first, and the one the fields below are for. */
+  const [accounts, setAccounts] = useState<AccountDraft[]>(() =>
+    settings.claude.accounts.map((saved) => ({
+      id: saved.id,
+      name: saved.name,
+      configDir: saved.configDir,
+      workspace: saved.workspace,
+      key: "",
+      dropKey: false,
+      saved,
+    })),
+  );
+  const [accountId, setAccountId] = useState(settings.claude.account);
+  const main = accounts[0]!;
+  const account = accounts.find((one) => one.id === accountId) ?? main;
+  const isMain = account.id === MAIN_ACCOUNT;
+  const editAccount = (patch: Partial<AccountDraft>) => {
+    setAccounts((list) => list.map((one) => (one.id === account.id ? { ...one, ...patch } : one)));
+    setCheck(null);
+  };
+  const addAccount = () => {
+    const taken = new Set(accounts.map((one) => one.name.trim().toLowerCase()));
+    let name = "work";
+    for (let n = accounts.length + 1; taken.has(name); n++) name = `account ${n}`;
+    const id = `a-${Math.random().toString(36).slice(2, 10)}`;
+    setAccounts((list) => [
+      ...list,
+      {
+        id,
+        name,
+        configDir: `~/.claude-${folderName(name)}`,
+        workspace: "",
+        key: "",
+        dropKey: false,
+        saved: null,
+      },
+    ]);
+    setAccountId(id);
+    setCheck(null);
+  };
+  const removeAccount = () => {
+    setAccounts((list) => list.filter((one) => one.id !== account.id || one.id === MAIN_ACCOUNT));
+    setAccountId(MAIN_ACCOUNT);
+    setCheck(null);
+  };
   const [githubToken, setGithubToken] = useState("");
   const [dropGithub, setDropGithub] = useState(false);
   const [runCode, setRunCode] = useState(settings.runCode.enabled);
-  const [workspace, setWorkspace] = useState(settings.claude.workspace);
   const listed = settings.claude.models.some((one) => one.id === claudeModel);
   const [codePermission, setCodePermission] = useState(settings.claudeCode.permission);
-  const [codeConfigDir, setCodeConfigDir] = useState(settings.claudeCode.configDir);
   const [codePath, setCodePath] = useState(settings.claudeCode.path);
   const pick = (next: ProviderChoice) => {
     setProvider(next);
@@ -55,20 +117,27 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
   /** What is in the form for Claude and GitHub, as a save or a test would send it. */
   const claudeFields = () => ({
     provider,
-    ...(provider === "claude" ? { runCode, claudeWorkspace: workspace.trim() } : {}),
-    ...(provider === "claude" ? { claudeModel } : {}),
+    ...(provider === "claude" ? { runCode, claudeModel } : {}),
     ...(provider === "claudecode"
+      ? { claudeCodePermission: codePermission, claudeCodePath: codePath.trim() }
+      : {}),
+    // The accounts: the one chosen is the one in use once this is saved.
+    ...(provider !== "compatible"
       ? {
-          claudeCodePermission: codePermission,
-          claudeCodeConfigDir: codeConfigDir.trim(),
-          claudeCodePath: codePath.trim(),
+          claudeAccount: account.id,
+          claudeMainName: main.name.trim(),
+          claudeCodeConfigDir: main.configDir.trim(),
+          claudeWorkspace: main.workspace.trim(),
+          claudeAccounts: accounts.slice(1).map((one) => ({
+            id: one.id,
+            name: one.name.trim(),
+            configDir: one.configDir.trim(),
+            workspace: one.workspace.trim(),
+            ...(one.key.trim() ? { key: one.key.trim() } : one.dropKey ? { key: null } : {}),
+          })),
         }
       : {}),
-    ...(claudeKey.trim()
-      ? { claudeKey: claudeKey.trim() }
-      : dropClaudeKey
-        ? { claudeKey: null }
-        : {}),
+    ...(main.key.trim() ? { claudeKey: main.key.trim() } : main.dropKey ? { claudeKey: null } : {}),
     ...(githubToken.trim()
       ? { githubToken: githubToken.trim() }
       : dropGithub
@@ -236,6 +305,70 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
             </p>
           </div>
 
+          {provider !== "compatible" && (
+            <div className={styles.field}>
+              <div className={styles.labelRow}>
+                <label className={styles.label} htmlFor="ogchat-account">
+                  Claude account
+                </label>
+                <span className={styles.linkRow}>
+                  {!isMain && (
+                    <button type="button" className={styles.linkButton} onClick={removeAccount}>
+                      remove this one
+                    </button>
+                  )}
+                  <button type="button" className={styles.linkButton} onClick={addAccount}>
+                    add an account
+                  </button>
+                </span>
+              </div>
+              <div className={styles.accountRow}>
+                <select
+                  id="ogchat-account"
+                  className={styles.textInput}
+                  value={account.id}
+                  onChange={(event) => {
+                    setAccountId(event.target.value);
+                    setCheck(null);
+                  }}
+                >
+                  {accounts.map((one) => (
+                    <option key={one.id} value={one.id}>
+                      {one.name.trim() || "no name yet"}
+                      {one.id === settings.claude.account ? " (in use)" : ""}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  className={styles.textInput}
+                  value={account.name}
+                  placeholder="its name"
+                  aria-label="Account name"
+                  maxLength={40}
+                  autoComplete="off"
+                  spellCheck={false}
+                  onChange={(event) => editAccount({ name: event.target.value })}
+                />
+              </div>
+              <p className={styles.help}>
+                {accounts.length > 1 ? (
+                  <>
+                    The account chosen here is the one every Claude chat uses once you save. You can
+                    also switch with <code>account</code> at the top of a Claude chat. Each reply
+                    says which account it ran on.
+                  </>
+                ) : (
+                  <>
+                    One account so far. Add another (a second Claude sign-in, or another API key) to
+                    switch between them from the top of a Claude chat.
+                  </>
+                )}{" "}
+                {!isMain &&
+                  "What an added account has none of its own (a sign-in folder, a key), it shares with the main one. Removing it here leaves its folder on disk alone."}
+              </p>
+            </div>
+          )}
+
           {provider === "compatible" && (
             <>
               <div className={styles.field}>
@@ -394,13 +527,13 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
                   <label className={styles.label} htmlFor="ogchat-claude-key">
                     Claude API key
                   </label>
-                  {settings.claude.key.source === "settings" && !claudeKey && (
+                  {account.saved?.key.source === "settings" && !account.key && (
                     <button
                       type="button"
                       className={styles.linkButton}
-                      onClick={() => setDropClaudeKey((value) => !value)}
+                      onClick={() => editAccount({ dropKey: !account.dropKey })}
                     >
-                      {dropClaudeKey ? "keep saved key" : "remove saved key"}
+                      {account.dropKey ? "keep saved key" : "remove saved key"}
                     </button>
                   )}
                 </div>
@@ -408,20 +541,23 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
                   id="ogchat-claude-key"
                   className={styles.textInput}
                   type="password"
-                  value={claudeKey}
+                  value={account.key}
                   placeholder={
-                    dropClaudeKey
+                    account.dropKey
                       ? "the saved key will be removed"
-                      : (settings.claude.key.masked ?? "sk-ant-…")
+                      : (account.saved?.key.masked ??
+                        (isMain ? "sk-ant-…" : "sk-ant-… (empty: the main account's key)"))
                   }
                   autoComplete="off"
                   spellCheck={false}
                   data-1p-ignore
                   data-lpignore="true"
-                  onChange={(event) => {
-                    setClaudeKey(event.target.value);
-                    if (event.target.value) setDropClaudeKey(false);
-                  }}
+                  onChange={(event) =>
+                    editAccount({
+                      key: event.target.value,
+                      ...(event.target.value ? { dropKey: false } : {}),
+                    })
+                  }
                 />
                 <p className={styles.help}>
                   From console.anthropic.com, under API keys. Saved to{" "}
@@ -437,11 +573,11 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
                 <input
                   id="ogchat-claude-workspace"
                   className={styles.textInput}
-                  value={workspace}
+                  value={account.workspace}
                   placeholder="wrkspc_… (usually empty)"
                   autoComplete="off"
                   spellCheck={false}
-                  onChange={(event) => setWorkspace(event.target.value)}
+                  onChange={(event) => editAccount({ workspace: event.target.value })}
                 />
                 <p className={styles.help}>
                   Leave empty unless the test says the key is &quot;not scoped to a workspace&quot;.
@@ -493,20 +629,32 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
                 <input
                   id="ogchat-code-config"
                   className={styles.textInput}
-                  value={codeConfigDir}
-                  placeholder="~/.claude (the usual one)"
+                  value={account.configDir}
+                  placeholder={
+                    isMain ? "~/.claude (the usual one)" : "empty: the main account's sign-in"
+                  }
                   autoComplete="off"
                   spellCheck={false}
-                  onChange={(event) => setCodeConfigDir(event.target.value)}
+                  onChange={(event) => editAccount({ configDir: event.target.value })}
                 />
                 <p className={styles.help}>
-                  Leave empty to use the account Claude Code is already signed in to. To use a
-                  second account here without disturbing that one, name a folder for it, such as{" "}
-                  <code>~/.claude-work</code>, and sign in to it once in Terminal:{" "}
-                  <code>
-                    CLAUDE_CONFIG_DIR={codeConfigDir.trim() || "~/.claude-work"} claude auth login
-                  </code>
-                  . Press <code>test</code> to see who it is signed in as.
+                  {isMain ? (
+                    <>
+                      Where Claude Code keeps this account&apos;s sign-in. Leave empty for the one
+                      it is already signed in to. For a second sign-in beside it, press{" "}
+                      <code>add an account</code> above.
+                    </>
+                  ) : (
+                    <>
+                      A folder of its own for this account&apos;s sign-in, so it does not disturb
+                      the main one. Sign in to it once in Terminal:{" "}
+                      <code>
+                        CLAUDE_CONFIG_DIR={account.configDir.trim() || "~/.claude-work"} claude auth
+                        login
+                      </code>
+                    </>
+                  )}{" "}
+                  Press <code>test</code> to see who it is signed in as.
                 </p>
               </div>
 

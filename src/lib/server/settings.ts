@@ -1,6 +1,8 @@
 import {
+  MAIN_ACCOUNT,
   REASONING_EFFORTS,
   PROVIDER_CHOICES,
+  type ClaudeAccount,
   type KeySource,
   type ProviderChoice,
   type PublicSettings,
@@ -62,7 +64,30 @@ export interface ResolvedSettings {
   claudeCodeConfigDir: string | null;
   claudeCodePermission: CodePermission;
   claudeCodeModel: string;
+  /**
+   * The Claude account in use, by id. The key, workspace and sign-in folder
+   * above are that account's: its own, or the main account's where it has none.
+   */
+  claudeAccount: string;
+  /**
+   * Whose account a reply is on, by name, for each way to Claude: the account
+   * in use where it has a key (or a sign-in) of its own, otherwise the main
+   * one. Null when there is only the one account, so there is nothing to tell apart.
+   */
+  claudeAccountOn: { claude: string | null; claudecode: string | null };
 }
+
+/** A Claude account besides the main one. It has a sign-in folder, a key, or both. */
+interface StoredAccount {
+  id: string;
+  name: string;
+  configDir?: string;
+  key?: string;
+  workspace?: string;
+}
+
+export const MAX_ACCOUNTS = 12;
+const ACCOUNT_ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
 
 interface StoredSettings {
   baseUrl?: string;
@@ -81,6 +106,11 @@ interface StoredSettings {
   claudeCodeConfigDir?: string;
   claudeCodePermission?: CodePermission;
   claudeCodeModel?: string;
+  /** The main account's name, if it was given one other than "main". */
+  claudeMainName?: string;
+  /** The other accounts, and the id of the one in use (absent: the main one). */
+  claudeAccounts?: StoredAccount[];
+  claudeAccount?: string;
 }
 
 export interface SettingsPatch {
@@ -109,6 +139,16 @@ export interface SettingsPatch {
   claudeCodeConfigDir?: unknown;
   claudeCodePermission?: unknown;
   claudeCodeModel?: unknown;
+  /** The name the main Claude account goes by; "" or null for "main". */
+  claudeMainName?: unknown;
+  /**
+   * Every Claude account besides the main one: { id, name, configDir, workspace, key }.
+   * The list replaces the saved one. A `key` is saved, removed and left alone
+   * as `apiKey` is, by the account's id.
+   */
+  claudeAccounts?: unknown;
+  /** The id of the account to use: "main", or one of the others. */
+  claudeAccount?: unknown;
 }
 
 export class SettingsValidationError extends Error {}
@@ -154,6 +194,9 @@ function readStored(): StoredSettings {
     claudeCodeConfigDir: str(s.claudeCodeConfigDir),
     claudeCodePermission: isPermission(s.claudeCodePermission) ? s.claudeCodePermission : undefined,
     claudeCodeModel: str(s.claudeCodeModel),
+    claudeMainName: str(s.claudeMainName),
+    claudeAccounts: readAccounts(s.claudeAccounts),
+    claudeAccount: str(s.claudeAccount),
     systemPrompt:
       typeof s.systemPrompt === "string" && s.systemPrompt.trim()
         ? s.systemPrompt.slice(0, MAX_SYSTEM_PROMPT_CHARS)
@@ -165,6 +208,27 @@ function readStored(): StoredSettings {
         ? Math.round(s.contextWindow)
         : undefined,
   };
+}
+
+function readAccounts(value: unknown): StoredAccount[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const list: StoredAccount[] = [];
+  for (const one of value) {
+    if (!one || typeof one !== "object") continue;
+    const a = one as Record<string, unknown>;
+    const id = str(a.id);
+    const name = str(a.name);
+    if (!id || !name || !ACCOUNT_ID.test(id) || id === MAIN_ACCOUNT) continue;
+    if (list.some((kept) => kept.id === id)) continue;
+    list.push({
+      id,
+      name,
+      configDir: str(a.configDir),
+      key: str(a.key),
+      workspace: str(a.workspace),
+    });
+  }
+  return list.length ? list : undefined;
 }
 
 function writeStored(stored: StoredSettings): void {
@@ -194,8 +258,15 @@ export function normalizeBaseUrl(input: unknown): string {
 }
 
 export function resolveSettings(): ResolvedSettings {
-  const stored = readStored();
+  return resolveFrom(readStored());
+}
+
+function resolveFrom(stored: StoredSettings): ResolvedSettings {
   const envKey = env("OGCHAT_API_KEY");
+  // The Claude account in use. What it has none of its own, it shares with the main one.
+  const account = stored.claudeAccounts?.find((one) => one.id === stored.claudeAccount) ?? null;
+  const several = Boolean(stored.claudeAccounts?.length);
+  const mainName = stored.claudeMainName ?? MAIN_ACCOUNT;
   return {
     baseUrl: stored.baseUrl ?? env("OGCHAT_API_BASE_URL") ?? DEFAULT_BASE_URL,
     model: stored.model ?? env("OGCHAT_MODEL") ?? DEFAULT_MODEL,
@@ -205,18 +276,53 @@ export function resolveSettings(): ResolvedSettings {
     systemPrompt: stored.systemPrompt ?? "",
     contextWindow: stored.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
     provider: stored.provider ?? "compatible",
-    claudeKey: stored.claudeKey ?? env("ANTHROPIC_API_KEY"),
-    claudeKeySource: stored.claudeKey ? "settings" : env("ANTHROPIC_API_KEY") ? "env" : null,
+    claudeKey: account?.key ?? stored.claudeKey ?? env("ANTHROPIC_API_KEY"),
+    claudeKeySource:
+      account?.key || stored.claudeKey ? "settings" : env("ANTHROPIC_API_KEY") ? "env" : null,
     claudeModel: stored.claudeModel ?? DEFAULT_CLAUDE_MODEL,
-    claudeWorkspace: stored.claudeWorkspace ?? env("ANTHROPIC_WORKSPACE_ID") ?? "",
+    // A workspace id goes with a key: an account with its own key has its own, or none.
+    claudeWorkspace: account?.key
+      ? (account.workspace ?? "")
+      : (stored.claudeWorkspace ?? env("ANTHROPIC_WORKSPACE_ID") ?? ""),
     githubToken: stored.githubToken ?? env("OGCHAT_GITHUB_TOKEN"),
     githubTokenSource: stored.githubToken ? "settings" : env("OGCHAT_GITHUB_TOKEN") ? "env" : null,
     runCode: stored.runCode === true,
     claudeCodePath: stored.claudeCodePath ?? null,
-    claudeCodeConfigDir: stored.claudeCodeConfigDir ?? null,
+    claudeCodeConfigDir: account?.configDir ?? stored.claudeCodeConfigDir ?? null,
     claudeCodePermission: stored.claudeCodePermission ?? "edit",
     claudeCodeModel: stored.claudeCodeModel ?? "default",
+    claudeAccount: account?.id ?? MAIN_ACCOUNT,
+    claudeAccountOn: {
+      claude: several ? (account?.key ? account.name : mainName) : null,
+      claudecode: several ? (account?.configDir ? account.name : mainName) : null,
+    },
   };
+}
+
+/** Every Claude account as the browser may see it: the main one first, keys masked. */
+function accountList(stored: StoredSettings): ClaudeAccount[] {
+  const mainKey = stored.claudeKey ?? env("ANTHROPIC_API_KEY");
+  const shown = (key: string | null | undefined, source: KeySource): ClaudeAccount["key"] => ({
+    set: Boolean(key),
+    masked: key ? maskKey(key) : null,
+    source: key ? source : null,
+  });
+  return [
+    {
+      id: MAIN_ACCOUNT,
+      name: stored.claudeMainName ?? MAIN_ACCOUNT,
+      configDir: stored.claudeCodeConfigDir ?? "",
+      key: shown(mainKey, stored.claudeKey ? "settings" : "env"),
+      workspace: stored.claudeWorkspace ?? env("ANTHROPIC_WORKSPACE_ID") ?? "",
+    },
+    ...(stored.claudeAccounts ?? []).map((one) => ({
+      id: one.id,
+      name: one.name,
+      configDir: one.configDir ?? "",
+      key: shown(one.key, "settings"),
+      workspace: one.workspace ?? "",
+    })),
+  ];
 }
 
 /** Claude Code as these settings have it: where it is, where it is signed in, what it may do. */
@@ -285,7 +391,8 @@ export function settingsFor(model: SessionModel | null | undefined): ResolvedSet
 }
 
 export function publicSettings(): PublicSettings {
-  const s = resolveSettings();
+  const stored = readStored();
+  const s = resolveFrom(stored);
   return {
     baseUrl: s.baseUrl,
     model: s.model,
@@ -314,6 +421,8 @@ export function publicSettings(): PublicSettings {
         source: s.claudeKeySource,
       },
       models: CLAUDE_MODELS.map((model) => ({ ...model })),
+      account: s.claudeAccount,
+      accounts: accountList(stored),
     },
     github: {
       set: Boolean(s.githubToken),
@@ -380,12 +489,123 @@ function cleanModel(input: unknown): string {
   return model;
 }
 
+/** An account's name as typed: one line, not empty, not long. */
+function cleanName(input: unknown): string {
+  if (typeof input !== "string") {
+    throw new SettingsValidationError("An account name must be text.");
+  }
+  const name = input.replace(/\s+/g, " ").trim();
+  if (!name) throw new SettingsValidationError("Give every Claude account a name.");
+  if (name.length > 40) {
+    throw new SettingsValidationError("An account name can be 40 characters at most.");
+  }
+  return name;
+}
+
+/** The main account's own fields in a patch, put into `stored`. */
+function applyMainAccount(stored: StoredSettings, patch: SettingsPatch): void {
+  if (patch.claudeKey !== undefined) {
+    const key = cleanKey(patch.claudeKey);
+    if (key) stored.claudeKey = key;
+    else delete stored.claudeKey;
+  }
+  if (patch.claudeWorkspace !== undefined) {
+    const workspace = cleanWorkspace(patch.claudeWorkspace);
+    if (workspace) stored.claudeWorkspace = workspace;
+    else delete stored.claudeWorkspace;
+  }
+  if (patch.claudeCodeConfigDir !== undefined) {
+    const value = cleanPath(patch.claudeCodeConfigDir);
+    if (value) stored.claudeCodeConfigDir = value;
+    else delete stored.claudeCodeConfigDir;
+  }
+  if (patch.claudeMainName !== undefined) {
+    const name =
+      patch.claudeMainName === null || patch.claudeMainName === ""
+        ? MAIN_ACCOUNT
+        : cleanName(patch.claudeMainName);
+    if (name === MAIN_ACCOUNT) delete stored.claudeMainName;
+    else stored.claudeMainName = name;
+  }
+}
+
+/** The other accounts in a patch, and which account is in use, put into `stored`. */
+function applyAccounts(stored: StoredSettings, patch: SettingsPatch): void {
+  if (patch.claudeAccounts !== undefined) {
+    if (!Array.isArray(patch.claudeAccounts)) {
+      throw new SettingsValidationError("Claude accounts must be a list.");
+    }
+    if (patch.claudeAccounts.length > MAX_ACCOUNTS) {
+      throw new SettingsValidationError(`There can be ${MAX_ACCOUNTS} added accounts at most.`);
+    }
+    const before = stored.claudeAccounts ?? [];
+    const next: StoredAccount[] = [];
+    for (const one of patch.claudeAccounts as unknown[]) {
+      if (!one || typeof one !== "object") {
+        throw new SettingsValidationError("Each Claude account must be an object.");
+      }
+      const given = one as Record<string, unknown>;
+      const id = typeof given.id === "string" ? given.id : "";
+      if (!ACCOUNT_ID.test(id) || id === MAIN_ACCOUNT) {
+        throw new SettingsValidationError(
+          'An account id is lower-case letters, digits and dashes, and is not "main".',
+        );
+      }
+      if (next.some((kept) => kept.id === id)) {
+        throw new SettingsValidationError("Two Claude accounts have the same id.");
+      }
+      const name = cleanName(given.name);
+      const configDir = cleanPath(given.configDir) ?? undefined;
+      // A key not mentioned is the one already saved for this account.
+      const key =
+        given.key === undefined
+          ? before.find((kept) => kept.id === id)?.key
+          : (cleanKey(given.key) ?? undefined);
+      const workspace = cleanWorkspace(given.workspace) || undefined;
+      if (!configDir && !key) {
+        throw new SettingsValidationError(
+          `The account "${name}" needs a sign-in folder for Claude Code, an API key, or both.`,
+        );
+      }
+      next.push({ id, name, configDir, key, workspace });
+    }
+    if (next.length) stored.claudeAccounts = next;
+    else delete stored.claudeAccounts;
+  }
+
+  const names = [stored.claudeMainName ?? MAIN_ACCOUNT].concat(
+    (stored.claudeAccounts ?? []).map((one) => one.name),
+  );
+  const twice = names.find(
+    (name, i) => names.findIndex((other) => other.toLowerCase() === name.toLowerCase()) !== i,
+  );
+  if (twice) {
+    throw new SettingsValidationError(`Two Claude accounts are called "${twice}".`);
+  }
+
+  if (patch.claudeAccount !== undefined) {
+    const id = patch.claudeAccount;
+    if (id === MAIN_ACCOUNT || id === null || id === "") delete stored.claudeAccount;
+    else if (typeof id === "string" && stored.claudeAccounts?.some((one) => one.id === id)) {
+      stored.claudeAccount = id;
+    } else throw new SettingsValidationError("There is no such Claude account.");
+  }
+  // The account in use was taken off the list: back to the main one.
+  if (!stored.claudeAccounts?.some((one) => one.id === stored.claudeAccount)) {
+    delete stored.claudeAccount;
+  }
+}
+
 /**
  * The settings a request would use if `patch` were saved, without saving it.
  * Lets the settings panel test what is typed before committing to it.
  */
 export function previewSettings(patch: SettingsPatch): ResolvedSettings {
-  const current = resolveSettings();
+  // The accounts as the patch would leave them. A key marked for removal is still the one tried.
+  const stored = readStored();
+  applyMainAccount(stored, { ...patch, claudeKey: patch.claudeKey || undefined });
+  applyAccounts(stored, patch);
+  const current = resolveFrom(stored);
   const typedKey = patch.apiKey === undefined ? null : cleanKey(patch.apiKey);
   return {
     ...current,
@@ -394,8 +614,6 @@ export function previewSettings(patch: SettingsPatch): ResolvedSettings {
     apiKey: typedKey ?? current.apiKey,
     keySource: typedKey ? "settings" : current.keySource,
     provider: isProvider(patch.provider) ? patch.provider : current.provider,
-    claudeKey:
-      (patch.claudeKey === undefined ? null : cleanKey(patch.claudeKey)) ?? current.claudeKey,
     claudeModel:
       patch.claudeModel === undefined ? current.claudeModel : cleanModel(patch.claudeModel),
     githubToken:
@@ -403,10 +621,6 @@ export function previewSettings(patch: SettingsPatch): ResolvedSettings {
     runCode: typeof patch.runCode === "boolean" ? patch.runCode : current.runCode,
     claudeCodePath:
       patch.claudeCodePath === undefined ? current.claudeCodePath : cleanPath(patch.claudeCodePath),
-    claudeCodeConfigDir:
-      patch.claudeCodeConfigDir === undefined
-        ? current.claudeCodeConfigDir
-        : cleanPath(patch.claudeCodeConfigDir),
     claudeCodePermission: isPermission(patch.claudeCodePermission)
       ? patch.claudeCodePermission
       : current.claudeCodePermission,
@@ -414,10 +628,6 @@ export function previewSettings(patch: SettingsPatch): ResolvedSettings {
       patch.claudeCodeModel === undefined
         ? current.claudeCodeModel
         : cleanModel(patch.claudeCodeModel),
-    claudeWorkspace:
-      patch.claudeWorkspace === undefined
-        ? current.claudeWorkspace
-        : cleanWorkspace(patch.claudeWorkspace),
   };
 }
 
@@ -487,11 +697,8 @@ export function updateSettings(patch: SettingsPatch): PublicSettings {
     if (patch.provider === "compatible") delete stored.provider;
     else stored.provider = patch.provider;
   }
-  if (patch.claudeKey !== undefined) {
-    const key = cleanKey(patch.claudeKey);
-    if (key) stored.claudeKey = key;
-    else delete stored.claudeKey;
-  }
+  applyMainAccount(stored, patch);
+  applyAccounts(stored, patch);
   if (patch.claudeModel !== undefined) {
     const model = cleanModel(patch.claudeModel);
     if (model === DEFAULT_CLAUDE_MODEL) delete stored.claudeModel;
@@ -502,16 +709,10 @@ export function updateSettings(patch: SettingsPatch): PublicSettings {
     if (token) stored.githubToken = token;
     else delete stored.githubToken;
   }
-  if (patch.claudeWorkspace !== undefined) {
-    const workspace = cleanWorkspace(patch.claudeWorkspace);
-    if (workspace) stored.claudeWorkspace = workspace;
-    else delete stored.claudeWorkspace;
-  }
-  for (const field of ["claudeCodePath", "claudeCodeConfigDir"] as const) {
-    if (patch[field] === undefined) continue;
-    const value = cleanPath(patch[field]);
-    if (value) stored[field] = value;
-    else delete stored[field];
+  if (patch.claudeCodePath !== undefined) {
+    const value = cleanPath(patch.claudeCodePath);
+    if (value) stored.claudeCodePath = value;
+    else delete stored.claudeCodePath;
   }
   if (patch.claudeCodePermission !== undefined) {
     if (!isPermission(patch.claudeCodePermission)) {

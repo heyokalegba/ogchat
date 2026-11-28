@@ -897,6 +897,16 @@ describe("settings API", () => {
         workspace: "",
         key: { set: false, masked: null, source: null },
         models: expect.arrayContaining([{ id: "claude-opus-5-5", label: "Claude Opus 5.5" }]),
+        account: "main",
+        accounts: [
+          {
+            id: "main",
+            name: "main",
+            configDir: "",
+            key: { set: false, masked: null, source: null },
+            workspace: "",
+          },
+        ],
       },
       github: { set: false, masked: null, source: null },
       runCode: { enabled: false, sandbox: "none" },
@@ -955,6 +965,42 @@ describe("settings API", () => {
     await useKey();
     const res = await putSettings(req("PUT", "/api/settings", { apiKey: null }));
     expect(((await res.json()) as { settings: PublicSettings }).settings.apiKey.set).toBe(false);
+  });
+
+  it("adds a Claude account and switches to it", async () => {
+    const res = await putSettings(
+      req("PUT", "/api/settings", {
+        claudeMainName: "personal",
+        claudeAccounts: [
+          { id: "a-work", name: "work", configDir: "~/.claude-work", key: TEST_KEY },
+        ],
+        claudeAccount: "a-work",
+      }),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).not.toContain(TEST_KEY);
+    expect((JSON.parse(body) as { settings: PublicSettings }).settings).toMatchObject({
+      claude: {
+        account: "a-work",
+        key: { set: true, masked: "••••••••CRET", source: "settings" },
+        accounts: [
+          { id: "main", name: "personal", key: { set: false } },
+          { id: "a-work", name: "work", configDir: "~/.claude-work", key: { set: true } },
+        ],
+      },
+      claudeCode: { configDir: "~/.claude-work" },
+    });
+
+    // The switch at the top of a chat sends only which one.
+    await putSettings(req("PUT", "/api/settings", { claudeAccount: "main" }));
+    expect(await settings()).toMatchObject({
+      claude: { account: "main", key: { set: false } },
+      claudeCode: { configDir: "" },
+    });
+    const unknown = await putSettings(req("PUT", "/api/settings", { claudeAccount: "a-gone" }));
+    expect(unknown.status).toBe(400);
+    expect((await errorOf(unknown)).message).toBe("There is no such Claude account.");
   });
 
   it("rejects invalid settings with 400", async () => {

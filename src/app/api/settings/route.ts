@@ -35,6 +35,9 @@ export async function PUT(request: Request): Promise<Response> {
       claudeCodePermission: body.claudeCodePermission,
       claudeCodeConfigDir: body.claudeCodeConfigDir,
       claudeCodePath: body.claudeCodePath,
+      claudeMainName: body.claudeMainName,
+      claudeAccounts: body.claudeAccounts,
+      claudeAccount: body.claudeAccount,
       runCode: body.runCode,
     });
     return json({ settings });
