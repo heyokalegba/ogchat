@@ -20,6 +20,8 @@ interface Launcher {
   staleServer(projectDir: string, port: number): { pid: number } | null;
   startServer(projectDir: string): Promise<{ url: string; stop(): Promise<void> }>;
   stopProcess(pid: number, patience?: number): Promise<boolean>;
+  stopServers(projectDir: string): Promise<number[]>;
+  startedBy(pid: number): boolean;
 }
 
 /** Stands in for `next start`: answers on the port it is given, and says which server it is. */
@@ -184,6 +186,28 @@ describe.skipIf(process.platform === "win32")("the desktop app's server", () => 
     expect(await which(url)).toBe("old");
   }, 30_000);
 
+  it("stops the project's servers when asked, as a build does, and no one else's", async () => {
+    const other = await leftOver(elsewhere);
+    expect(await launcher.stopServers(project)).toEqual([]);
+    expect(alive(other)).toBe(true);
+    running.splice(0)[0]!.kill("SIGKILL");
+    await until(async () => (await which(url)) === null);
+
+    // However new the build it serves: the build about to be made replaces it.
+    builtIn(-3600);
+    const own = await leftOver(project);
+    expect(await launcher.stopServers(project)).toEqual([own]);
+    expect(alive(own)).toBe(false);
+    expect(await which(url)).toBeNull();
+    expect(await launcher.stopServers(project)).toEqual([]);
+  }, 30_000);
+
+  it("knows the processes it was started from, so a build never stops the server it runs in", () => {
+    expect(launcher.startedBy(process.ppid)).toBe(true);
+    expect(launcher.startedBy(process.pid)).toBe(false);
+    expect(launcher.startedBy(1)).toBe(false);
+  });
+
   it("stops the server it started, even one with something still going on", async () => {
     builtIn(-3600);
     process.env.STUBBORN = "1";
@@ -195,4 +219,57 @@ describe.skipIf(process.platform === "win32")("the desktop app's server", () => 
     expect(alive(pid)).toBe(false);
     expect(await which(url)).toBeNull();
   }, 30_000);
+});
+
+/**
+ * What the app runs first (app.cjs) takes the launcher from the project, so
+ * that a fix to the launcher comes with an update and the app need not be
+ * built again; the copy inside the app is what it falls back on.
+ */
+describe("the desktop app's choice of launcher", () => {
+  let root: string;
+  const loaded = globalThis as { ogchatLauncher?: string };
+  const says = (who: string) => `globalThis.ogchatLauncher = ${JSON.stringify(who)};`;
+
+  /** An app with its own launcher inside, and a project with the launcher given, if any. */
+  function open(name: string, projectLauncher: string | null) {
+    const app = path.join(root, name, "app");
+    const project = path.join(root, name, "project");
+    fs.mkdirSync(app, { recursive: true });
+    fs.mkdirSync(path.join(project, "electron"), { recursive: true });
+    fs.copyFileSync(path.resolve("electron/app.cjs"), path.join(app, "app.cjs"));
+    fs.writeFileSync(path.join(app, "main.cjs"), says("the app's own"));
+    if (projectLauncher !== null) {
+      fs.writeFileSync(path.join(project, "electron", "main.cjs"), projectLauncher);
+    }
+    process.env.OGCHAT_PROJECT_DIR = project;
+    delete loaded.ogchatLauncher;
+    createRequire(import.meta.url)(path.join(app, "app.cjs"));
+    return loaded.ogchatLauncher;
+  }
+
+  beforeAll(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), "ogchat-launcher-"));
+  });
+
+  afterAll(() => {
+    delete process.env.OGCHAT_PROJECT_DIR;
+    delete loaded.ogchatLauncher;
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it("is the project's, so the launcher is updated with the project", () => {
+    expect(open("updated", says("the project's"))).toBe("the project's");
+  });
+
+  it("is the app's own when the project's is missing or will not load", () => {
+    expect(open("missing", null)).toBe("the app's own");
+    const quiet = console.error;
+    console.error = () => {};
+    try {
+      expect(open("broken", "this is not javascript (")).toBe("the app's own");
+    } finally {
+      console.error = quiet;
+    }
+  });
 });

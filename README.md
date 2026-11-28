@@ -288,15 +288,20 @@ with its own Dock icon. Three ways, the first being the real thing:
   port of its own (3311), and shows it;
   quitting the app stops the server. Your chats, settings and key stay where
   they are, in the project's `data/` and `.env.local`, so the app and the
-  browser see the same conversations. Updating the project updates what the app shows, the next time it is
-  opened: quitting waits until the server has stopped, and if a server of
-  this project from before the last build is found still running on the
-  app's port, the app stops it and starts a new one rather than show the old
-  ogchat. (If the app ever does show an ogchat from before an update, quit
-  it, run `lsof -ti tcp:3311 | xargs kill` in Terminal, and open it again.)
-  The app itself (its icon, and the small launcher inside it) is only
-  remade by running `npm run mac` again and replacing the copy in
-  Applications; that is also what to do after moving the project folder. The
+  browser see the same conversations.
+
+  **Updating** is two steps: bring the project up to date (`git pull`), then
+  quit the app and open it again. Nothing else: no server to stop by hand, and
+  no app to build again. On opening, the app sees that the project has
+  changed and builds it, and the build stops any server of this project still
+  running from before (on the app's ports only), so the app starts a new one
+  on the new build instead of showing the old ogchat. Quitting waits until
+  the app's own server has stopped. The launcher inside the app is taken from
+  the project too (`electron/main.cjs`), so fixes to it arrive the same way.
+  `npm run mac` is only needed again for a new icon or a newer Electron, or
+  after moving the project folder; an app built before this was written
+  starts taking its launcher from the project once it has been built again.
+  The
   server runs under the Node the app was built with, so nothing extra shows in
   the Dock while it runs; if that Node has since gone, the app falls back to
   the runtime inside itself. The look

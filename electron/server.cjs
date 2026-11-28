@@ -209,6 +209,10 @@ function realPath(dir) {
  */
 function listener(port) {
   const pid = Number(said("lsof", ["-nP", "-t", `-iTCP:${port}`, "-sTCP:LISTEN"]).split("\n")[0]);
+  return about(pid);
+}
+
+function about(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return null;
   const cwd = said("lsof", ["-a", "-p", String(pid), "-d", "cwd", "-Fn"])
     .split("\n")
@@ -269,6 +273,44 @@ async function stopProcess(pid, patience = 3000) {
     // already gone, or not ours to stop
   }
   return gone(2000);
+}
+
+/** Whether this process was started by the one given, however far back. */
+function startedBy(pid) {
+  for (let at = process.ppid, n = 0; Number.isInteger(at) && at > 1 && n < 40; n++) {
+    if (at === pid) return true;
+    at = Number(said("ps", ["-o", "ppid=", "-p", String(at)]));
+  }
+  return false;
+}
+
+/**
+ * Stops this project's servers on the app's ports, and resolves with the ids
+ * of the ones it stopped. The project's build calls this as it begins (see
+ * next.config.ts).
+ *
+ * A build puts new files where a running server's were, so that server is
+ * done for either way: it would go on answering with the old ogchat, or with
+ * half of each. Stopping it here is also what lets any copy of the app, even
+ * one built long ago, show an update after no more than quitting and opening
+ * it again: the app builds, the old server goes, and the app, finding none,
+ * starts one.
+ *
+ * Servers run from another folder are left alone, as are ports that are not
+ * the app's, and the server this build was itself started from (a chat that
+ * builds ogchat inside ogchat would otherwise end its own reply).
+ */
+async function stopServers(projectDir) {
+  const last = FIRST_PORT + 19;
+  const pids = said("lsof", ["-nP", "-t", `-iTCP:${FIRST_PORT}-${last}`, "-sTCP:LISTEN"]);
+  const stopped = [];
+  for (const pid of new Set(pids.split("\n").map(Number))) {
+    const running = about(pid);
+    if (!running || realPath(running.cwd) !== realPath(projectDir)) continue;
+    if (pid === process.pid || startedBy(pid)) continue;
+    if (await stopProcess(pid)) stopped.push(pid);
+  }
+  return stopped;
 }
 
 /**
@@ -342,5 +384,7 @@ module.exports = {
   runtime,
   staleServer,
   startServer,
+  startedBy,
   stopProcess,
+  stopServers,
 };
