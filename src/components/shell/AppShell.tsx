@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { ChatSurface } from "@/components/chat";
+import { ChatSurface, ClaudeAccounts } from "@/components/chat";
 import { MenuIcon } from "@/components/chat/icons";
 import "@/components/chat/theme.css";
 import { createApi } from "@/lib/client/api";
@@ -29,8 +29,12 @@ import { shelterOf } from "@/lib/weather";
 import { trafficAt } from "./life";
 import { useAmbience } from "./useAmbience";
 import { useWeather } from "./useWeather";
+import { colorHex } from "@/lib/accounts";
+import { describePaidBy } from "@/lib/models";
 import {
   isClaudeProvider,
+  type ClaudeAccount,
+  type CodeSignIn,
   type Environment,
   type Project,
   type PublicSettings,
@@ -41,6 +45,7 @@ import {
   type SessionWork,
 } from "@/lib/types";
 import { EnvironmentsPanel } from "./EnvironmentsPanel";
+import { HelpPanel } from "./HelpPanel";
 import { WorkBar } from "./WorkBar";
 import { SCENES, type SceneId } from "./art";
 import { Backdrop } from "./Backdrop";
@@ -81,7 +86,9 @@ function writeUrl(id: string | null, mode: "push" | "replace"): void {
   else window.history.replaceState(null, "", url);
 }
 
-const NO_WORK: SessionWork = { repo: null, branch: null, environmentId: null };
+const NO_WORK: SessionWork = { repo: null, branch: null, environmentId: null, folder: null };
+/** One and the same list every time, so that nothing downstream is drawn again for it. */
+const NO_ACCOUNTS: readonly ClaudeAccount[] = [];
 
 function newestFirst(a: SessionMeta, b: SessionMeta): number {
   return b.updatedAt.localeCompare(a.updatedAt) || b.createdAt.localeCompare(a.createdAt);
@@ -108,6 +115,7 @@ export function AppShell() {
   const [query, setQuery] = useState("");
   const [settings, setSettings] = useState<PublicSettings | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   /** Projects, which one's chats are listed (null: all), and which one is open for editing. */
@@ -386,6 +394,11 @@ export function AppShell() {
     api.getSettings().then(setSettings, () => {});
   }, [api]);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
+  const openHelp = useCallback(() => {
+    setSidebarOpen(false);
+    setHelpOpen(true);
+  }, []);
+  const closeHelp = useCallback(() => setHelpOpen(false), []);
   /**
    * The composer's thinking button: this chat's own level, applied at once and
    * saved with the chat. The level in settings is what a chat starts from.
@@ -444,11 +457,13 @@ export function AppShell() {
   useEffect(() => {
     if (look.chatShown) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !lookOpen && !settingsOpen) changeLook({ chatShown: true });
+      if (event.key === "Escape" && !lookOpen && !settingsOpen && !helpOpen) {
+        changeLook({ chatShown: true });
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [look.chatShown, lookOpen, settingsOpen, changeLook]);
+  }, [look.chatShown, lookOpen, settingsOpen, helpOpen, changeLook]);
 
   // The scene's clock: real time, looked at again every few seconds and
   // whenever the tab comes back. It is never stopped; setting a time only
@@ -574,8 +589,36 @@ export function AppShell() {
       // not remembered: the page settles a moment later next time
     }
   }, [model]);
+  // What the chat on screen is paid for with: a Claude plan's usage, or API
+  // tokens. For Claude Code that is a matter of how it is signed in on the
+  // account in use, so it is asked again whenever the account changes.
+  const [codeSignIn, setCodeSignIn] = useState<CodeSignIn | null>(null);
+  const codeFound = settings?.claudeCode.found ?? false;
+  const codeHome = settings
+    ? `${settings.claude.account}\n${settings.claudeCode.configDir}\n${settings.claudeCode.path}`
+    : "";
+  useEffect(() => {
+    if (!codeFound) return setCodeSignIn(null);
+    let live = true;
+    api.getCodeSignIn().then(
+      (signIn) => live && setCodeSignIn(signIn),
+      () => live && setCodeSignIn(null),
+    );
+    return () => {
+      live = false;
+    };
+  }, [api, codeFound, codeHome]);
+  const paid = model && provider?.ready ? describePaidBy(model.provider, codeSignIn) : null;
   // The Claude accounts there are to switch between, when there is more than one.
-  const accounts = settings && settings.claude.accounts.length > 1 ? settings.claude.accounts : [];
+  const accounts =
+    settings && settings.claude.accounts.length > 1 ? settings.claude.accounts : NO_ACCOUNTS;
+  // The one this chat's next reply runs on. An account with no sign-in of its
+  // own (on Claude Code) or no key of its own (on the API) borrows the main one's.
+  const picked = accounts.find((one) => one.id === settings?.claude.account) ?? accounts[0];
+  const accountInUse =
+    picked && (model?.provider === "claudecode" ? picked.configDir : picked.key.set)
+      ? picked
+      : accounts[0];
   const onAccountChange = useCallback(
     (id: string) => {
       setSettings((current) =>
@@ -645,6 +688,7 @@ export function AppShell() {
           onRename={onRename}
           onDelete={onDelete}
           onOpenSettings={openSettings}
+          onOpenHelp={openHelp}
           projects={projects}
           projectId={projectId}
           onProjectChange={onProjectChange}
@@ -679,6 +723,15 @@ export function AppShell() {
                 title="Which Claude account this and every other Claude chat runs on, from the next message"
               >
                 <span className={styles.accountLabel}>account</span>
+                {accountInUse && (
+                  <span
+                    className={styles.accountDot}
+                    style={{ background: colorHex(accountInUse.color) }}
+                    data-account={accountInUse.id}
+                    title={`This chat's next reply runs on ${accountInUse.name}`}
+                    aria-hidden="true"
+                  />
+                )}
                 <select
                   className={styles.accountSelect}
                   value={settings.claude.account}
@@ -692,6 +745,18 @@ export function AppShell() {
                   ))}
                 </select>
               </label>
+            )}
+            {paid && (
+              <span
+                className={`${styles.paidBy} ${
+                  paid.kind === "plan" ? "" : paid.kind === "api" ? styles.paidApi : styles.paidOut
+                }`}
+                title={paid.full}
+                aria-label={paid.full}
+              >
+                {paid.kind !== "out" && <span className={styles.paidLabel}>uses</span>}
+                {paid.label}
+              </span>
             )}
             <div
               className={`${styles.sceneSwitch} ${styles.pageSwitch}`}
@@ -753,48 +818,62 @@ export function AppShell() {
               <span className={styles.lookClock}>{clock ? clock.label : "look"}</span>
               <span aria-hidden="true">{lookOpen ? "▴" : "▾"}</span>
             </button>
+            <button
+              type="button"
+              className={`${styles.lookButton} ${styles.topHelp} ${helpOpen ? styles.lookButtonOpen : ""}`}
+              aria-haspopup="dialog"
+              title="Help: where things are, and how to use them"
+              onClick={openHelp}
+            >
+              help
+            </button>
           </div>
         </header>
         <div className={styles.surfaceSlot}>
           {ready && (
-            <ChatSurface
-              className={styles.wall}
-              sessionId={activeId}
-              openToken={openToken}
-              provider={provider}
-              models={settings?.choices}
-              model={model}
-              onModelChange={onModelChange}
-              startModel={startModel}
-              startReasoning={startReasoning}
-              startWork={startWork}
-              above={
-                settings && model && model.provider !== "compatible" && provider?.ready ? (
-                  <WorkBar
-                    api={api}
-                    // Claude Code can also reach a repository with this computer's own git sign-in.
-                    github={settings.github.set || model.provider === "claudecode"}
-                    runCode={settings.runCode.enabled || model.provider === "claudecode"}
-                    repos={settings.github.set ? repos : []}
-                    environments={environments}
-                    work={activeId ? (activeSession ?? NO_WORK) : startWork}
-                    projectRepo={titleProject?.repo ?? null}
-                    onChange={onWorkChange}
-                    onOpenSettings={openSettings}
-                    onEditEnvironments={() => setEnvironmentsOpen(true)}
-                  />
-                ) : null
-              }
-              projectId={projectId}
-              reasoning={
-                (activeId ? activeSession?.reasoning : startReasoning) ?? settings?.reasoning
-              }
-              onReasoningChange={settings ? onReasoningChange : undefined}
-              onSessionCreated={onSessionCreated}
-              onSessionUpdated={onSessionUpdated}
-              onSessionMissing={onSessionMissing}
-              onOpenSettings={openSettings}
-            />
+            <ClaudeAccounts value={accounts}>
+              <ChatSurface
+                className={styles.wall}
+                sessionId={activeId}
+                openToken={openToken}
+                provider={provider}
+                models={settings?.choices}
+                model={model}
+                codeSignIn={codeSignIn}
+                onModelChange={onModelChange}
+                startModel={startModel}
+                startReasoning={startReasoning}
+                startWork={startWork}
+                above={
+                  settings && model && model.provider !== "compatible" && provider?.ready ? (
+                    <WorkBar
+                      api={api}
+                      // Claude Code can also reach a repository with this computer's own git sign-in.
+                      github={settings.github.set || model.provider === "claudecode"}
+                      runCode={settings.runCode.enabled || model.provider === "claudecode"}
+                      folders={model.provider === "claudecode"}
+                      folderDialog={settings.claudeCode.folderDialog}
+                      repos={settings.github.set ? repos : []}
+                      environments={environments}
+                      work={activeId ? (activeSession ?? NO_WORK) : startWork}
+                      projectRepo={titleProject?.repo ?? null}
+                      onChange={onWorkChange}
+                      onOpenSettings={openSettings}
+                      onEditEnvironments={() => setEnvironmentsOpen(true)}
+                    />
+                  ) : null
+                }
+                projectId={projectId}
+                reasoning={
+                  (activeId ? activeSession?.reasoning : startReasoning) ?? settings?.reasoning
+                }
+                onReasoningChange={settings ? onReasoningChange : undefined}
+                onSessionCreated={onSessionCreated}
+                onSessionUpdated={onSessionUpdated}
+                onSessionMissing={onSessionMissing}
+                onOpenSettings={openSettings}
+              />
+            </ClaudeAccounts>
           )}
         </div>
       </main>
@@ -866,6 +945,20 @@ export function AppShell() {
           onSaved={(next) => {
             setSettings(next);
             setSettingsOpen(false);
+          }}
+          onHelp={openHelp}
+        />
+      )}
+
+      {/* After settings, so that help opened from there lies over it and settings keeps what was typed. */}
+      {helpOpen && (
+        <HelpPanel
+          paidNow={paid?.full ?? null}
+          accountNow={accountInUse?.name ?? null}
+          onClose={closeHelp}
+          onOpenSettings={() => {
+            setHelpOpen(false);
+            if (!settingsOpen) openSettings();
           }}
         />
       )}

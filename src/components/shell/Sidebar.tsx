@@ -1,8 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent, type Ref } from "react";
+import { colorHex, findAccount } from "@/lib/accounts";
 import { shortAge } from "@/lib/format";
-import { isClaudeProvider, type Project, type PublicSettings, type SessionMeta } from "@/lib/types";
+import {
+  isClaudeProvider,
+  type ClaudeAccount,
+  type Project,
+  type PublicSettings,
+  type SessionMeta,
+} from "@/lib/types";
 import { GearIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from "../chat/icons";
 import styles from "./shell.module.css";
 
@@ -27,6 +34,7 @@ export interface SidebarProps {
   onRename: (id: string, title: string) => void;
   onDelete: (id: string) => void;
   onOpenSettings: () => void;
+  onOpenHelp: () => void;
   projects: Project[];
   /** The project whose sessions are listed, or null for every chat. */
   projectId: string | null;
@@ -78,6 +86,8 @@ function SessionItem(props: {
   tag?: string;
   /** A chat on Claude or Claude Code: marked, so it is told apart from the rest. */
   claude: boolean;
+  /** The Claude account its latest reply ran on, when there is more than one to tell apart. */
+  account?: ClaudeAccount | null;
   active: boolean;
   /** Open in a window of its own. */
   away: boolean;
@@ -179,7 +189,24 @@ function SessionItem(props: {
         }}
       >
         {props.claude && (
-          <span className={styles.itemClaude} title="A chat on Claude" aria-hidden="true">
+          <span
+            className={`${styles.itemClaude} ${props.account ? styles.itemAccount : ""}`}
+            style={
+              props.account
+                ? {
+                    borderColor: colorHex(props.account.color),
+                    background: colorHex(props.account.color),
+                  }
+                : undefined
+            }
+            data-account={props.account?.id}
+            title={
+              props.account
+                ? `A chat on Claude · account: ${props.account.name}`
+                : "A chat on Claude"
+            }
+            aria-hidden="true"
+          >
             C
           </span>
         )}
@@ -244,6 +271,8 @@ export function Sidebar(props: SidebarProps) {
   const [naming, setNaming] = useState(false);
   const [newName, setNewName] = useState("");
   const project = projects.find((candidate) => candidate.id === projectId) ?? null;
+  // The accounts to tell apart by colour: none, while there is only the one.
+  const accounts = settings && settings.claude.accounts.length > 1 ? settings.claude.accounts : [];
   const projectName = (id: string | null) =>
     projects.find((candidate) => candidate.id === id)?.name;
   const [modKey, setModKey] = useState("⌘");
@@ -391,6 +420,7 @@ export function Sidebar(props: SidebarProps) {
                 ? isClaudeProvider(session.model.provider)
                 : Boolean(props.claudeByDefault)
             }
+            account={accounts.length ? findAccount(accounts, session.account) : null}
             active={session.id === activeId}
             away={props.away?.has(session.id) ?? false}
             onPopOut={props.onPopOut ? (at) => props.onPopOut?.(session.id, at) : undefined}
@@ -416,10 +446,24 @@ export function Sidebar(props: SidebarProps) {
           className={styles.settingsButton}
           onClick={props.onOpenSettings}
           aria-label="Open settings"
+          title="Settings: provider, keys, Claude accounts, what Claude may do"
         >
           <span className={`${styles.dot} ${settings?.active.ready ? "" : styles.dotOff}`} />
           <span className={styles.settingsLabel}>{keyStatus}</span>
           <GearIcon />
+          <span className={styles.settingsWord}>settings</span>
+        </button>
+        <button
+          type="button"
+          className={styles.settingsButton}
+          onClick={props.onOpenHelp}
+          aria-label="Open help"
+          title="Help: where things are, and how to use them"
+        >
+          <span className={styles.helpMark} aria-hidden="true">
+            ?
+          </span>
+          <span className={styles.settingsLabel}>help: where things are</span>
         </button>
       </div>
     </aside>

@@ -5,7 +5,7 @@ import path from "node:path";
 import readline from "node:readline";
 import type { ProviderMessage } from "@/lib/provider/adapter";
 import { ProviderAbortedError, ProviderError } from "@/lib/provider/errors";
-import type { Environment } from "@/lib/types";
+import type { CodeSignIn, Environment } from "@/lib/types";
 import { workBranch } from "./github";
 import { workspaceFor } from "./workspace";
 
@@ -110,6 +110,44 @@ export function codeEnv(
   return env;
 }
 
+const SIGN_INS = new Map<string, { at: number; signIn: CodeSignIn }>();
+
+/**
+ * How Claude Code is signed in on an account: to a Claude plan, or to the
+ * Anthropic Console (billed in API tokens). That is what decides what a
+ * reply through it is paid for with. It is asked the program itself, and
+ * the answer is kept for a minute, since it is asked on every reply.
+ */
+export function codeSignIn(setup: CodeSetup, maxAgeMs = 60_000): CodeSignIn {
+  const unknown: CodeSignIn = { state: "unknown", email: null };
+  const bin = findClaudeCode(setup.path);
+  if (!bin) return unknown;
+  const key = `${bin}\n${setup.configDir?.trim() ?? ""}`;
+  const kept = SIGN_INS.get(key);
+  if (kept && Date.now() - kept.at < maxAgeMs) return kept.signIn;
+  let signIn = unknown;
+  try {
+    const run = spawnSync(/* turbopackIgnore: true */ bin, ["auth", "status", "--json"], {
+      env: codeEnv(setup) as unknown as NodeJS.ProcessEnv,
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+    const status = JSON.parse(run.stdout || "null") as Record<string, unknown> | null;
+    // An older version without this command says nothing that can be read: leave it unknown.
+    if (status && typeof status.loggedIn === "boolean") {
+      signIn = {
+        state: !status.loggedIn ? "out" : status.authMethod === "claude.ai" ? "plan" : "api",
+        email:
+          status.loggedIn && typeof status.email === "string" && status.email ? status.email : null,
+      };
+    }
+  } catch {
+    // it would not start, or said something else: unknown
+  }
+  SIGN_INS.set(key, { at: Date.now(), signIn });
+  return signIn;
+}
+
 /** Whether Claude Code is installed and signed in: for the settings test. */
 export function checkClaudeCode(setup: CodeSetup): { ok: boolean; detail: string } {
   const bin = findClaudeCode(setup.path);
@@ -147,11 +185,14 @@ export function checkClaudeCode(setup: CodeSetup): { ok: boolean; detail: string
       detail: `Found ${version}, but it is not signed in. In Terminal run: ${login}`,
     };
   }
-  const who = [status.email, status.orgName, status.subscriptionType]
+  const who = [status.email, status.orgName]
     .filter((part): part is string => typeof part === "string" && part.length > 0)
     .join(", ");
-  const how = status.authMethod === "api_key" ? " (with an API key, not a subscription)" : "";
-  return { ok: true, detail: `${version}, signed in${who ? ` as ${who}` : ""}${how}.` };
+  const paid =
+    status.authMethod === "claude.ai"
+      ? "Replies count against that plan's usage limits, not API tokens."
+      : "It is signed in to the Anthropic Console, not a plan: replies are paid for in API tokens.";
+  return { ok: true, detail: `${version}, signed in${who ? ` as ${who}` : ""}. ${paid}` };
 }
 
 // ------------------------------------------------------------- the chat's folder
@@ -184,18 +225,36 @@ export function githubEnv(token: string | null): Record<string, string> {
 }
 
 /**
- * The folder a Claude Code chat works in. With a repository it is a clone of
- * it, on a branch of the chat's own made from the branch it works from; it
- * is cloned once and then left alone, since from then on it is Claude Code's
- * working copy. Without one it is an empty folder kept for the chat.
+ * The folder a Claude Code chat works in. With a folder of your own it is
+ * that folder, as it stands. With a repository it is a clone of it, on a
+ * branch of the chat's own made from the branch it works from; it is cloned
+ * once and then left alone, since from then on it is Claude Code's working
+ * copy. With neither it is an empty folder kept for the chat.
  */
 export async function codeFolder(options: {
   sessionId: string;
+  /** A folder on this computer, chosen for the chat. It comes before a repository. */
+  folder?: string | null;
   repo?: string | null;
   baseBranch?: string | null;
   token: string | null;
   signal?: AbortSignal;
 }): Promise<string> {
+  if (options.folder) {
+    let there = false;
+    try {
+      there = fs.statSync(options.folder).isDirectory();
+    } catch {
+      // gone, or out of reach
+    }
+    if (!there) {
+      throw new ProviderError(
+        "provider_error",
+        `The folder this chat works in, ${options.folder}, is not there any more. Pick another above the message box, or clear it.`,
+      );
+    }
+    return options.folder;
+  }
   const root = workspaceFor(options.sessionId).root;
   if (!options.repo) {
     const scratch = path.join(root, "code");
@@ -237,6 +296,7 @@ export async function codeFolder(options: {
 /** What Claude Code is told about where it is, on top of its own instructions. */
 export function codeBriefing(options: {
   sessionId: string;
+  folder?: string | null;
   repo?: string | null;
   baseBranch?: string | null;
   permission: CodePermission;
@@ -247,9 +307,11 @@ export function codeBriefing(options: {
   const environment = options.environment;
   return [
     "You are running inside ogchat, a chat window on the user's own computer. What you write is shown to them as the reply.",
-    options.repo
-      ? `Your working directory is a clone of the GitHub repository ${options.repo}, on the branch ${branch}, which was made from ${options.baseBranch ?? "the default branch"} for this chat. Commit your work to ${branch} and nowhere else; do not push to or change any other branch. Push with "git push -u origin ${branch}" only when the user asks you to push or to open a pull request${options.hasToken ? ' (git is already signed in to GitHub; "gh pr create" works if gh is installed)' : ""}. Merging is theirs to do.`
-      : "Your working directory is a scratch folder kept for this chat.",
+    options.folder
+      ? `Your working directory is ${options.folder}, a folder of the user's own on this computer, which they chose for this chat. The files here are theirs and you are working on them in place: ogchat keeps no copy, and a change you make is made for good. Change only what the task calls for, and say which files you changed. If the folder is a git repository, leave its history alone: do not commit, push, or switch or make branches unless the user asks.`
+      : options.repo
+        ? `Your working directory is a clone of the GitHub repository ${options.repo}, on the branch ${branch}, which was made from ${options.baseBranch ?? "the default branch"} for this chat. Commit your work to ${branch} and nowhere else; do not push to or change any other branch. Push with "git push -u origin ${branch}" only when the user asks you to push or to open a pull request${options.hasToken ? ' (git is already signed in to GitHub; "gh pr create" works if gh is installed)' : ""}. Merging is theirs to do.`
+        : "Your working directory is a scratch folder kept for this chat.",
     options.permission === "plan"
       ? "You are in plan mode here: you can read and search, but not change files or run commands. Say what you would do."
       : options.permission === "edit"

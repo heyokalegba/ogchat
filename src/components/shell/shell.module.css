@@ -269,6 +269,11 @@
   color: var(--og-on-dark-2);
 }
 
+/* With more than one Claude account: filled with the colour of the one the chat last ran on. */
+.itemAccount {
+  color: #111114;
+}
+
 /* A project's files, in its panel. */
 .fileList {
   display: grid;
@@ -477,6 +482,9 @@
 }
 
 .sidebarFooter {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   padding: 8px;
   border-top: var(--og-line) solid rgba(246, 241, 230, 0.22);
 }
@@ -507,6 +515,28 @@
   white-space: nowrap;
   text-overflow: ellipsis;
   text-align: left;
+}
+
+/* The word beside the gear, so that the button says what it opens. */
+.settingsWord {
+  flex: none;
+  font-size: calc(12px * var(--og-type));
+  color: var(--og-on-dark-2);
+}
+
+/* The "?" that leads the help button, in the place of the settings button's dot. */
+.helpMark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-left: -4px;
+  margin-right: -5px;
+  border: 1px solid currentColor;
+  font-size: calc(11px * var(--og-type));
+  font-weight: 700;
+  line-height: 1;
 }
 
 .dot {
@@ -667,6 +697,38 @@
   border-color: rgba(246, 241, 230, 0.5);
 }
 
+/*
+ * What a chat on Claude is paid for with: a black label, plain for a plan's
+ * usage and amber for API tokens, which are the ones that cost by the reply.
+ */
+.paidBy {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border: var(--og-line) solid var(--og-ink);
+  background: var(--og-ink);
+  font-family: var(--og-font-mono);
+  font-size: calc(12.5px * var(--og-type));
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--og-on-dark);
+  cursor: help;
+}
+
+.paidLabel {
+  color: var(--og-on-dark-3);
+}
+
+.paidApi {
+  color: #e6c068;
+}
+
+.paidOut {
+  color: #f08a7b;
+}
+
 /* Which Claude account a Claude chat runs on: a black label with a list in it. */
 .accountPick {
   display: flex;
@@ -683,6 +745,15 @@
 .accountLabel {
   padding: 0 2px 0 10px;
   color: var(--og-on-dark-3);
+}
+
+/* The colour of the account in use: the same one its chats and replies carry. */
+.accountDot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-left: 6px;
+  border-radius: 50%;
 }
 
 .shell .accountSelect {
@@ -1012,8 +1083,14 @@
     padding: 0 12px;
   }
 
-  /* On a phone the page and scene switches live in the look panel, leaving room for the title. */
-  .topTools > .sceneSwitch {
+  /*
+   * On a phone the page and scene switches live in the look panel, leaving
+   * room for the title; what a chat is paid for with is said beside each reply,
+   * and help is at the foot of the chat list.
+   */
+  .topTools > .paidBy,
+  .topTools > .sceneSwitch,
+  .topTools > .topHelp {
     display: none;
   }
 
@@ -1087,6 +1164,13 @@
   color: var(--og-ink);
 }
 
+/* What sits at the right of a panel's head: a link or two, and the close button. */
+.panelTools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .panel .iconButton {
   color: var(--og-ink);
 }
@@ -1157,6 +1241,41 @@
   cursor: pointer;
 }
 
+/* The colour an account's chats are marked with: one of a few, picked by its square. */
+.accountColors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.accountColorsLabel {
+  margin-right: 4px;
+  font-family: var(--og-font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.overlay .accountColor {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.overlay .accountColor[aria-checked="true"] {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.overlay .accountColor:focus-visible {
+  outline: 2px dashed currentColor;
+  outline-offset: 2px;
+}
+
 .textInput {
   width: 100%;
   height: 40px;
@@ -1204,6 +1323,97 @@
   font-size: 0.92em;
   font-weight: 600;
   color: var(--og-ink);
+}
+
+/* ------------------------------------------------------------------- help */
+
+.helpPanel {
+  max-width: 620px;
+}
+
+/* The topics, as a row of jumps. */
+.helpJump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.overlay .helpChip {
+  height: 26px;
+  padding: 0 9px;
+  border: var(--og-line) solid var(--og-ink);
+  background: var(--og-white);
+  font-family: var(--og-font-mono);
+  font-size: calc(12px * var(--og-type));
+  font-weight: 600;
+  color: var(--og-ink);
+  transition: background var(--og-fast) var(--og-ease);
+}
+
+.overlay .helpChip:hover {
+  background: var(--og-yellow);
+}
+
+.helpTopic {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding-top: 16px;
+  border-top: var(--og-line) solid var(--og-ink);
+  scroll-margin-top: 10px;
+}
+
+.helpTitle {
+  margin: 0;
+  font-family: var(--og-font-mono);
+  font-size: calc(14.5px * var(--og-type));
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--og-ink);
+}
+
+/* Where it is in the window, and what is so right now: set apart from the rest. */
+.helpWhere,
+.helpNow {
+  margin: 0;
+  padding: 7px 10px;
+  border: var(--og-line) solid var(--og-ink);
+  font-size: calc(14px * var(--og-type));
+  line-height: 1.5;
+  color: var(--og-ink);
+  background: var(--og-white);
+}
+
+.helpNow {
+  border-style: dashed;
+  background: transparent;
+}
+
+.helpWhere .label,
+.helpNow .label {
+  margin-right: 6px;
+}
+
+.helpPoints {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0;
+  padding-left: 18px;
+  font-size: calc(14px * var(--og-type));
+  line-height: 1.5;
+  color: #25333f;
+}
+
+.helpPanel code {
+  font-family: var(--og-font-mono);
+  font-size: 0.92em;
+  font-weight: 600;
+  color: var(--og-ink);
+}
+
+.helpGo {
+  display: flex;
 }
 
 .formError {
@@ -1465,6 +1675,48 @@
   cursor: pointer;
 }
 
+/* A folder of your own: a path is long, so once there is one its box is wider. */
+.shell .workFolder {
+  width: 320px;
+}
+
+/* "choose…", at the end of the folder's box: opens a window to pick it in. */
+.shell .workPick {
+  padding: 0 8px;
+  border-left: var(--og-line) solid var(--og-ink);
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.shell .workPick:hover:not(:disabled) {
+  color: #ebe4d4;
+  background: var(--og-ink);
+}
+
+.shell .workPick:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* What is wrong with the folder that was typed, and a note on one that is not in use. */
+.workError,
+.workNote {
+  padding: 2px 7px;
+  font-weight: 600;
+  background: rgba(235, 228, 212, 0.92);
+}
+
+.workError {
+  color: #8f2a1f;
+}
+
+.workNote {
+  cursor: help;
+}
+
 .shell .workInput::placeholder {
   color: rgba(23, 23, 26, 0.55);
 }
@@ -1566,6 +1818,7 @@
 .shell[data-look="formal"] .topTitle,
 .shell[data-look="formal"] .lookButton,
 .shell[data-look="formal"] .accountPick,
+.shell[data-look="formal"] .paidBy,
 .shell[data-look="formal"] .menuButton {
   border: 1px solid var(--og-rule);
   background: #000000;
@@ -1639,6 +1892,24 @@
 
 .shell[data-look="formal"] .workLink {
   background: transparent;
+}
+
+.shell[data-look="formal"] .workPick {
+  border-left-color: var(--og-rule);
+}
+
+.shell[data-look="formal"] .workPick:hover:not(:disabled) {
+  color: #0b0b0c;
+  background: #f4f4f5;
+}
+
+.shell[data-look="formal"] .workError,
+.shell[data-look="formal"] .workNote {
+  background: transparent;
+}
+
+.shell[data-look="formal"] .workError {
+  color: #f08a7b;
 }
 
 .shell[data-look="formal"] .workLink:hover {

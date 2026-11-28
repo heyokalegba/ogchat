@@ -346,9 +346,12 @@ export async function runTurn(
     let codeHome = "";
     let codeSystem = "";
     if (settings.provider === "claudecode") {
-      const codeRepo = turn.session.repo ?? project?.repo ?? null;
+      // A folder of your own comes first; then the chat's repository, or its project's.
+      const codeDir = turn.session.folder ?? null;
+      const codeRepo = codeDir ? null : (turn.session.repo ?? project?.repo ?? null);
       const cwd = await codeFolder({
         sessionId,
+        folder: codeDir,
         repo: codeRepo,
         baseBranch,
         token: settings.githubToken,
@@ -381,6 +384,7 @@ export async function runTurn(
         settings.systemPrompt,
         codeBriefing({
           sessionId,
+          folder: codeDir,
           repo: codeRepo,
           baseBranch,
           permission: settings.claudeCodePermission,

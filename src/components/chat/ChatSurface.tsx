@@ -13,11 +13,13 @@ import {
   type ReactNode,
 } from "react";
 import { createApi } from "@/lib/client/api";
-import { describeRanOn, effortFacts, effortName, modelName } from "@/lib/models";
+import { describeRanOn, effortFacts, effortName, modelName, paidByOf } from "@/lib/models";
 import type {
   Attachment,
   ChatMessage,
+  CodeSignIn,
   ModelChoice,
+  ProviderChoice,
   ReasoningEffort,
   SessionMeta,
   SessionModel,
@@ -53,6 +55,8 @@ export interface ChatSurfaceProps {
   models?: ModelChoice[];
   model?: SessionModel | null;
   onModelChange?: (model: SessionModel) => void;
+  /** How Claude Code is signed in, so the picker can say what a chat on it is paid for with. */
+  codeSignIn?: CodeSignIn | null;
   /** For a conversation not yet saved: the model it starts with, if not the one in settings. */
   startModel?: SessionModel | null;
   /** Likewise the thinking level a conversation not yet saved starts with. */
@@ -76,10 +80,28 @@ const STICK_PX = 96;
 
 const keyOf = (m: SessionModel) => `${m.provider}:${m.model}`;
 
-/** The model's name, as a list to pick another from. Models whose provider has no key are left out. */
+/** The ways to a model, in the order the picker lists them, and what each is headed. */
+const PICKER_GROUPS: readonly ProviderChoice[] = ["claudecode", "claude", "compatible"];
+function groupLabel(provider: ProviderChoice, signIn: CodeSignIn | null): string {
+  if (provider === "compatible") return "Other provider";
+  const paidBy = paidByOf(provider, signIn);
+  const name = provider === "claude" ? "Claude API" : "Claude Code";
+  return paidBy === "plan"
+    ? `${name} · uses your plan`
+    : paidBy === "api"
+      ? `${name} · uses API tokens`
+      : name;
+}
+
+/**
+ * The model's name, as a list to pick another from. Models whose provider has
+ * no key are left out. They are listed under the way each is reached, which
+ * says what it is paid for with: a plan's usage, or API tokens.
+ */
 function ModelPicker(props: {
   models: ModelChoice[];
   model: SessionModel;
+  signIn: CodeSignIn | null;
   onChange: (model: SessionModel) => void;
 }) {
   const { models, model } = props;
@@ -92,17 +114,25 @@ function ModelPicker(props: {
       className={styles.modelPicker}
       value={keyOf(model)}
       aria-label="Model for this chat"
-      title="The model this chat uses. Each chat keeps its own."
+      title="The model this chat uses, and what it is paid for with. Each chat keeps its own."
       onChange={(event) => {
         const picked = listed.find((m) => keyOf(m) === event.target.value);
         if (picked) props.onChange({ provider: picked.provider, model: picked.model });
       }}
     >
-      {listed.map((m) => (
-        <option key={keyOf(m)} value={keyOf(m)}>
-          {m.label}
-        </option>
-      ))}
+      {PICKER_GROUPS.filter((provider) => listed.some((m) => m.provider === provider)).map(
+        (provider) => (
+          <optgroup key={provider} label={groupLabel(provider, props.signIn)}>
+            {listed
+              .filter((m) => m.provider === provider)
+              .map((m) => (
+                <option key={keyOf(m)} value={keyOf(m)}>
+                  {m.label}
+                </option>
+              ))}
+          </optgroup>
+        ),
+      )}
     </select>
   );
 }
@@ -566,6 +596,7 @@ export function ChatSurface(props: ChatSurfaceProps) {
                     <ModelPicker
                       models={props.models}
                       model={props.model}
+                      signIn={props.codeSignIn ?? null}
                       onChange={props.onModelChange}
                     />
                   )}

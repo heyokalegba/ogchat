@@ -18,7 +18,8 @@ if (args[0] === "auth") {
   console.log(
     JSON.stringify({
       loggedIn: signedIn,
-      authMethod: "claude.ai",
+      // Signed in to a plan, unless its folder says it is the Console's.
+      authMethod: process.env.CLAUDE_CONFIG_DIR?.includes("console") ? "console" : "claude.ai",
       email: "someone@example.com",
       subscriptionType: "max",
     }),

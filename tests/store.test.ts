@@ -185,6 +185,7 @@ describe("settings persistence", () => {
       claudeCodeModel: "default",
       claudeAccount: "main",
       claudeAccountOn: { claude: null, claudecode: null },
+      claudeAccountIdOn: { claude: "main", claudecode: "main" },
     });
   });
 
@@ -219,6 +220,7 @@ describe("settings persistence", () => {
       claudeCodeModel: "default",
       claudeAccount: "main",
       claudeAccountOn: { claude: null, claudecode: null },
+      claudeAccountIdOn: { claude: "main", claudecode: "main" },
     });
     const file = path.join(data.dir(), "settings.json");
     expect(fs.statSync(file).mode & 0o777).toBe(0o600);
@@ -259,6 +261,7 @@ describe("settings persistence", () => {
       claudeCodeModel: "default",
       claudeAccount: "main",
       claudeAccountOn: { claude: null, claudecode: null },
+      claudeAccountIdOn: { claude: "main", claudecode: "main" },
     });
     expect(settings.publicSettings().apiKey).toEqual({
       set: true,
@@ -317,11 +320,63 @@ describe("Claude accounts", () => {
         {
           id: "main",
           name: "main",
+          color: "blue",
           configDir: "",
           key: { set: false, masked: null, source: null },
           workspace: "",
         },
       ],
+    });
+  });
+
+  it("gives each account a colour of its own, and keeps it", async () => {
+    const { settings } = await boot();
+    const colors = (view: { claude: { accounts: { id: string; color: string }[] } }) =>
+      view.claude.accounts.map((one) => [one.id, one.color]);
+    const side = { id: "a-side", name: "side", configDir: "~/.claude-side" };
+    // The first colour nobody has, in the order the colours come.
+    expect(colors(settings.updateSettings({ claudeAccounts: [work, side] }))).toEqual([
+      ["main", "blue"],
+      ["a-work", "green"],
+      ["a-side", "violet"],
+    ]);
+    // Taking one off the list does not repaint the others, nor does saving without a colour.
+    expect(colors(settings.updateSettings({ claudeAccounts: [side] }))).toEqual([
+      ["main", "blue"],
+      ["a-side", "violet"],
+    ]);
+    // A colour that is picked is the one it has from then on, and across a restart.
+    settings.updateSettings({
+      claudeMainColor: "pink",
+      claudeAccounts: [{ ...side, color: "teal" }],
+    });
+    settings.updateSettings({ claudeAccounts: [side, { ...work, name: "the office" }] });
+    const restarted = await boot();
+    expect(colors(restarted.settings.publicSettings())).toEqual([
+      ["main", "pink"],
+      ["a-side", "teal"],
+      ["a-work", "blue"],
+    ]);
+    for (const bad of [
+      { claudeMainColor: "#ff0000" },
+      { claudeAccounts: [{ ...side, color: 3 }] },
+    ]) {
+      expect(() => settings.updateSettings(bad)).toThrow(/not one of the colours/);
+    }
+  });
+
+  it("says by id whose key and whose sign-in a reply runs on", async () => {
+    const { settings } = await boot();
+    settings.updateSettings({ claudeKey: TEST_KEY, claudeAccounts: [work] });
+    expect(settings.resolveSettings().claudeAccountIdOn).toEqual({
+      claude: "main",
+      claudecode: "main",
+    });
+    settings.updateSettings({ claudeAccount: "a-work" });
+    // It has a sign-in of its own and no key: the API still goes through the main account's.
+    expect(settings.resolveSettings().claudeAccountIdOn).toEqual({
+      claude: "main",
+      claudecode: "a-work",
     });
   });
 
@@ -410,6 +465,7 @@ describe("Claude accounts", () => {
       claudeAccount: "main",
       claudeCodeConfigDir: null,
       claudeAccountOn: { claude: null, claudecode: null },
+      claudeAccountIdOn: { claude: "main", claudecode: "main" },
     });
   });
 

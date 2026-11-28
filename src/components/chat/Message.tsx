@@ -1,9 +1,19 @@
 "use client";
 
-import { memo, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import {
+  memo,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
+import { accountRefOf, colorHex, findAccount } from "@/lib/accounts";
 import { clockTime, stopwatch } from "@/lib/format";
 import { describeRanOn } from "@/lib/models";
 import type { Attachment, ChatMessage, RanOn } from "@/lib/types";
+import { ClaudeAccounts } from "./accounts";
 import { MessageAttachments } from "./Attachments";
 import { BlockCaret } from "./BlockCaret";
 import styles from "./chat.module.css";
@@ -35,11 +45,25 @@ function usable(ranOn: RanOn | null | undefined): ranOn is RanOn {
   return Boolean(ranOn && typeof ranOn.model === "string" && typeof ranOn.provider === "string");
 }
 
-/** Which model wrote a reply and at what thinking level; the full story is in its tooltip. */
+/**
+ * Which model wrote a reply and at what thinking level; the full story is in
+ * its tooltip. With more than one Claude account, a dot in the colour of the
+ * account it ran on comes first.
+ */
 function ModelNote({ ranOn }: { ranOn: RanOn }) {
   const { short, full } = describeRanOn(ranOn);
+  const accounts = useContext(ClaudeAccounts);
+  const account = accounts.length > 1 ? findAccount(accounts, accountRefOf(ranOn)) : null;
   return (
     <span className={styles.modelNote} title={full} aria-label={full.replace(/\n/g, " ")}>
+      {account && (
+        <span
+          className={styles.accountDot}
+          style={{ background: colorHex(account.color) }}
+          data-account={account.id}
+          aria-hidden="true"
+        />
+      )}
       {short}
     </span>
   );

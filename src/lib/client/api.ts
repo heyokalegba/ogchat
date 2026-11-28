@@ -1,4 +1,5 @@
 import type {
+  CodeSignIn,
   ContextUse,
   Project,
   ProviderChoice,
@@ -79,8 +80,12 @@ export interface ChatApi {
     reasoning?: ReasoningEffort | null,
     work?: Partial<SessionWork> | null,
   ): Promise<Session>;
-  /** Sets where a chat works: its repository, branch and environment. Null clears one. */
+  /** Sets where a chat works: its folder or repository, branch and environment. Null clears one. */
   setSessionWork(id: string, work: Partial<SessionWork>): Promise<SessionMeta>;
+  /** A folder as it was typed, checked on this computer: its full path, or an error saying why not. */
+  checkFolder(path: string): Promise<string>;
+  /** Opens the system's window for choosing a folder. Null if it was cancelled. */
+  chooseFolder(): Promise<string | null>;
   /** The repositories the GitHub token in settings can reach. */
   listRepos(): Promise<RepoChoice[]>;
   listBranches(repo: string): Promise<{ branches: string[]; defaultBranch: string }>;
@@ -114,6 +119,8 @@ export interface ChatApi {
   expand(id: string): Promise<{ session: Session; context: ContextUse }>;
   stop(id: string): Promise<void>;
   getSettings(): Promise<PublicSettings>;
+  /** How Claude Code is signed in on the account in use: to a plan, or to be billed in API tokens. */
+  getCodeSignIn(): Promise<CodeSignIn>;
   /** When this installation's street was first opened: what its wear is counted from. */
   getWorld(): Promise<{ builtAt: string }>;
   /** New York's weather at this moment, from the public weather service. */
@@ -198,6 +205,13 @@ export function createApi(base = "/api"): ChatApi {
     async setSessionWork(id, work) {
       return (await data<{ session: SessionMeta }>(`/sessions/${id}`, body("PATCH", work))).session;
     },
+    async checkFolder(path) {
+      return (await data<{ folder: string }>("/folders", body("POST", { path }))).folder;
+    },
+    async chooseFolder() {
+      return (await data<{ folder: string | null }>("/folders", body("POST", { choose: true })))
+        .folder;
+    },
     async listRepos() {
       return (await data<{ repos: RepoChoice[] }>("/github/repos")).repos;
     },
@@ -228,8 +242,9 @@ export function createApi(base = "/api"): ChatApi {
             ...(projectId ? { projectId } : {}),
             ...(model ? { model } : {}),
             ...(reasoning ? { reasoning } : {}),
-            ...(work?.repo ? { repo: work.repo } : {}),
-            ...(work?.repo && work.branch ? { branch: work.branch } : {}),
+            ...(work?.folder ? { folder: work.folder } : {}),
+            ...(work?.repo && !work.folder ? { repo: work.repo } : {}),
+            ...(work?.repo && !work.folder && work.branch ? { branch: work.branch } : {}),
             ...(work?.environmentId ? { environmentId: work.environmentId } : {}),
           }),
         )
@@ -310,6 +325,9 @@ export function createApi(base = "/api"): ChatApi {
     },
     async getSettings() {
       return (await data<{ settings: PublicSettings }>("/settings")).settings;
+    },
+    async getCodeSignIn() {
+      return (await data<{ signIn: CodeSignIn }>("/settings/sign-in")).signIn;
     },
     async saveSettings(update) {
       return (await data<{ settings: PublicSettings }>("/settings", body("PUT", update))).settings;

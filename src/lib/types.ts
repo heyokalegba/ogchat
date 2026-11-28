@@ -61,6 +61,39 @@ export interface RanOn {
   effort: string | null;
   /** Which Claude account it ran on, by name. Only set when there is more than one to be on. */
   account?: string;
+  /** The same account by its id, which a new name does not change. Set on every reply from Claude. */
+  accountId?: string;
+  /** What it was paid for with, where that is known: a Claude plan's usage, or API tokens. */
+  paidBy?: PaidBy;
+}
+
+/**
+ * What a reply from Claude is paid for with. "plan": it counts against a
+ * Claude subscription's usage limits (Claude Code, signed in to one). "api":
+ * it is billed by the token (an API key, or Claude Code signed in to the
+ * Anthropic Console).
+ */
+export type PaidBy = "plan" | "api";
+
+/** How Claude Code is signed in on the account in use. */
+export interface CodeSignIn {
+  /**
+   * "plan": to a Claude subscription. "api": to the Anthropic Console or with
+   * a key, billed by the token. "out": not signed in. "unknown": it would
+   * not say, or it is not installed.
+   */
+  state: PaidBy | "out" | "unknown";
+  /** Who it is signed in as, when it says. */
+  email: string | null;
+}
+
+/**
+ * A pointer at a Claude account: its id, or for a reply written before ids
+ * were kept, its name. With neither, it is the main account.
+ */
+export interface AccountRef {
+  id?: string;
+  name?: string;
 }
 
 /** Whether a provider is one of the two ways to Claude, rather than any other model. */
@@ -94,10 +127,18 @@ export interface SessionMeta {
   branch: string | null;
   /** The environment its commands run in, or null for the default one. */
   environmentId: string | null;
+  /**
+   * A folder on this computer that a chat on Claude Code works in, where the
+   * files are edited in place; null for a folder ogchat keeps for the chat.
+   * A chat has this or a repository, not both.
+   */
+  folder: string | null;
+  /** The Claude account its latest reply from Claude ran on; null if it has none. */
+  account: AccountRef | null;
 }
 
 /** Where a chat works: what the bar above the message box sets. */
-export type SessionWork = Pick<SessionMeta, "repo" | "branch" | "environmentId">;
+export type SessionWork = Pick<SessionMeta, "repo" | "branch" | "environmentId" | "folder">;
 
 /** A named set-up for the folder Claude runs commands in. */
 export interface Environment {
@@ -193,6 +234,8 @@ export interface ClaudeAccount {
   name: string;
   /** Where Claude Code keeps this account's sign-in. "" for none of its own. */
   configDir: string;
+  /** The colour its chats are marked with: one of ACCOUNT_COLORS, by id. */
+  color: string;
   /** Its API key, masked as every key is. */
   key: { set: boolean; masked: string | null; source: KeySource | null };
   /** The workspace id sent with its key. "" for none. */
@@ -247,6 +290,8 @@ export interface PublicSettings {
     configDir: string;
     permission: "plan" | "edit" | "run" | "auto";
     model: string;
+    /** Whether this computer can show a window to choose a chat's folder in. */
+    folderDialog: boolean;
   };
   /** Whether Claude may run commands here, and whether this system can fence them in. */
   runCode: { enabled: boolean; sandbox: "macos" | "none" };
