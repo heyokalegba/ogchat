@@ -45,6 +45,7 @@ import {
   type SessionWork,
 } from "@/lib/types";
 import { EnvironmentsPanel } from "./EnvironmentsPanel";
+import { HelpPanel } from "./HelpPanel";
 import { WorkBar } from "./WorkBar";
 import { SCENES, type SceneId } from "./art";
 import { Backdrop } from "./Backdrop";
@@ -114,6 +115,7 @@ export function AppShell() {
   const [query, setQuery] = useState("");
   const [settings, setSettings] = useState<PublicSettings | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   /** Projects, which one's chats are listed (null: all), and which one is open for editing. */
@@ -392,6 +394,11 @@ export function AppShell() {
     api.getSettings().then(setSettings, () => {});
   }, [api]);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
+  const openHelp = useCallback(() => {
+    setSidebarOpen(false);
+    setHelpOpen(true);
+  }, []);
+  const closeHelp = useCallback(() => setHelpOpen(false), []);
   /**
    * The composer's thinking button: this chat's own level, applied at once and
    * saved with the chat. The level in settings is what a chat starts from.
@@ -450,11 +457,13 @@ export function AppShell() {
   useEffect(() => {
     if (look.chatShown) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !lookOpen && !settingsOpen) changeLook({ chatShown: true });
+      if (event.key === "Escape" && !lookOpen && !settingsOpen && !helpOpen) {
+        changeLook({ chatShown: true });
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [look.chatShown, lookOpen, settingsOpen, changeLook]);
+  }, [look.chatShown, lookOpen, settingsOpen, helpOpen, changeLook]);
 
   // The scene's clock: real time, looked at again every few seconds and
   // whenever the tab comes back. It is never stopped; setting a time only
@@ -679,6 +688,7 @@ export function AppShell() {
           onRename={onRename}
           onDelete={onDelete}
           onOpenSettings={openSettings}
+          onOpenHelp={openHelp}
           projects={projects}
           projectId={projectId}
           onProjectChange={onProjectChange}
@@ -808,6 +818,15 @@ export function AppShell() {
               <span className={styles.lookClock}>{clock ? clock.label : "look"}</span>
               <span aria-hidden="true">{lookOpen ? "▴" : "▾"}</span>
             </button>
+            <button
+              type="button"
+              className={`${styles.lookButton} ${styles.topHelp} ${helpOpen ? styles.lookButtonOpen : ""}`}
+              aria-haspopup="dialog"
+              title="Help: where things are, and how to use them"
+              onClick={openHelp}
+            >
+              help
+            </button>
           </div>
         </header>
         <div className={styles.surfaceSlot}>
@@ -926,6 +945,20 @@ export function AppShell() {
           onSaved={(next) => {
             setSettings(next);
             setSettingsOpen(false);
+          }}
+          onHelp={openHelp}
+        />
+      )}
+
+      {/* After settings, so that help opened from there lies over it and settings keeps what was typed. */}
+      {helpOpen && (
+        <HelpPanel
+          paidNow={paid?.full ?? null}
+          accountNow={accountInUse?.name ?? null}
+          onClose={closeHelp}
+          onOpenSettings={() => {
+            setHelpOpen(false);
+            if (!settingsOpen) openSettings();
           }}
         />
       )}

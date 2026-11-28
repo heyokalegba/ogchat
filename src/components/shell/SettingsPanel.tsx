@@ -41,6 +41,8 @@ export interface SettingsPanelProps {
   settings: PublicSettings;
   onClose: () => void;
   onSaved: (settings: PublicSettings) => void;
+  /** Open the help over the settings, which stay as they are underneath. */
+  onHelp?: () => void;
 }
 
 /**
@@ -52,7 +54,7 @@ export interface SettingsPanelProps {
  * "test" tries what is in the form right now, saved or not, and says in plain
  * words which part works and which does not: the key, the model id, credits.
  */
-export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanelProps) {
+export function SettingsPanel({ api, settings, onClose, onSaved, onHelp }: SettingsPanelProps) {
   const [baseUrl, setBaseUrl] = useState(settings.baseUrl);
   const [model, setModel] = useState(settings.model);
   const [apiKey, setApiKey] = useState("");
@@ -262,14 +264,26 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
           <h2 id="ogchat-settings-title" className={styles.panelTitle}>
             settings
           </h2>
-          <button
-            type="button"
-            className={styles.iconButton}
-            onClick={onClose}
-            aria-label="Close settings"
-          >
-            <CloseIcon />
-          </button>
+          <span className={styles.panelTools}>
+            {onHelp && (
+              <button
+                type="button"
+                className={styles.linkButton}
+                onClick={onHelp}
+                title="Where things are, and how to use them. Settings stay open underneath."
+              >
+                help
+              </button>
+            )}
+            <button
+              type="button"
+              className={styles.iconButton}
+              onClick={onClose}
+              aria-label="Close settings"
+            >
+              <CloseIcon />
+            </button>
+          </span>
         </div>
 
         <div className={styles.panelBody}>

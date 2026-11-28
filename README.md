@@ -780,6 +780,17 @@ The provider must speak the OpenAI chat-completions shape:
 
 ## Using it
 
+**Help is in the app.** Press **help** at the foot of the chat list, at the
+top right of a chat, or in the head of settings. It says where each thing is
+in the window and how to use the ones that are not plain from looking: what a
+chat is paid for with (plan usage or API tokens), working on files on this
+computer, Claude accounts and their colours, the page, and a map of the
+window a corner at a time. Topics that are set in settings end in an **open
+settings** button; opened from settings, help lies over them and what you
+had typed there is kept. The button at the foot of the chat list that shows
+the model in use is the one that opens **settings**, and now says so. The
+words of the help are in `src/lib/help.ts`.
+
 | Key                             | Action                                             |
 | ------------------------------- | -------------------------------------------------- |
 | Enter                           | Send                                               |

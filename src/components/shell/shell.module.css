@@ -482,6 +482,9 @@
 }
 
 .sidebarFooter {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   padding: 8px;
   border-top: var(--og-line) solid rgba(246, 241, 230, 0.22);
 }
@@ -512,6 +515,28 @@
   white-space: nowrap;
   text-overflow: ellipsis;
   text-align: left;
+}
+
+/* The word beside the gear, so that the button says what it opens. */
+.settingsWord {
+  flex: none;
+  font-size: calc(12px * var(--og-type));
+  color: var(--og-on-dark-2);
+}
+
+/* The "?" that leads the help button, in the place of the settings button's dot. */
+.helpMark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-left: -4px;
+  margin-right: -5px;
+  border: 1px solid currentColor;
+  font-size: calc(11px * var(--og-type));
+  font-weight: 700;
+  line-height: 1;
 }
 
 .dot {
@@ -1060,10 +1085,12 @@
 
   /*
    * On a phone the page and scene switches live in the look panel, leaving
-   * room for the title; what a chat is paid for with is said beside each reply.
+   * room for the title; what a chat is paid for with is said beside each reply,
+   * and help is at the foot of the chat list.
    */
   .topTools > .paidBy,
-  .topTools > .sceneSwitch {
+  .topTools > .sceneSwitch,
+  .topTools > .topHelp {
     display: none;
   }
 
@@ -1135,6 +1162,13 @@
   font-size: calc(15.5px * var(--og-type));
   font-weight: 700;
   color: var(--og-ink);
+}
+
+/* What sits at the right of a panel's head: a link or two, and the close button. */
+.panelTools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .panel .iconButton {
@@ -1289,6 +1323,97 @@
   font-size: 0.92em;
   font-weight: 600;
   color: var(--og-ink);
+}
+
+/* ------------------------------------------------------------------- help */
+
+.helpPanel {
+  max-width: 620px;
+}
+
+/* The topics, as a row of jumps. */
+.helpJump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.overlay .helpChip {
+  height: 26px;
+  padding: 0 9px;
+  border: var(--og-line) solid var(--og-ink);
+  background: var(--og-white);
+  font-family: var(--og-font-mono);
+  font-size: calc(12px * var(--og-type));
+  font-weight: 600;
+  color: var(--og-ink);
+  transition: background var(--og-fast) var(--og-ease);
+}
+
+.overlay .helpChip:hover {
+  background: var(--og-yellow);
+}
+
+.helpTopic {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding-top: 16px;
+  border-top: var(--og-line) solid var(--og-ink);
+  scroll-margin-top: 10px;
+}
+
+.helpTitle {
+  margin: 0;
+  font-family: var(--og-font-mono);
+  font-size: calc(14.5px * var(--og-type));
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--og-ink);
+}
+
+/* Where it is in the window, and what is so right now: set apart from the rest. */
+.helpWhere,
+.helpNow {
+  margin: 0;
+  padding: 7px 10px;
+  border: var(--og-line) solid var(--og-ink);
+  font-size: calc(14px * var(--og-type));
+  line-height: 1.5;
+  color: var(--og-ink);
+  background: var(--og-white);
+}
+
+.helpNow {
+  border-style: dashed;
+  background: transparent;
+}
+
+.helpWhere .label,
+.helpNow .label {
+  margin-right: 6px;
+}
+
+.helpPoints {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0;
+  padding-left: 18px;
+  font-size: calc(14px * var(--og-type));
+  line-height: 1.5;
+  color: #25333f;
+}
+
+.helpPanel code {
+  font-family: var(--og-font-mono);
+  font-size: 0.92em;
+  font-weight: 600;
+  color: var(--og-ink);
+}
+
+.helpGo {
+  display: flex;
 }
 
 .formError {

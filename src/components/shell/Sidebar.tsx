@@ -34,6 +34,7 @@ export interface SidebarProps {
   onRename: (id: string, title: string) => void;
   onDelete: (id: string) => void;
   onOpenSettings: () => void;
+  onOpenHelp: () => void;
   projects: Project[];
   /** The project whose sessions are listed, or null for every chat. */
   projectId: string | null;
@@ -445,10 +446,24 @@ export function Sidebar(props: SidebarProps) {
           className={styles.settingsButton}
           onClick={props.onOpenSettings}
           aria-label="Open settings"
+          title="Settings: provider, keys, Claude accounts, what Claude may do"
         >
           <span className={`${styles.dot} ${settings?.active.ready ? "" : styles.dotOff}`} />
           <span className={styles.settingsLabel}>{keyStatus}</span>
           <GearIcon />
+          <span className={styles.settingsWord}>settings</span>
+        </button>
+        <button
+          type="button"
+          className={styles.settingsButton}
+          onClick={props.onOpenHelp}
+          aria-label="Open help"
+          title="Help: where things are, and how to use them"
+        >
+          <span className={styles.helpMark} aria-hidden="true">
+            ?
+          </span>
+          <span className={styles.settingsLabel}>help: where things are</span>
         </button>
       </div>
     </aside>
