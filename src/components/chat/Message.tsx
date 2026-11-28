@@ -24,6 +24,8 @@ export interface MessageViewProps {
   onReplay?: (message: ChatMessage) => void;
   /** Where to load an attachment from (thumbnails, "open file" links). */
   fileUrl: (attachment: Attachment) => string;
+  /** Opens one of the message's files over the chat. */
+  onOpenFile?: (attachment: Attachment, url: string) => void;
 }
 
 const CONFIRM_MS = 3000;
@@ -162,7 +164,7 @@ export const MessageView = memo(function MessageView(props: MessageViewProps) {
     return (
       <article className={styles.message} data-role="user">
         <TagRow role="user" time={clockTime(message.createdAt)} />
-        <MessageAttachments attachments={attachments} fileUrl={fileUrl} />
+        <MessageAttachments attachments={attachments} fileUrl={fileUrl} onOpen={props.onOpenFile} />
         <Editor
           initial={message.content}
           allowEmpty={attachments.length > 0}
@@ -241,7 +243,11 @@ export const MessageView = memo(function MessageView(props: MessageViewProps) {
           {message.content && (
             <div className={`${styles.body} ${styles.userBody}`}>{message.content}</div>
           )}
-          <MessageAttachments attachments={attachments} fileUrl={fileUrl} />
+          <MessageAttachments
+            attachments={attachments}
+            fileUrl={fileUrl}
+            onOpen={props.onOpenFile}
+          />
         </div>
       ) : (
         <div className={styles.body}>

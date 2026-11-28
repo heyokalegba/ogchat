@@ -586,6 +586,13 @@ export function useChat(options: UseChatOptions) {
     [setFiles],
   );
 
+  /** Puts an edited file where the one it came from was. */
+  const replaceFile = useCallback(
+    (file: File, next: File) =>
+      setFiles(filesRef.current.map((held) => (held === file ? next : held))),
+    [setFiles],
+  );
+
   const fileUrl = useCallback(
     (attachment: Attachment) => {
       if (attachment.previewUrl) return attachment.previewUrl;
@@ -751,6 +758,7 @@ export function useChat(options: UseChatOptions) {
     files,
     addFiles,
     removeFile,
+    replaceFile,
     fileUrl,
     openCount,
     send,

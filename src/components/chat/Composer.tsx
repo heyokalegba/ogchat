@@ -34,6 +34,8 @@ export interface ComposerProps {
   files: File[];
   onAddFiles: (files: File[]) => void;
   onRemoveFile: (index: number) => void;
+  /** Opens a queued file to be read or edited. */
+  onOpenFile?: (file: File) => void;
   /** Whether the next message may search the web. */
   web: boolean;
   onToggleWeb: () => void;
@@ -50,7 +52,8 @@ export interface ComposerProps {
 /**
  * Enter sends, Shift+Enter inserts a newline, Escape stops a reply in progress.
  * Files are attached with the paperclip, by pasting, or by dropping them on the chat.
- * Pasting a lot of text attaches it as a text file rather than filling the box.
+ * Pasting a lot of text attaches it as a text file rather than filling the box;
+ * pressing the file opens it, to read it or change it before it is sent.
  * The globe lets the next message search the web; "think" opens the thinking
  * effort levels (Auto, Low, Medium, High, Extra, Max).
  */
@@ -109,6 +112,7 @@ export function Composer(props: ComposerProps) {
       <div className={styles.inputPanel}>
         <PendingFiles
           files={files}
+          onOpen={props.onOpenFile}
           onRemove={(index) => {
             onRemoveFile(index);
             // The removed chip took focus with it; hand it back to the message box.

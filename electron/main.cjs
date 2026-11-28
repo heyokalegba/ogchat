@@ -50,13 +50,17 @@ function splash(message) {
 function keepLinksOut(contents) {
   contents.setWindowOpenHandler(({ url }) => {
     if (server && url.startsWith(server.url)) {
+      // An attachment is served as bare text, which brings no colours of its
+      // own: black letters on whatever the window is. So its window is white.
+      // (On the app's night blue the text could not be read.)
+      const bareFile = /\/api\/(sessions|projects)\/[^/]+\/files\//.test(url);
       return {
         action: "allow",
         overrideBrowserWindowOptions: {
           minWidth: 480,
           minHeight: 420,
           title: "ogchat",
-          backgroundColor: "#151b2e",
+          backgroundColor: bareFile ? "#ffffff" : "#151b2e",
           webPreferences: { contextIsolation: true, sandbox: true },
         },
       };

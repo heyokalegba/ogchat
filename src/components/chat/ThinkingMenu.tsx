@@ -69,7 +69,7 @@ export function ThinkingMenu({ value, onChange, recommended, autoMeans }: Thinki
       <button
         ref={button}
         type="button"
-        className={`${styles.chip} ${value === "default" ? "" : styles.chipOn}`}
+        className={`${styles.thinkChip} ${value === "default" ? "" : styles.thinkChipOn}`}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`Thinking effort: ${name}. Press to change.`}
