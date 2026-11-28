@@ -1,9 +1,10 @@
 import { streamChat, type ProviderMessage } from "@/lib/provider/adapter";
 import { streamClaude, type ClaudeTool } from "@/lib/provider/claude";
 import path from "node:path";
-import { streamClaudeCode } from "./claudecode";
+import { codeSignIn, streamClaudeCode } from "./claudecode";
 import { dataDir } from "./paths";
 import { activeModel, codeSetup, type ResolvedSettings } from "./settings";
+import { paidByOf } from "@/lib/models";
 import type { RanOn } from "@/lib/types";
 
 /**
@@ -23,12 +24,18 @@ export function ranOnFor(settings: ResolvedSettings, reasoning?: string | null):
   const requested = activeModel(settings).model;
   const account =
     settings.provider === "compatible" ? null : settings.claudeAccountOn[settings.provider];
+  // A plan's usage or API tokens: for Claude Code that is a matter of how it is signed in.
+  const paidBy = paidByOf(
+    settings.provider,
+    settings.provider === "claudecode" ? codeSignIn(codeSetup(settings)) : null,
+  );
   return {
     provider: settings.provider,
     requested,
     model: requested,
     effort: effortSent(settings, reasoning),
     ...(account ? { account } : {}),
+    ...(paidBy ? { paidBy } : {}),
   };
 }
 

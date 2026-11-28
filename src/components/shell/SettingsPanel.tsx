@@ -298,9 +298,9 @@ export function SettingsPanel({ api, settings, onClose, onSaved }: SettingsPanel
             </div>
             <p className={styles.help}>
               {provider === "claude"
-                ? "Claude, from Anthropic, on your own API credit. With a GitHub token it can also read and change a repository you tie to a project."
+                ? "Claude, from Anthropic, through the API. Replies are paid for in API tokens, on your API key; your plan's usage limits are not touched. With a GitHub token it can also read and change a repository you tie to a project."
                 : provider === "claudecode"
-                  ? "Claude Code, the program on this computer, on the account it is signed in to in Terminal. It works in a real copy of a repository and can edit, run and commit."
+                  ? "Claude Code, the program on this computer, on the account it is signed in to in Terminal. Signed in to a Claude plan, replies count against that plan's usage limits and spend no API tokens. It works in a real copy of a repository and can edit, run and commit."
                   : "Any provider that speaks the OpenAI chat format, by its address, model id and key."}
             </p>
           </div>

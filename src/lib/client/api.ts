@@ -1,4 +1,5 @@
 import type {
+  CodeSignIn,
   ContextUse,
   Project,
   ProviderChoice,
@@ -114,6 +115,8 @@ export interface ChatApi {
   expand(id: string): Promise<{ session: Session; context: ContextUse }>;
   stop(id: string): Promise<void>;
   getSettings(): Promise<PublicSettings>;
+  /** How Claude Code is signed in on the account in use: to a plan, or to be billed in API tokens. */
+  getCodeSignIn(): Promise<CodeSignIn>;
   /** When this installation's street was first opened: what its wear is counted from. */
   getWorld(): Promise<{ builtAt: string }>;
   /** New York's weather at this moment, from the public weather service. */
@@ -310,6 +313,9 @@ export function createApi(base = "/api"): ChatApi {
     },
     async getSettings() {
       return (await data<{ settings: PublicSettings }>("/settings")).settings;
+    },
+    async getCodeSignIn() {
+      return (await data<{ signIn: CodeSignIn }>("/settings/sign-in")).signIn;
     },
     async saveSettings(update) {
       return (await data<{ settings: PublicSettings }>("/settings", body("PUT", update))).settings;

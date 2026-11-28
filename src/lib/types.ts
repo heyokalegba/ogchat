@@ -61,6 +61,28 @@ export interface RanOn {
   effort: string | null;
   /** Which Claude account it ran on, by name. Only set when there is more than one to be on. */
   account?: string;
+  /** What it was paid for with, where that is known: a Claude plan's usage, or API tokens. */
+  paidBy?: PaidBy;
+}
+
+/**
+ * What a reply from Claude is paid for with. "plan": it counts against a
+ * Claude subscription's usage limits (Claude Code, signed in to one). "api":
+ * it is billed by the token (an API key, or Claude Code signed in to the
+ * Anthropic Console).
+ */
+export type PaidBy = "plan" | "api";
+
+/** How Claude Code is signed in on the account in use. */
+export interface CodeSignIn {
+  /**
+   * "plan": to a Claude subscription. "api": to the Anthropic Console or with
+   * a key, billed by the token. "out": not signed in. "unknown": it would
+   * not say, or it is not installed.
+   */
+  state: PaidBy | "out" | "unknown";
+  /** Who it is signed in as, when it says. */
+  email: string | null;
 }
 
 /** Whether a provider is one of the two ways to Claude, rather than any other model. */

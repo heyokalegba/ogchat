@@ -589,6 +589,37 @@ far, since one account cannot resume another's session. Removing an account
 from the list leaves its folder on disk alone. Keys are kept in
 `data/settings.json` like the others, and are only ever shown masked.
 
+### Plan usage or API tokens: what a Claude chat is paid for with
+
+There are two ways to Claude here, and they are paid for differently:
+
+| The chat is on                            | Each reply                                                                                                  |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| **claude code**, signed in to a plan      | counts against that Claude plan's session and weekly usage limits. No API tokens are spent.                 |
+| **claude** (the API key in settings)      | is paid for in API tokens, from the credit on that key. The plan's usage limits are not touched.            |
+| **claude code**, signed in to the Console | is paid for in API tokens too: Claude Code was signed in with `claude auth login --console`, not to a plan. |
+
+ogchat says which it is in three places:
+
+- **At the top right of a Claude chat**, a label reads `uses your plan` or, in
+  amber, `uses api tokens`. Rest the pointer on it for the whole of it,
+  including who Claude Code is signed in as. It reads `not signed in`, in red,
+  when Claude Code has no sign-in on the account in use.
+- **In the model list** beneath the chat, the models are listed under
+  _Claude Code · uses your plan_ and _Claude API · uses API tokens_, so the
+  choice between the two is made knowingly.
+- **Beside each reply**, after the model's name: `plan usage` or
+  `API tokens`. This is recorded when the reply is written, so it stays true
+  of that reply after you switch.
+
+For Claude Code, ogchat asks the program itself (`claude auth status`) how the
+account in use is signed in, and asks again when you switch accounts. Claude
+Code is never handed the API key from settings, so a chat on it is always
+billed to its own sign-in. To move a Claude Code account from the Console to
+a plan, sign in again with `claude auth login`. How much of a plan's usage is
+left is not something Claude Code tells other programs: type `/usage` inside
+`claude` in Terminal, or look under Settings → Usage on claude.ai.
+
 ### Any OpenAI-compatible provider
 
 Three values: API base URL, API key, model id. Set them in either place:
@@ -1023,6 +1054,7 @@ still, with a few figures standing in it.
 | `DELETE /api/sessions/:id/messages/:messageId`   | Delete a user message and everything after it                                                                                                                                                                                                                             |
 | `POST /api/sessions/:id/stop`                    | Stop the reply in progress                                                                                                                                                                                                                                                |
 | `GET` / `PUT /api/settings`                      | Read (masked) / update provider settings: `baseUrl`, `model`, `apiKey`, `reasoning`, `systemPrompt`                                                                                                                                                                       |
+| `GET /api/settings/sign-in`                      | `{ signIn: { state, email } }`: how Claude Code is signed in on the account in use. `state` is `plan` (replies count against a Claude plan), `api` (the Console: API tokens), `out` or `unknown`                                                                          |
 | `POST /api/settings/test`                        | Try `{ baseUrl?, model?, apiKey? }` (or the current settings) against the provider without saving; returns `{ check }`                                                                                                                                                    |
 | `GET /api/world`                                 | `{ world: { builtAt } }`: when this street was first opened                                                                                                                                                                                                               |
 | `POST /api/sessions/:id/compress`                | `{ session, context }`: has the model summarise the conversation and keeps the summary with the session; waits for the model. `400 nothing_to_compress`, `409 busy`, `502` when the provider fails                                                                        |

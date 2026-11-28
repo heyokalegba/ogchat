@@ -5,7 +5,7 @@ import path from "node:path";
 import readline from "node:readline";
 import type { ProviderMessage } from "@/lib/provider/adapter";
 import { ProviderAbortedError, ProviderError } from "@/lib/provider/errors";
-import type { Environment } from "@/lib/types";
+import type { CodeSignIn, Environment } from "@/lib/types";
 import { workBranch } from "./github";
 import { workspaceFor } from "./workspace";
 
@@ -110,6 +110,44 @@ export function codeEnv(
   return env;
 }
 
+const SIGN_INS = new Map<string, { at: number; signIn: CodeSignIn }>();
+
+/**
+ * How Claude Code is signed in on an account: to a Claude plan, or to the
+ * Anthropic Console (billed in API tokens). That is what decides what a
+ * reply through it is paid for with. It is asked the program itself, and
+ * the answer is kept for a minute, since it is asked on every reply.
+ */
+export function codeSignIn(setup: CodeSetup, maxAgeMs = 60_000): CodeSignIn {
+  const unknown: CodeSignIn = { state: "unknown", email: null };
+  const bin = findClaudeCode(setup.path);
+  if (!bin) return unknown;
+  const key = `${bin}\n${setup.configDir?.trim() ?? ""}`;
+  const kept = SIGN_INS.get(key);
+  if (kept && Date.now() - kept.at < maxAgeMs) return kept.signIn;
+  let signIn = unknown;
+  try {
+    const run = spawnSync(/* turbopackIgnore: true */ bin, ["auth", "status", "--json"], {
+      env: codeEnv(setup) as unknown as NodeJS.ProcessEnv,
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+    const status = JSON.parse(run.stdout || "null") as Record<string, unknown> | null;
+    // An older version without this command says nothing that can be read: leave it unknown.
+    if (status && typeof status.loggedIn === "boolean") {
+      signIn = {
+        state: !status.loggedIn ? "out" : status.authMethod === "claude.ai" ? "plan" : "api",
+        email:
+          status.loggedIn && typeof status.email === "string" && status.email ? status.email : null,
+      };
+    }
+  } catch {
+    // it would not start, or said something else: unknown
+  }
+  SIGN_INS.set(key, { at: Date.now(), signIn });
+  return signIn;
+}
+
 /** Whether Claude Code is installed and signed in: for the settings test. */
 export function checkClaudeCode(setup: CodeSetup): { ok: boolean; detail: string } {
   const bin = findClaudeCode(setup.path);
@@ -147,11 +185,14 @@ export function checkClaudeCode(setup: CodeSetup): { ok: boolean; detail: string
       detail: `Found ${version}, but it is not signed in. In Terminal run: ${login}`,
     };
   }
-  const who = [status.email, status.orgName, status.subscriptionType]
+  const who = [status.email, status.orgName]
     .filter((part): part is string => typeof part === "string" && part.length > 0)
     .join(", ");
-  const how = status.authMethod === "api_key" ? " (with an API key, not a subscription)" : "";
-  return { ok: true, detail: `${version}, signed in${who ? ` as ${who}` : ""}${how}.` };
+  const paid =
+    status.authMethod === "claude.ai"
+      ? "Replies count against that plan's usage limits, not API tokens."
+      : "It is signed in to the Anthropic Console, not a plan: replies are paid for in API tokens.";
+  return { ok: true, detail: `${version}, signed in${who ? ` as ${who}` : ""}. ${paid}` };
 }
 
 // ------------------------------------------------------------- the chat's folder

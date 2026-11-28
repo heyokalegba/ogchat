@@ -1635,7 +1635,8 @@ button.chip:hover {
   border-bottom-style: solid;
 }
 
-.surface .modelPicker option {
+.surface .modelPicker option,
+.surface .modelPicker optgroup {
   color: #17171a;
   background: #ebe4d4;
 }
@@ -1876,7 +1877,8 @@ button.chip:hover {
   background: #f4f4f5;
 }
 
-:global([data-look="formal"]) .surface .modelPicker option {
+:global([data-look="formal"]) .surface .modelPicker option,
+:global([data-look="formal"]) .surface .modelPicker optgroup {
   color: #f4f4f5;
   background: #17181b;
 }

@@ -667,6 +667,38 @@
   border-color: rgba(246, 241, 230, 0.5);
 }
 
+/*
+ * What a chat on Claude is paid for with: a black label, plain for a plan's
+ * usage and amber for API tokens, which are the ones that cost by the reply.
+ */
+.paidBy {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border: var(--og-line) solid var(--og-ink);
+  background: var(--og-ink);
+  font-family: var(--og-font-mono);
+  font-size: calc(12.5px * var(--og-type));
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--og-on-dark);
+  cursor: help;
+}
+
+.paidLabel {
+  color: var(--og-on-dark-3);
+}
+
+.paidApi {
+  color: #e6c068;
+}
+
+.paidOut {
+  color: #f08a7b;
+}
+
 /* Which Claude account a Claude chat runs on: a black label with a list in it. */
 .accountPick {
   display: flex;
@@ -1012,7 +1044,11 @@
     padding: 0 12px;
   }
 
-  /* On a phone the page and scene switches live in the look panel, leaving room for the title. */
+  /*
+   * On a phone the page and scene switches live in the look panel, leaving
+   * room for the title; what a chat is paid for with is said beside each reply.
+   */
+  .topTools > .paidBy,
   .topTools > .sceneSwitch {
     display: none;
   }
@@ -1566,6 +1602,7 @@
 .shell[data-look="formal"] .topTitle,
 .shell[data-look="formal"] .lookButton,
 .shell[data-look="formal"] .accountPick,
+.shell[data-look="formal"] .paidBy,
 .shell[data-look="formal"] .menuButton {
   border: 1px solid var(--og-rule);
   background: #000000;

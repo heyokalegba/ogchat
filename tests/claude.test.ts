@@ -638,7 +638,13 @@ describe("Claude and a repository, through the app", () => {
       ),
     );
     const said = sent.filter((e) => e.type === "model").map((e) => e.ranOn);
-    const asked = { provider: "claude", requested: "claude-fable-5-2", effort: "xhigh" };
+    const asked = {
+      provider: "claude",
+      requested: "claude-fable-5-2",
+      effort: "xhigh",
+      // The API is paid for in API tokens, and each reply keeps that on record.
+      paidBy: "api",
+    };
     expect(said).toEqual([
       { ...asked, model: "claude-fable-5-2" },
       { ...asked, model: "claude-opus-5-5" },

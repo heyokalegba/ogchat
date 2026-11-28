@@ -29,8 +29,10 @@ import { shelterOf } from "@/lib/weather";
 import { trafficAt } from "./life";
 import { useAmbience } from "./useAmbience";
 import { useWeather } from "./useWeather";
+import { describePaidBy } from "@/lib/models";
 import {
   isClaudeProvider,
+  type CodeSignIn,
   type Environment,
   type Project,
   type PublicSettings,
@@ -574,6 +576,26 @@ export function AppShell() {
       // not remembered: the page settles a moment later next time
     }
   }, [model]);
+  // What the chat on screen is paid for with: a Claude plan's usage, or API
+  // tokens. For Claude Code that is a matter of how it is signed in on the
+  // account in use, so it is asked again whenever the account changes.
+  const [codeSignIn, setCodeSignIn] = useState<CodeSignIn | null>(null);
+  const codeFound = settings?.claudeCode.found ?? false;
+  const codeHome = settings
+    ? `${settings.claude.account}\n${settings.claudeCode.configDir}\n${settings.claudeCode.path}`
+    : "";
+  useEffect(() => {
+    if (!codeFound) return setCodeSignIn(null);
+    let live = true;
+    api.getCodeSignIn().then(
+      (signIn) => live && setCodeSignIn(signIn),
+      () => live && setCodeSignIn(null),
+    );
+    return () => {
+      live = false;
+    };
+  }, [api, codeFound, codeHome]);
+  const paid = model && provider?.ready ? describePaidBy(model.provider, codeSignIn) : null;
   // The Claude accounts there are to switch between, when there is more than one.
   const accounts = settings && settings.claude.accounts.length > 1 ? settings.claude.accounts : [];
   const onAccountChange = useCallback(
@@ -693,6 +715,18 @@ export function AppShell() {
                 </select>
               </label>
             )}
+            {paid && (
+              <span
+                className={`${styles.paidBy} ${
+                  paid.kind === "plan" ? "" : paid.kind === "api" ? styles.paidApi : styles.paidOut
+                }`}
+                title={paid.full}
+                aria-label={paid.full}
+              >
+                {paid.kind !== "out" && <span className={styles.paidLabel}>uses</span>}
+                {paid.label}
+              </span>
+            )}
             <div
               className={`${styles.sceneSwitch} ${styles.pageSwitch}`}
               role="group"
@@ -764,6 +798,7 @@ export function AppShell() {
               provider={provider}
               models={settings?.choices}
               model={model}
+              codeSignIn={codeSignIn}
               onModelChange={onModelChange}
               startModel={startModel}
               startReasoning={startReasoning}

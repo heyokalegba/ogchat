@@ -4,7 +4,7 @@
  * reply says it was written by), so both always say the same thing.
  */
 
-import type { ProviderChoice, RanOn, ReasoningEffort } from "./types";
+import type { CodeSignIn, PaidBy, ProviderChoice, RanOn, ReasoningEffort } from "./types";
 
 /** Current Claude models, for the settings panel and the chat picker. Any other id can be typed. */
 export const CLAUDE_MODELS = [
@@ -124,6 +124,72 @@ export const PROVIDER_NAMES: Record<ProviderChoice, string> = {
 
 const isFullId = (id: string) => /^claude-/.test(id);
 
+/**
+ * What a chat on a provider is paid for with. The Claude API is always API
+ * tokens. Claude Code is whatever it is signed in to: a plan, or the Console
+ * (API tokens). Null where it is not known, or is no business of Claude's.
+ */
+export function paidByOf(provider: ProviderChoice, signIn: CodeSignIn | null): PaidBy | null {
+  if (provider === "claude") return "api";
+  if (provider !== "claudecode") return null;
+  return signIn?.state === "plan" || signIn?.state === "api" ? signIn.state : null;
+}
+
+/** What each is called beside a reply. */
+export const PAID_BY_NAMES: Record<PaidBy, string> = { plan: "plan usage", api: "API tokens" };
+
+/**
+ * What the chat on screen draws on, for the label at the top of it: a word
+ * or two, and the whole of it for the tooltip. Null where there is nothing
+ * to say (another provider, or Claude Code has not said how it is signed in).
+ */
+export function describePaidBy(
+  provider: ProviderChoice,
+  signIn: CodeSignIn | null,
+): { kind: PaidBy | "out"; label: string; full: string } | null {
+  if (provider === "claude") {
+    return {
+      kind: "api",
+      label: "api tokens",
+      full: "This chat is on the Claude API. Each reply is paid for in API tokens, on the API key in settings. Your plan's usage limits are not touched.",
+    };
+  }
+  if (provider !== "claudecode" || !signIn) return null;
+  const who = signIn.email ? `, signed in as ${signIn.email}` : "";
+  if (signIn.state === "plan") {
+    return {
+      kind: "plan",
+      label: "your plan",
+      full: `This chat is on Claude Code${who}, on a Claude plan. Each reply counts against that plan's session and weekly limits. No API tokens are spent.`,
+    };
+  }
+  if (signIn.state === "api") {
+    return {
+      kind: "api",
+      label: "api tokens",
+      full: `This chat is on Claude Code${who}, through the Anthropic Console and not a plan. Each reply is paid for in API tokens.`,
+    };
+  }
+  if (signIn.state === "out") {
+    return {
+      kind: "out",
+      label: "not signed in",
+      full: "Claude Code is not signed in on this account. In Terminal run: claude auth login",
+    };
+  }
+  return null;
+}
+
+/** The same, as a line of a reply's tooltip. */
+function paidLine(provider: ProviderChoice, paidBy: PaidBy): string {
+  if (paidBy === "plan") {
+    return "Paid for by: your Claude plan. It counts against the plan's usage limits; no API tokens are spent.";
+  }
+  return provider === "claudecode"
+    ? "Paid for in: API tokens. Claude Code is signed in to the Anthropic Console, not a plan."
+    : "Paid for in: API tokens, on the Claude API key. Your plan's usage limits are not touched.";
+}
+
 /** What Auto came to: the model's own default, where it is known. */
 function autoLine(provider: ProviderChoice, model: string): string {
   if (provider === "claudecode") {
@@ -141,10 +207,13 @@ const shortName = (id: string) => modelName(id).replace(/^Claude /, "");
  * A reply's model and thinking level, as a short line to show beside it
  * ("Fable 5.2 · think: high", "Claude Code · Fable 5.1 · think: auto") and as
  * a few full sentences for its tooltip. Where there are several Claude
- * accounts, both also say which one it ran on.
+ * accounts, both also say which one it ran on; and for a reply from Claude,
+ * what it was paid for with: a plan's usage, or API tokens.
  */
 export function describeRanOn(ranOn: RanOn): { short: string; full: string } {
   const { provider, requested, model, effort, account } = ranOn;
+  // A reply through the Claude API was paid for in API tokens, whether or not it was written down.
+  const paidBy = ranOn.paidBy ?? (provider === "claude" ? "api" : null);
   // Claude Code's "default" or an alias, not yet resolved to a model.
   const unresolved = provider === "claudecode" && !isFullId(model);
   const name = unresolved
@@ -158,6 +227,8 @@ export function describeRanOn(ranOn: RanOn): { short: string; full: string } {
   const short = [
     provider === "claudecode" ? "Claude Code" : "",
     swapped ? `${name} (in place of ${shortName(requested)})` : name,
+    // Ahead of the rest, so it is still there when a narrow window cuts the line short.
+    paidBy ? PAID_BY_NAMES[paidBy] : "",
     think,
     account ? `account: ${account}` : "",
   ]
@@ -174,6 +245,7 @@ export function describeRanOn(ranOn: RanOn): { short: string; full: string } {
       : "",
     `Through: ${PROVIDER_NAMES[provider]}.`,
     account ? `Account: ${account}.` : "",
+    paidBy ? paidLine(provider, paidBy) : "",
     effort
       ? `Thinking: ${effortName(effort)} (sent as effort "${effort}").`
       : autoLine(provider, model),

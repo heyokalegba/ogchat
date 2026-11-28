@@ -6,12 +6,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { POST as sendMessage } from "@/app/api/sessions/[id]/messages/route";
 import { POST as createSession } from "@/app/api/sessions/route";
 import { GET as getSettings, PUT as putSettings } from "@/app/api/settings/route";
+import { GET as getSignIn } from "@/app/api/settings/sign-in/route";
 import { POST as testSettings } from "@/app/api/settings/test/route";
 import {
   codeBriefing,
   codeEnv,
   codeFolder,
   codePrompt,
+  codeSignIn,
   findClaudeCode,
   streamClaudeCode,
   type CodeSetup,
@@ -65,6 +67,23 @@ describe("finding Claude Code", () => {
     expect(findClaudeCode(FAKE)).toBe(FAKE);
     expect(findClaudeCode("/nowhere/claude")).toBeNull();
     expect(findClaudeCode(__dirname)).toBeNull(); // a folder is not a program
+  });
+});
+
+describe("how Claude Code is signed in", () => {
+  it("is to a plan, to the Console, or not at all, and unknown when the program is not there", () => {
+    expect(codeSignIn(setup(), 0)).toEqual({ state: "plan", email: "someone@example.com" });
+    expect(codeSignIn(setup({ configDir: "/tmp/ogchat-console" }), 0)).toMatchObject({
+      state: "api",
+    });
+    expect(codeSignIn(setup({ configDir: "/tmp/ogchat-signed-out" }), 0)).toEqual({
+      state: "out",
+      email: null,
+    });
+    expect(codeSignIn(setup({ path: "/nowhere/claude" }), 0)).toEqual({
+      state: "unknown",
+      email: null,
+    });
   });
 });
 
@@ -361,7 +380,12 @@ describe("Claude Code, through the app", () => {
       ).check;
     const ok = await check({ provider: "claudecode" });
     expect(ok.ok).toBe(true);
-    expect(ok.steps[0]!.detail).toBe("9.9.9 (Claude Code), signed in as someone@example.com, max.");
+    expect(ok.steps[0]!.detail).toBe(
+      "9.9.9 (Claude Code), signed in as someone@example.com. Replies count against that plan's usage limits, not API tokens.",
+    );
+    const tokens = await check({ provider: "claudecode", claudeCodeConfigDir: "~/console" });
+    expect(tokens.ok).toBe(true);
+    expect(tokens.steps[0]!.detail).toContain("replies are paid for in API tokens");
     const out = await check({ provider: "claudecode", claudeCodeConfigDir: "~/signed-out" });
     expect(out.ok).toBe(false);
     expect(out.steps[0]!.detail).toContain("CLAUDE_CONFIG_DIR=~/signed-out claude auth login");
@@ -405,6 +429,8 @@ describe("Claude Code, through the app", () => {
         requested: "sonnet",
         model: "claude-sonnet-5-5",
         effort: "max",
+        // It is signed in to a plan, so the reply counted against that and not API tokens.
+        paidBy: "plan",
       },
     });
     await send(session.id, "and again");
@@ -427,6 +453,30 @@ describe("Claude Code, through the app", () => {
     expect(three.args).not.toContain("--resume");
     expect(three.typed).toContain("<user>\nhello\n</user>");
     expect(three.typed.endsWith("third")).toBe(true);
+  });
+
+  it("tells the page how the account in use is signed in, and so what a chat on it is paid for with", async () => {
+    const asked = async () =>
+      ((await (await getSignIn(req("GET", "/api/settings/sign-in"))).json()) as { signIn: unknown })
+        .signIn;
+    await putSettings(
+      req("PUT", "/api/settings", {
+        provider: "claudecode",
+        claudeCodePath: FAKE,
+        claudeAccounts: [{ id: "a-console", name: "tokens", configDir: "/tmp/ogchat-console" }],
+      }),
+    );
+    expect(await asked()).toEqual({ state: "plan", email: "someone@example.com" });
+    await putSettings(req("PUT", "/api/settings", { claudeAccount: "a-console" }));
+    expect(await asked()).toMatchObject({ state: "api" });
+    // And a reply on that account is recorded as paid for in API tokens.
+    const { session } = (await (await createSession(req("POST", "/api/sessions"))).json()) as {
+      session: Session;
+    };
+    const done = (await send(session.id, "hello")).at(-1) as {
+      message: { ranOn: { paidBy?: string } };
+    };
+    expect(done.message.ranOn.paidBy).toBe("api");
   });
 
   it("runs on the account that is switched to, and does not carry one account's session to another", async () => {
