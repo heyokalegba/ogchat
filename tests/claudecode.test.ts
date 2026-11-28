@@ -429,6 +429,45 @@ describe("Claude Code, through the app", () => {
     expect(three.typed.endsWith("third")).toBe(true);
   });
 
+  it("runs on the account that is switched to, and does not carry one account's session to another", async () => {
+    const runs = logged();
+    const home = path.join(temp(), "work-home");
+    await putSettings(
+      req("PUT", "/api/settings", {
+        provider: "claudecode",
+        claudeCodePath: FAKE,
+        claudeAccounts: [{ id: "a-work", name: "work", configDir: home }],
+      }),
+    );
+    const { session } = (await (await createSession(req("POST", "/api/sessions"))).json()) as {
+      session: Session;
+    };
+    const said = async (content: string) =>
+      (
+        (await send(session.id, content)).at(-1) as {
+          message: { ranOn: { account?: string } };
+        }
+      ).message.ranOn.account;
+
+    expect(await said("hello")).toBe("main");
+    expect(await said("again")).toBe("main");
+    await putSettings(req("PUT", "/api/settings", { claudeAccount: "a-work" }));
+    expect(await said("now from work")).toBe("work");
+    expect(await said("and once more")).toBe("work");
+
+    const [one, two, three, four] = runs();
+    expect(one!.env.CLAUDE_CONFIG_DIR).toBeUndefined();
+    expect(two!.args.join(" ")).toContain("--resume sess-5");
+    // Another account cannot resume the first one's session: the chat is retold to it.
+    expect(three!.env.CLAUDE_CONFIG_DIR).toBe(home);
+    expect(three!.args).not.toContain("--resume");
+    expect(three!.typed).toContain("<user>\nhello\n</user>");
+    expect(three!.typed.endsWith("now from work")).toBe(true);
+    // From then on it carries on with its own.
+    expect(four!.env.CLAUDE_CONFIG_DIR).toBe(home);
+    expect(four!.args.join(" ")).toMatch(/--resume sess-\d+/);
+  });
+
   it("shows a plain message in the chat when Claude Code is not signed in", async () => {
     await putSettings(
       req("PUT", "/api/settings", { provider: "claudecode", claudeCodePath: FAKE }),

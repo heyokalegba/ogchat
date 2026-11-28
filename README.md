@@ -523,14 +523,9 @@ newest)_ and the other aliases are whatever the installed Claude Code takes
 them to mean, which can lag behind: an older Claude Code takes `fable` to be
 Fable 5.1. Either way the reply says which model Claude Code actually used.
 
-**A second account.** Claude Code keeps one sign-in per folder (`~/.claude`
-by default). To use another account in ogchat without disturbing the one you
-use in Terminal, put a folder name under **Account folder** in settings, such
-as `~/.claude-work`, and sign in to it once:
-
-```bash
-CLAUDE_CONFIG_DIR=~/.claude-work claude auth login
-```
+**More than one account.** See [Switching between Claude accounts](#switching-between-claude-accounts)
+below: each account is a sign-in folder of its own, and a list at the top of a
+Claude chat switches between them.
 
 **What it may do** is set in settings: _look only_ (plan mode: read and
 search), _edit files_ (the default), _edit files and run commands_, or _auto_
@@ -559,6 +554,41 @@ context meter do not apply: Claude Code manages its own context. Images
 attached to a message are not passed on. Its usage counts against the plan of
 the account it is signed in to, under that account's terms.
 
+### Switching between Claude accounts
+
+ogchat starts with one Claude account, called _main_: the sign-in Claude Code
+already has in Terminal, and the API key in settings. To add another, open
+settings, choose **claude** or **claude code**, and press **add an account**
+beside _Claude account_. An account is either or both of:
+
+- **A sign-in of Claude Code's.** Claude Code keeps one sign-in per folder
+  (`~/.claude` by default), so a second account gets a folder of its own, such
+  as `~/.claude-work`. Put it under **Account folder** and sign in to it once:
+
+  ```bash
+  CLAUDE_CONFIG_DIR=~/.claude-work claude auth login
+  ```
+
+  **test** then says who that folder is signed in as.
+
+- **An API key** (and its workspace id, if it needs one), for chats on
+  _claude_.
+
+What an added account has none of its own, it shares with the main one: an
+account with only a sign-in folder still uses the main API key, and one with
+only a key still uses the main sign-in. Give each a name you will know it by
+(_personal_, _work_); the main one can be renamed too.
+
+**Switching.** Once there is more than one, a Claude chat has an **account**
+list at the top right. Whichever is chosen there (or saved in settings) is the
+one every Claude chat uses from the next message on; it is one switch for the
+whole app, not one per chat. Each reply then says which account it ran on
+(`account: work`) beside its model. A Claude Code chat that moves to another
+account starts a fresh Claude Code session there and is told what was said so
+far, since one account cannot resume another's session. Removing an account
+from the list leaves its folder on disk alone. Keys are kept in
+`data/settings.json` like the others, and are only ever shown masked.
+
 ### Any OpenAI-compatible provider
 
 Three values: API base URL, API key, model id. Set them in either place:
@@ -585,6 +615,17 @@ The **plain** button at the top right (also under _page_ in the look panel)
 turns ogchat into black text on a white page: no city, no wall, no colour
 behind the words, for long stretches of focused work. Text size and sidebar
 width still apply. **scene** brings everything back as it was.
+
+### Formal: white on black, for chats on Claude
+
+A chat on Claude or Claude Code is shown **formal**: white text on a black
+page in thin grey rules, with no city, no wall and no colour to speak of. A
+chat on any other model keeps the scene (or the plain page), so the two are
+told apart at a glance; in the sidebar a Claude chat also carries a small
+**C**. The **formal** button at the top right of a Claude chat turns this off
+and on, as does _claude chats_ under _page_ in the look panel: _like the rest_
+shows Claude chats the way every other chat is shown. Text size and sidebar
+width still apply.
 
 ### Thinking, web search and a system prompt
 

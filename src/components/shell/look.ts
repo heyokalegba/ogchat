@@ -14,6 +14,12 @@ export interface Look {
    * when it is switched off again.
    */
   plain: boolean;
+  /**
+   * The page behind a chat on Claude or Claude Code. "formal" is white text
+   * on a black page, so those chats are told apart at a glance from chats on
+   * any other model; "same" shows them like the rest.
+   */
+  claudePage: "formal" | "same";
   scene: SceneId;
   /** Milliseconds the scene's clock runs ahead of (or behind) the real one. 0 is real time. */
   clockOffsetMs: number;
@@ -58,8 +64,18 @@ export interface Look {
   textColorOpen: string;
 }
 
+/** What is behind a chat: the scene and its wall, black on white, or white on black. */
+export type Page = "scene" | "plain" | "formal";
+
+/** The page a chat is shown on, given whether it is a chat on Claude. */
+export function pageFor(look: Look, claude: boolean): Page {
+  if (claude && look.claudePage === "formal") return "formal";
+  return look.plain ? "plain" : "scene";
+}
+
 export const DEFAULT_LOOK: Look = {
   plain: false,
+  claudePage: "formal",
   scene: "skyline",
   clockOffsetMs: 0,
   date: "",
@@ -115,12 +131,14 @@ const HEX = /^#[0-9a-f]{6}$/i;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const DAY_MS = 86_400_000;
 
-function clean(value: unknown): Look {
+/** A look as it was stored, with anything missing or out of range put right. */
+export function cleanLook(value: unknown): Look {
   const raw = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
   const number = (v: unknown, fallback: number) =>
     typeof v === "number" && Number.isFinite(v) ? v : fallback;
   return {
     plain: raw.plain === true,
+    claudePage: raw.claudePage === "same" ? "same" : "formal",
     scene:
       typeof raw.scene === "string" && raw.scene in SCENES
         ? (raw.scene as SceneId)
@@ -177,7 +195,7 @@ function clean(value: unknown): Look {
 
 export function loadLook(): Look {
   try {
-    return clean(JSON.parse(window.localStorage.getItem(KEY) ?? "{}"));
+    return cleanLook(JSON.parse(window.localStorage.getItem(KEY) ?? "{}"));
   } catch {
     return DEFAULT_LOOK; // storage unavailable or unreadable: the defaults are fine
   }
@@ -210,8 +228,28 @@ function lightness(color: string): number {
  * wall hidden the text sits on buildings and sky, so the halo is made much
  * stronger: a solid outline first, then the soft glow.
  */
-export function lookVariables(look: Look): Record<string, string> {
-  if (look.plain) {
+export function lookVariables(
+  look: Look,
+  page: Page = look.plain ? "plain" : "scene",
+): Record<string, string> {
+  if (page === "formal") {
+    // White on black: as with plain, only the text size and sidebar width still apply.
+    return {
+      "--og-sidebar": `${look.sidebarWidth}px`,
+      "--og-type": (look.textSize / 100).toFixed(2),
+      "--og-input-bg": "#0c0c0e",
+      "--og-input-ink": "#f4f4f5",
+      "--og-input-dim": "rgba(244, 244, 245, 0.5)",
+      "--og-input-accent": "#f4f4f5",
+      "--og-wall-opacity": "1",
+      "--og-wall-light": "1",
+      "--og-scene-veil": "0",
+      "--og-wall-text": "#f4f4f5",
+      "--og-halo-rgb": "0, 0, 0",
+      "--og-halo": "none",
+    };
+  }
+  if (page === "plain") {
     // Black on white: the text size and sidebar width still apply; nothing else does.
     return {
       "--og-sidebar": `${look.sidebarWidth}px`,

@@ -1674,6 +1674,226 @@ button.chip:hover {
   box-shadow: 3px 3px 0 #000000;
 }
 
+/* ---------------------------------------------------------------- formal */
+
+/*
+ * Formal: white on black, in thin rules and no colour to speak of. The shell
+ * shows a chat on Claude this way (unless the look panel says otherwise), so
+ * it is told apart at a glance from a chat on any other model.
+ *
+ * The tokens are turned over here, on the chat surface only: what was ink is
+ * light and what was paper is black, so every rule above that pairs the two
+ * still reads. The shell around it and the panels over it keep their own.
+ */
+:global([data-look="formal"]) .surface {
+  --og-ink: #ececee;
+  --og-white: #0b0b0c;
+  --og-brick: #000000;
+  --og-text: #f4f4f5;
+  --og-text-2: #b4b4ba;
+  --og-text-3: #8c8c93;
+  --og-on-dark: #0b0b0c;
+  --og-on-dark-2: rgba(11, 11, 12, 0.8);
+  --og-on-dark-3: rgba(11, 11, 12, 0.6);
+  --og-accent: #f4f4f5;
+  --og-accent-bright: #cfcfd4;
+  --og-accent-on-dark: #0b0b0c;
+  --og-green: #a9cbb2;
+  --og-blue: #a9c0d6;
+  --og-yellow: #1b1b1e;
+  --og-blue-pale: #17181b;
+  --og-line: 1px;
+  --og-shadow: none;
+  --og-shadow-s: none;
+  --og-wall-text: #f4f4f5;
+  --og-halo: none;
+  /* The thin rule round a sheet, a box or a table. */
+  --og-rule: #34343a;
+}
+
+:global([data-look="formal"]) .surface::before {
+  background-image: none;
+  background-color: #000000;
+  filter: none;
+  opacity: 1;
+}
+
+:global([data-look="formal"]) .surface * {
+  scrollbar-color: rgba(244, 244, 245, 0.35) transparent;
+}
+
+/* No strips of paper behind the small print: it is written on the page. */
+:global([data-look="formal"]) .messages .tag,
+:global([data-look="formal"]) .messages .time,
+:global([data-look="formal"]) .messages .modelNote,
+:global([data-look="formal"]) .messages .action,
+:global([data-look="formal"]) .hintKeys,
+:global([data-look="formal"]) .status,
+:global([data-look="formal"]) .thinkingNote,
+:global([data-look="formal"]) .summaryLabel,
+:global([data-look="formal"]) .summaryNote,
+:global([data-look="formal"]) .queueNote {
+  background: transparent;
+}
+
+:global([data-look="formal"]) .surface .action:hover,
+:global([data-look="formal"]) .surface .statusButton:hover {
+  color: var(--og-white);
+  background: var(--og-ink);
+}
+
+/* Sheets and boxes: a shade off black, inside a thin grey rule. */
+:global([data-look="formal"]) .userPlate,
+:global([data-look="formal"]) .thought,
+:global([data-look="formal"]) .summaryBody,
+:global([data-look="formal"]) .queueItem,
+:global([data-look="formal"]) .tableWrap,
+:global([data-look="formal"]) .codeBlock,
+:global([data-look="formal"]) .notice,
+:global([data-look="formal"]) .editor,
+:global([data-look="formal"]) .inputPanel,
+:global([data-look="formal"]) .md img {
+  border-color: var(--og-rule);
+  box-shadow: none;
+}
+
+:global([data-look="formal"]) .userPlate {
+  padding: 5px 11px 6px;
+}
+
+:global([data-look="formal"]) .thought,
+:global([data-look="formal"]) .summaryBody {
+  background: #101012;
+}
+
+:global([data-look="formal"]) .thoughtBody {
+  border-top-color: var(--og-rule);
+}
+
+/* The boot line and the thinking level: quiet labels, not white blocks. */
+:global([data-look="formal"]) .bootLabel {
+  border: 1px solid var(--og-rule);
+  color: var(--og-text-2);
+  background: #101012;
+}
+
+:global([data-look="formal"]) .bootCaret {
+  background: #f4f4f5;
+}
+
+:global([data-look="formal"]) .surface .thinkChip {
+  border: 1px solid #8c8c93;
+}
+
+:global([data-look="formal"]) .thinkMenu {
+  border-color: #8c8c93;
+}
+
+:global([data-look="formal"]) .inputPanel:focus-within,
+:global([data-look="formal"]) .editor {
+  border-color: #8c8c93;
+  box-shadow: none;
+}
+
+:global([data-look="formal"]) .surface .button:active:not(:disabled) {
+  box-shadow: none;
+}
+
+/* Something went wrong is still said in red, the one colour kept. */
+:global([data-look="formal"]) .tagError,
+:global([data-look="formal"]) .thinkWarning,
+:global([data-look="formal"]) .meter[data-level="now"] .meterAdvice,
+:global([data-look="formal"]) .meter[data-level="full"] .meterAdvice {
+  color: #f08a7b;
+}
+
+:global([data-look="formal"]) .notice:not(.noticeQuiet) {
+  border-left-color: #f08a7b;
+}
+
+:global([data-look="formal"]) .meter[data-level="now"] .meterFill,
+:global([data-look="formal"]) .meter[data-level="full"] .meterFill {
+  background: #f08a7b;
+}
+
+:global([data-look="formal"]) .meter[data-level="soon"] .meterFill {
+  background: #d9b665;
+}
+
+:global([data-look="formal"]) .meter[data-level="soon"] .meterAdvice {
+  color: #d9b665;
+}
+
+:global([data-look="formal"]) .meterBar {
+  border-color: var(--og-rule);
+  background: rgba(244, 244, 245, 0.1);
+}
+
+:global([data-look="formal"]) .dropOverlay {
+  border-width: 1px;
+  background: rgba(0, 0, 0, 0.86);
+}
+
+:global([data-look="formal"]) .editorInput::placeholder {
+  color: #8c8c93;
+}
+
+:global([data-look="formal"]) .surface .send:disabled {
+  color: rgba(244, 244, 245, 0.45);
+  background: rgba(244, 244, 245, 0.12);
+}
+
+:global([data-look="formal"]) .md hr {
+  border-top: 1px solid var(--og-rule);
+}
+
+:global([data-look="formal"]) .md :not(pre) > code {
+  border-color: var(--og-rule);
+  background: rgba(244, 244, 245, 0.08);
+}
+
+:global([data-look="formal"]) .md th,
+:global([data-look="formal"]) .md td {
+  border-bottom-color: var(--og-rule);
+}
+
+/* A block of code is dark in every look: its bar keeps light lettering. */
+:global([data-look="formal"]) .codeBar {
+  color: rgba(244, 244, 245, 0.58);
+}
+
+:global([data-look="formal"]) .surface .codeBar .action {
+  color: rgba(244, 244, 245, 0.8);
+}
+
+:global([data-look="formal"]) .surface .codeBar .action:hover,
+:global([data-look="formal"]) .surface .codeBar .actionDone {
+  color: #0b0b0c;
+  background: #f4f4f5;
+}
+
+:global([data-look="formal"]) .streaming .md > .codeBlock:last-child code::after {
+  background: #f4f4f5;
+}
+
+:global([data-look="formal"]) .surface .modelPicker option {
+  color: #f4f4f5;
+  background: #17181b;
+}
+
+:global([data-look="formal"]) .viewerScrim {
+  background: rgba(0, 0, 0, 0.72);
+}
+
+:global([data-look="formal"]) .viewer {
+  border-color: #8c8c93;
+}
+
+:global([data-look="formal"]) .viewerHead,
+:global([data-look="formal"]) .viewerFoot {
+  border-color: var(--og-rule);
+}
+
 /* ---------------------------------------------------------------- queue */
 
 /* Messages written while a reply was coming, waiting their turn above the box. */

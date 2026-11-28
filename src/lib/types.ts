@@ -59,6 +59,13 @@ export interface RanOn {
   model: string;
   /** The thinking level sent with it; null when none was sent and the model chose. */
   effort: string | null;
+  /** Which Claude account it ran on, by name. Only set when there is more than one to be on. */
+  account?: string;
+}
+
+/** Whether a provider is one of the two ways to Claude, rather than any other model. */
+export function isClaudeProvider(provider: ProviderChoice | null | undefined): boolean {
+  return provider === "claude" || provider === "claudecode";
 }
 
 /**
@@ -173,6 +180,25 @@ export interface ContextUse {
 
 export type KeySource = "settings" | "env";
 
+/** The id of the Claude account every install has. The others have ids of their own. */
+export const MAIN_ACCOUNT = "main";
+
+/**
+ * A Claude account ogchat can be switched to. An account is a sign-in of
+ * Claude Code's (a folder of its own on this computer), an API key, or both.
+ * What an added account does not have of its own, it shares with the main one.
+ */
+export interface ClaudeAccount {
+  id: string;
+  name: string;
+  /** Where Claude Code keeps this account's sign-in. "" for none of its own. */
+  configDir: string;
+  /** Its API key, masked as every key is. */
+  key: { set: boolean; masked: string | null; source: KeySource | null };
+  /** The workspace id sent with its key. "" for none. */
+  workspace: string;
+}
+
 /** What the browser is allowed to know about the provider configuration. */
 export interface PublicSettings {
   baseUrl: string;
@@ -203,6 +229,9 @@ export interface PublicSettings {
     workspace: string;
     /** The models the settings panel offers. Any other id can be typed. */
     models: { id: string; label: string }[];
+    /** The account in use (the key and workspace above are its own), and every account: the main one first. */
+    account: string;
+    accounts: ClaudeAccount[];
   };
   /** The GitHub token Claude's repository tools use (masked). */
   github: { set: boolean; masked: string | null; source: KeySource | null };

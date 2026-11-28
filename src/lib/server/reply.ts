@@ -21,11 +21,14 @@ export function effortSent(settings: ResolvedSettings, reasoning?: string | null
 /** What a turn is about to be sent to, before the provider has said anything. */
 export function ranOnFor(settings: ResolvedSettings, reasoning?: string | null): RanOn {
   const requested = activeModel(settings).model;
+  const account =
+    settings.provider === "compatible" ? null : settings.claudeAccountOn[settings.provider];
   return {
     provider: settings.provider,
     requested,
     model: requested,
     effort: effortSent(settings, reasoning),
+    ...(account ? { account } : {}),
   };
 }
 

@@ -51,6 +51,19 @@ export interface SettingsUpdate {
   claudeCodePermission?: "plan" | "edit" | "run" | "auto";
   claudeCodeConfigDir?: string;
   claudeCodePath?: string;
+  /** The name of the main Claude account. */
+  claudeMainName?: string;
+  /** Every Claude account besides the main one. The list replaces the saved one. */
+  claudeAccounts?: {
+    id: string;
+    name: string;
+    configDir: string;
+    workspace: string;
+    /** A string saves a new key, null removes the saved one, omitted leaves it. */
+    key?: string | null;
+  }[];
+  /** The account to use: "main" or another one's id. */
+  claudeAccount?: string;
 }
 
 export interface ChatApi {

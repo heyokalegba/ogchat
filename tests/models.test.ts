@@ -108,4 +108,14 @@ describe("what a reply says it was written by", () => {
     expect(pinned.short).toBe("Claude Code · Fable 5.2 · think: auto");
     expect(pinned.full).not.toContain("Chosen by");
   });
+
+  it("names the account, where there is more than one", () => {
+    const one = { provider: "claudecode", requested: "opus", model: "claude-opus-5-5" } as const;
+    const { short, full } = describeRanOn({ ...one, effort: "high", account: "work" });
+    expect(short).toBe("Claude Code · Opus 5.5 · think: high · account: work");
+    expect(full).toContain("Through: Claude Code.\nAccount: work.");
+    const single = describeRanOn({ ...one, effort: "high" });
+    expect(single.short).not.toContain("account");
+    expect(single.full).not.toContain("Account");
+  });
 });
