@@ -609,23 +609,27 @@ defaults:
 attached images are refused by the provider. Text files and PDFs are fine,
 because ogchat sends those as text.
 
-### Plain: black on white
+### The page: scene, black on white, or white on black
 
-The **plain** button at the top right (also under _page_ in the look panel)
-turns ogchat into black text on a white page: no city, no wall, no colour
-behind the words, for long stretches of focused work. Text size and sidebar
-width still apply. **scene** brings everything back as it was.
+The switch at the top right, **scene · plain · formal** (also under _page_ in
+the look panel), picks what is behind the chat:
 
-### Formal: white on black, for chats on Claude
+- **scene** is the city and the wall.
+- **plain** is black text on a white page.
+- **formal** is white text on a black page, in thin grey rules.
 
-A chat on Claude or Claude Code is shown **formal**: white text on a black
-page in thin grey rules, with no city, no wall and no colour to speak of. A
-chat on any other model keeps the scene (or the plain page), so the two are
-told apart at a glance; in the sidebar a Claude chat also carries a small
-**C**. The **formal** button at the top right of a Claude chat turns this off
-and on, as does _claude chats_ under _page_ in the look panel: _like the rest_
-shows Claude chats the way every other chat is shown. Text size and sidebar
-width still apply.
+Plain and formal have no city, no wall and no colour to speak of behind the
+words, for long stretches of focused work. Text size and sidebar width still
+apply, and **scene** brings everything back as it was.
+
+### Chats on Claude have a page of their own
+
+The page is kept twice: once for chats on Claude and Claude Code, and once for
+chats on any other model. Chats on Claude start out **formal** and the rest on
+the **scene**, so the two are told apart at a glance; in the sidebar a Claude
+chat also carries a small **C**. The switch at the top right changes the page
+for the kind of chat that is on screen, and the look panel has both: _page_
+for the rest, and _claude chats_.
 
 ### Thinking, web search and a system prompt
 

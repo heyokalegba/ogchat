@@ -44,7 +44,16 @@ import { EnvironmentsPanel } from "./EnvironmentsPanel";
 import { WorkBar } from "./WorkBar";
 import { SCENES, type SceneId } from "./art";
 import { Backdrop } from "./Backdrop";
-import { DEFAULT_LOOK, loadLook, lookVariables, pageFor, saveLook, type Look } from "./look";
+import {
+  DEFAULT_LOOK,
+  PAGES,
+  loadLook,
+  lookVariables,
+  pageChange,
+  pageFor,
+  saveLook,
+  type Look,
+} from "./look";
 import { LookPanel } from "./LookPanel";
 import { ProjectPanel } from "./ProjectPanel";
 import { SettingsPanel } from "./SettingsPanel";
@@ -552,7 +561,7 @@ export function AppShell() {
     return { ready, model: model.model };
   }, [settings, model]);
   // A chat on Claude or Claude Code is told apart from one on any other model:
-  // it has a page of its own (white on black, unless the look panel says otherwise).
+  // it has a page of its own (white on black, until another is picked for it).
   const onClaude = model ? isClaudeProvider(model.provider) : wasClaude;
   const page = pageFor(look, onClaude);
   useEffect(() => {
@@ -684,38 +693,24 @@ export function AppShell() {
                 </select>
               </label>
             )}
-            {onClaude && (
-              <button
-                type="button"
-                className={`${styles.lookButton} ${page === "formal" ? styles.lookButtonOpen : ""}`}
-                aria-pressed={page === "formal"}
-                title={
-                  page === "formal"
-                    ? "Chats on Claude are shown white on black. Click to show them like every other chat"
-                    : "Formal: show chats on Claude white on black, apart from the rest"
-                }
-                onClick={() =>
-                  changeLook({ claudePage: look.claudePage === "formal" ? "same" : "formal" })
-                }
-              >
-                formal
-              </button>
-            )}
-            {page !== "formal" && (
-              <button
-                type="button"
-                className={`${styles.lookButton} ${look.plain ? styles.lookButtonOpen : ""}`}
-                aria-pressed={look.plain}
-                title={
-                  look.plain
-                    ? "Back to the scene and the wall"
-                    : "Plain: black text on white, nothing behind it, for focused work"
-                }
-                onClick={() => changeLook({ plain: !look.plain, chatShown: true })}
-              >
-                {look.plain ? "scene" : "plain"}
-              </button>
-            )}
+            <div
+              className={`${styles.sceneSwitch} ${styles.pageSwitch}`}
+              role="group"
+              aria-label={onClaude ? "Page for chats on Claude" : "Page"}
+            >
+              {PAGES.map((choice) => (
+                <button
+                  key={choice.id}
+                  type="button"
+                  className={`${styles.sceneButton} ${choice.id === page ? styles.sceneActive : ""}`}
+                  aria-pressed={choice.id === page}
+                  title={`${choice.hint}, for ${onClaude ? "chats on Claude" : "chats on any other model"}`}
+                  onClick={() => changeLook(pageChange(onClaude, choice.id))}
+                >
+                  {choice.label}
+                </button>
+              ))}
+            </div>
             {page === "scene" && (
               <div className={styles.sceneSwitch} role="group" aria-label="Scene">
                 {SCENE_IDS.map((id) => (
