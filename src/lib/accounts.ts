@@ -36,6 +36,24 @@ export function nextAccountColor(taken: readonly (string | null | undefined)[]):
 }
 
 /**
+ * The letters each account is marked with, in the order the names are given.
+ * Colour alone does not tell two accounts apart on a screen set to greyscale,
+ * or to an eye that does not see the colours, so the mark carries a letter as
+ * well: the first of the account's name. Where two names start alike, each of
+ * them gets a number after it, in the order they are listed: W1, W2.
+ */
+export function accountTags(names: readonly string[]): string[] {
+  const letters = names.map((name) => (/[\p{L}\p{N}]/u.exec(name)?.[0] ?? "?").toUpperCase());
+  const seen = new Map<string, number>();
+  return letters.map((letter) => {
+    if (letters.filter((one) => one === letter).length === 1) return letter;
+    const nth = (seen.get(letter) ?? 0) + 1;
+    seen.set(letter, nth);
+    return `${letter}${nth}`;
+  });
+}
+
+/**
  * Which account a reply ran on, as far as it says. Null for a reply that was
  * not from Claude. A reply from Claude that names no account was written
  * when there was only the one, so it stands for the main account.

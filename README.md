@@ -288,10 +288,20 @@ with its own Dock icon. Three ways, the first being the real thing:
   port of its own (3311), and shows it;
   quitting the app stops the server. Your chats, settings and key stay where
   they are, in the project's `data/` and `.env.local`, so the app and the
-  browser see the same conversations. Updating the project updates what the app shows, the next time it is
-  opened. The app itself (its icon, and the small launcher inside it) is only
-  remade by running `npm run mac` again and replacing the copy in
-  Applications; that is also what to do after moving the project folder. The
+  browser see the same conversations.
+
+  **Updating** is two steps: bring the project up to date (`git pull`), then
+  quit the app and open it again. Nothing else: no server to stop by hand, and
+  no app to build again. On opening, the app sees that the project has
+  changed and builds it, and the build stops any server of this project still
+  running from before (on the app's ports only), so the app starts a new one
+  on the new build instead of showing the old ogchat. Quitting waits until
+  the app's own server has stopped. The launcher inside the app is taken from
+  the project too (`electron/main.cjs`), so fixes to it arrive the same way.
+  `npm run mac` is only needed again for a new icon or a newer Electron, or
+  after moving the project folder; an app built before this was written
+  starts taking its launcher from the project once it has been built again.
+  The
   server runs under the Node the app was built with, so nothing extra shows in
   the Dock while it runs; if that Node has since gone, the app falls back to
   the runtime inside itself. The look
@@ -629,21 +639,27 @@ far, since one account cannot resume another's session. Removing an account
 from the list leaves its folder on disk alone. Keys are kept in
 `data/settings.json` like the others, and are only ever shown masked.
 
-**Colours.** Once there is more than one account, each has a colour, so that
-a chat on one is told from a chat on another at a glance:
+**Marks.** Once there is more than one account, each has a mark, so that a
+chat on one is told from a chat on another at a glance. A mark is a letter on
+a colour. The letter is the first of the account's name (**P** for personal,
+**W** for work; two that start alike become **W1** and **W2**, in the order
+they are listed), and it is there so the mark still works where the colour
+does not show: on a screen set to greyscale, in print, or to an eye that does
+not see the colours. The mark is drawn:
 
-- in the list of chats, the **C** beside a Claude chat is filled with the
-  colour of the account its latest reply ran on (hover it for the name);
-- beside each reply, a dot in the colour of the account that reply ran on, so
-  a chat that moved from one account to another shows where;
-- at the top of a Claude chat, a dot in the **account** list in the colour of
-  the account the next reply will run on.
+- in the list of chats, in the box beside a Claude chat, for the account its
+  latest reply ran on (hover it for the name);
+- before each reply's model, for the account that reply ran on, so a chat
+  that moved from one account to another shows where;
+- at the top of a Claude chat, in the **account** list, for the account the
+  next reply will run on.
 
 The first account is blue, the next green, then violet, and so on. To give an
 account another colour, pick it in settings under **its colour**, below the
-account's name. An account keeps its colour when it is renamed or when
-another is removed. A reply written before there was a second account counts
-as the main account's.
+account's name; its mark is shown beside the colours as it will look. An
+account keeps its colour when it is renamed or when another is removed; its
+letter follows its name. A reply written before there was a second account
+counts as the main account's.
 
 ### Plan usage or API tokens: what a Claude chat is paid for with
 

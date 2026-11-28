@@ -1,9 +1,10 @@
 /**
  * Builds ogchat.app. Run on the Mac it is for:  npm run mac  (from the project).
  *
- * The app is a thin shell: Electron plus two small scripts. It runs the
- * project where it lives, so the app is built once and keeps working through
- * updates to the project; only moving the project folder needs a rebuild.
+ * The app is a thin shell: Electron plus three small scripts. It runs the
+ * project where it lives, and takes its own launcher from there too (see
+ * app.cjs), so the app is built once and keeps working through updates to
+ * the project; only moving the project folder needs a rebuild.
  */
 const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
@@ -57,7 +58,7 @@ async function main() {
     icon: icns(),
     extraResource: [note],
     prune: true,
-    // Only the two scripts and package.json go in; the builder itself stays out.
+    // Only the three scripts and package.json go in; the builder itself stays out.
     ignore: [/^\/build\.cjs$/, /^\/node_modules/, /^\/package-lock\.json$/],
     quiet: true,
   });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ACCOUNT_COLORS, colorHex, nextAccountColor } from "@/lib/accounts";
+import { ACCOUNT_COLORS, accountTags, colorHex, nextAccountColor } from "@/lib/accounts";
 import { ApiError, type ChatApi } from "@/lib/client/api";
 import {
   MAIN_ACCOUNT,
@@ -372,6 +372,21 @@ export function SettingsPanel({ api, settings, onClose, onSaved, onHelp }: Setti
                 />
               </div>
               {accounts.length > 1 && (
+                <div className={styles.accountColors}>
+                  <span className={styles.accountColorsLabel}>its mark</span>
+                  <span
+                    className={styles.accountTag}
+                    style={{ background: colorHex(account.color) }}
+                    data-account={account.id}
+                  >
+                    {accountTags(accounts.map((one) => one.name))[accounts.indexOf(account)]}
+                  </span>
+                  <span className={styles.accountMarkNote}>
+                    the first letter of its name, on its colour
+                  </span>
+                </div>
+              )}
+              {accounts.length > 1 && (
                 <div
                   className={styles.accountColors}
                   role="radiogroup"
@@ -394,6 +409,7 @@ export function SettingsPanel({ api, settings, onClose, onSaved, onHelp }: Setti
                       />
                     );
                   })}
+                  <span className={styles.accountColorsLabel}>{account.color}</span>
                 </div>
               )}
               <p className={styles.help}>
@@ -401,8 +417,8 @@ export function SettingsPanel({ api, settings, onClose, onSaved, onHelp }: Setti
                   <>
                     The account chosen here is the one every Claude chat uses once you save. You can
                     also switch with <code>account</code> at the top of a Claude chat. Each reply
-                    says which account it ran on, and carries its colour, as does the chat in the
-                    list.
+                    says which account it ran on, and carries its mark (its letter, on its colour),
+                    as does the chat in the list.
                   </>
                 ) : (
                   <>

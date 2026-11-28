@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "ogchat as a desktop app: a window of its own around the local server.",
-  "main": "main.cjs",
+  "main": "app.cjs",
   "scripts": {
     "start": "electron .",
     "build": "node build.cjs"

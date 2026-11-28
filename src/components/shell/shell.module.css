@@ -270,7 +270,13 @@
 }
 
 /* With more than one Claude account: filled with the colour of the one the chat last ran on. */
+/* With more than one account the box carries the account's letter, on its colour. */
 .itemAccount {
+  width: auto;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 2px;
+  font-size: 10.5px;
   color: #111114;
 }
 
@@ -747,13 +753,28 @@
   color: var(--og-on-dark-3);
 }
 
-/* The colour of the account in use: the same one its chats and replies carry. */
-.accountDot {
+/*
+ * The mark of the account in use, the same one its chats and replies carry:
+ * its letter, on its colour. The letter is what tells accounts apart where
+ * the colour does not show, and the rule round it keeps a pale mark in sight
+ * on a white page.
+ */
+.accountTag {
   flex: none;
-  width: 10px;
-  height: 10px;
+  display: grid;
+  place-items: center;
+  min-width: 16px;
+  height: 16px;
   margin-left: 6px;
-  border-radius: 50%;
+  padding: 0 3px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+  font-family: var(--og-font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  color: #111114;
+  text-shadow: none;
 }
 
 .shell .accountSelect {
@@ -1248,6 +1269,16 @@
   align-items: center;
   gap: 8px;
   margin-top: 10px;
+}
+
+/* The mark as it will be drawn, above the colours to pick from, and what its letter is. */
+.accountColors .accountTag {
+  margin: 0;
+}
+
+.accountMarkNote {
+  font-size: calc(12.5px * var(--og-type));
+  opacity: 0.75;
 }
 
 .accountColorsLabel {

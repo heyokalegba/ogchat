@@ -321,6 +321,7 @@ describe("Claude accounts", () => {
           id: "main",
           name: "main",
           color: "blue",
+          tag: "M",
           configDir: "",
           key: { set: false, masked: null, source: null },
           workspace: "",
@@ -357,6 +358,21 @@ describe("Claude accounts", () => {
       ["a-side", "teal"],
       ["a-work", "blue"],
     ]);
+    // Each has a letter as well, from its name as it is now, for where colour does not show.
+    expect(restarted.settings.publicSettings().claude.accounts.map((one) => one.tag)).toEqual([
+      "M",
+      "S",
+      "T",
+    ]);
+    expect(
+      settings
+        .updateSettings({ claudeMainName: "site", claudeAccounts: [side] })
+        .claude.accounts.map((one) => one.tag),
+    ).toEqual(["S1", "S2"]);
+    settings.updateSettings({
+      claudeMainName: "main",
+      claudeAccounts: [side, { ...work, name: "the office" }],
+    });
     for (const bad of [
       { claudeMainColor: "#ff0000" },
       { claudeAccounts: [{ ...side, color: 3 }] },

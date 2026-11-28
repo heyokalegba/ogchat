@@ -236,6 +236,8 @@ export interface ClaudeAccount {
   configDir: string;
   /** The colour its chats are marked with: one of ACCOUNT_COLORS, by id. */
   color: string;
+  /** The letters its chats are marked with, for where colour does not show: "W", or "W2". */
+  tag: string;
   /** Its API key, masked as every key is. */
   key: { set: boolean; masked: string | null; source: KeySource | null };
   /** The workspace id sent with its key. "" for none. */
